@@ -281,9 +281,9 @@ export function selectBestSpyTarget(bot: Player, opponents: Player[]): Player | 
     if (knownCount === 0) score += 4.0;
     if (knownCount === 1) score += 1.5;
 
-    // Leader priority
-    if (opp.favor >= 5) score += 6.0;
-    else if (opp.favor >= 3) score += 3.0;
+    // Leader priority (close to 5 crowns)
+    if (opp.favor >= 4) score += 6.0;
+    else if (opp.favor >= 2) score += 3.0;
 
     // Wealthy priority
     if (opp.gold >= 4) score += 2.0;
@@ -300,6 +300,45 @@ export function selectBestSpyTarget(bot: Player, opponents: Player[]): Player | 
 }
 
 /**
+ * Evaluates which card a bot Spy should take from target's hand, or null to draw from deck
+ */
+export function evaluateBotSpyTake(bot: Player, targetCards: Role[]): number | null {
+  if (!targetCards || targetCards.length === 0) return null;
+  const c0 = targetCards[0];
+  const c1 = targetCards[1];
+
+  const getCardValue = (role?: Role): number => {
+    if (!role) return -1;
+    let val = 1;
+    if (role === 'Наследник') val = bot.favor >= 3 ? 10 : 7;
+    if (role === 'Шантажист') val = 7;
+    if (role === 'Казначей') val = 6;
+    if (role === 'Рыцарь') val = 5;
+    if (role === 'Вор') val = 4;
+    if (role === 'Интриган') val = 4;
+    if (role === 'Шут') val = 3;
+    if (role === 'Шпион') val = 2;
+    if (bot.hand.includes(role)) val -= 3;
+    return val;
+  };
+
+  const v0 = getCardValue(c0);
+  const v1 = getCardValue(c1);
+
+  if (c0 === 'Наследник') return 0;
+  if (c1 === 'Наследник') return 1;
+
+  if (v0 >= 5 && v0 >= v1) return 0;
+  if (v1 >= 5 && v1 > v0) return 1;
+
+  if (Math.max(v0, v1) >= 4) {
+    return v0 >= v1 ? 0 : 1;
+  }
+
+  return null;
+}
+
+/**
  * Evaluates target for "Интриган" (Intriguer - forces target to reshuffle and redraw BOTH cards)
  * Prioritizes leaders (to destroy their held Heir/Knight), players known to hold Heir/Treasurer, or highest favor.
  */
@@ -313,9 +352,9 @@ export function selectBestIntriguerTarget(bot: Player, opponents: Player[]): Pla
   for (const opp of aliveOpponents) {
     let score = 2.0;
 
-    // Leader disruption: extreme priority if close to victory (5+ crowns)
-    if (opp.favor >= 6) score += 12.0;
-    else if (opp.favor >= 4) score += 6.0;
+    // Leader disruption: extreme priority if close to victory (4+ crowns)
+    if (opp.favor >= 4) score += 12.0;
+    else if (opp.favor >= 3) score += 6.0;
     else if (opp.favor >= 2) score += 2.0;
 
     // Known cards check: if known to hold Heir or Knight, shuffle them away!
@@ -335,7 +374,7 @@ export function selectBestIntriguerTarget(bot: Player, opponents: Player[]): Pla
 }
 
 /**
- * Evaluates target for "📜 Распустить слух" (Rumor - normal action, 6 gold for -1 crown on target)
+ * Evaluates target for "📜 Распустить слух" (Rumor - normal action, 5 gold for -1 crown on target)
  */
 export function selectBestRumorTarget(opponents: Player[]): Player | null {
   const withCrowns = opponents.filter(p => p.reputation > 0 && p.favor > 0);
@@ -361,8 +400,8 @@ export interface DoubtDecision {
  * - Exact card counting (hand + discard pile + known cards via Spy: max 3 per deck)
  * - Strict third-party action filtering (bots ignore actions targeted at other players unless 2+ copies known or game-winning threat)
  * - 1 HP Survival Mode (strict caution: no speculative checks, only 100% proof or existential win-prevention)
- * - Existential threat ("Бросок на амбразуру" when someone attempts a game-winning 7th crown or coronation win)
- * - Win threat & tempo progression (leader with 5 crowns claiming Heir or Treasurer)
+ * - Existential threat ("Бросок на амбразуру" when someone attempts a game-winning 5th crown or coronation win)
+ * - Win threat & tempo progression (leader with 4 crowns claiming Heir or Treasurer)
  * - Consecutive role claims / spam detection
  */
 export function evaluateBotDoubt(
@@ -408,16 +447,16 @@ export function evaluateBotDoubt(
   // --------------------------------------------------------------------------
   // SCENARIO 2: "БРОСОК НА АМБРАЗУРУ" — EXISTENTIAL GAME-WINNING THREAT
   // --------------------------------------------------------------------------
-  // If actor reaching 7 crowns or completing coronation means instant loss for everyone:
+  // If actor reaching 5 crowns or completing coronation means instant loss for everyone:
   const isWinningAction =
-    (claimedRole === 'Наследник' && actor.favor >= 6) ||
-    (claimedRole === 'Шантажист' && actor.favor >= 6) ||
+    (claimedRole === 'Наследник' && actor.favor >= 4) ||
+    (claimedRole === 'Шантажист' && actor.favor >= 4) ||
     (actor.id === coronationCandidateId);
 
   if (isWinningAction && !isBlockClaim) {
     // Inaction = 100% defeat for all other players.
-    // Even at 1 HP, bot MUST jump to stop the win!
-    const winStopScore = totalKnownExcluded >= 1 ? 0.96 : 0.88;
+    // Even at 1 HP, bot MUST jump to stop the win (since check cancels action!)
+    const winStopScore = totalKnownExcluded >= 1 ? 0.98 : 0.92;
     return {
       shouldDoubt: Math.random() < winStopScore,
       score: winStopScore,
@@ -476,8 +515,8 @@ export function evaluateBotDoubt(
     // Allowed only for:
     // 1) Guaranteed bluff (handled in Scenario 1: totalKnownExcluded >= 3)
     // 2) Existential win (handled in Scenario 2: isWinningAction)
-    // 3) Extreme stakes: Leader with 5 crowns claiming Heir/Treasurer AND bot has 2 copies known (totalKnownExcluded === 2)
-    if (totalKnownExcluded === 2 && actor.favor >= 5 && (claimedRole === 'Наследник' || claimedRole === 'Казначей')) {
+    // 3) Extreme stakes: Leader with 4 crowns claiming Heir/Treasurer AND bot has 2 copies known (totalKnownExcluded === 2)
+    if (totalKnownExcluded === 2 && actor.favor >= 4 && (claimedRole === 'Наследник' || claimedRole === 'Казначей')) {
       const desperateCheckScore = 0.35 * archetype.doubtAggression;
       const shouldDoubt = Math.random() < desperateCheckScore;
       return {
@@ -512,8 +551,8 @@ export function evaluateBotDoubt(
     score *= 0.80; // Measured caution
   }
 
-  // Self-preservation when bot itself is leading (5-6 crowns)
-  if (bot.favor >= 5 && totalKnownExcluded < 2) {
+  // Self-preservation when bot itself is leading (4+ crowns)
+  if (bot.favor >= 4 && totalKnownExcluded < 2) {
     score *= 0.60;
   }
 
@@ -521,19 +560,19 @@ export function evaluateBotDoubt(
   let tacticalBonus = 0;
   const consecutiveUsage = botMemory.getConsecutiveRoleClaims(actor.id, claimedRole);
 
-  // 1. Leader at 5 crowns claiming Heir (+1 crown -> 6 crowns, 1 step from win!)
-  if (actor.favor >= 5 && claimedRole === 'Наследник') {
-    tacticalBonus += 0.35;
+  // 1. Leader at 4 crowns claiming Heir (+1 crown -> 5 crowns, instant win!)
+  if (actor.favor >= 4 && claimedRole === 'Наследник') {
+    tacticalBonus += 0.40;
   }
 
-  // 2. Leader at 5 crowns claiming Treasurer (+3 gold -> feast/rumor threat)
-  if (actor.favor >= 5 && claimedRole === 'Казначей') {
+  // 2. Leader at 4 crowns claiming Treasurer (+3 gold -> feast/rumor threat)
+  if (actor.favor >= 4 && claimedRole === 'Казначей') {
     tacticalBonus += 0.30;
   }
 
-  // 3. Leader at 4+ crowns claiming Blackmailer or Thief
-  if (actor.favor >= 4 && (claimedRole === 'Шантажист' || claimedRole === 'Вор')) {
-    tacticalBonus += 0.20;
+  // 3. Leader at 3+ crowns claiming Blackmailer or Thief
+  if (actor.favor >= 3 && (claimedRole === 'Шантажист' || claimedRole === 'Вор')) {
+    tacticalBonus += 0.25;
   }
 
   // 4. Opponent with high gold (4+ gold) using economic roles
@@ -556,7 +595,7 @@ export function evaluateBotDoubt(
   if (archetype.type === 'opportunist') archetypeMod = 1.30;
   if (archetype.type === 'provocateur') archetypeMod = 1.15;
   if (archetype.type === 'gambler') archetypeMod = 1.10;
-  if (archetype.type === 'cautious') archetypeMod = actor.favor >= 5 ? 0.90 : 0.35;
+  if (archetype.type === 'cautious') archetypeMod = actor.favor >= 4 ? 0.90 : 0.35;
 
   score += tacticalBonus * archetypeMod;
 
@@ -724,10 +763,10 @@ export function startBotEngine() {
               }
             } else if (pendingAction.roleClaim === 'Шантажист') {
               // Blackmailer steals 1 crown
-              if (attacker.favor >= 6) {
-                // Attacker reaching 7 crowns = instant win -> bot MUST contest!
+              if (attacker.favor >= 4) {
+                // Attacker reaching 5 crowns = instant win -> bot MUST contest!
                 fakeDuelChance = target.reputation === 1 ? 0.75 : 0.90;
-              } else if (target.favor >= 5) {
+              } else if (target.favor >= 4) {
                 // Protecting bot's own victory lead
                 if (target.reputation === 1) fakeDuelChance = 0.30;
                 else if (target.reputation === 2) fakeDuelChance = 0.65;
@@ -827,10 +866,10 @@ export function makeBotMove(botId: string) {
   const leader = [...opponents].sort((a, b) => b.favor - a.favor)[0];
 
   // --------------------------------------------------------------------------
-  // PRIORITY 1: IMMEDIATE WIN / CLOSING MOVE (6 Crowns -> 7th Crown)
-  // (Note: The 7th crown CANNOT be bought via Feast, only Наследник or Шантажист!)
+  // PRIORITY 1: IMMEDIATE WIN / CLOSING MOVE (4 Crowns -> 5th Crown)
+  // (Note: The 5th crown CANNOT be bought via Feast, only Наследник or Шантажист!)
   // --------------------------------------------------------------------------
-  if (bot.favor >= 6) {
+  if (bot.favor >= 4) {
     // 1. If bot holds "Наследник" -> claim Heir!
     if (bot.hand.includes('Наследник')) {
       useGameStore.getState().performAction({
@@ -839,13 +878,13 @@ export function makeBotMove(botId: string) {
         roleClaim: 'Наследник',
         actorId: bot.id,
         costGold: 0,
-        description: 'Заявляет «Наследник» и берет победную 7-ю 👑 (Коронация)!'
+        description: 'Заявляет «Наследник» и берет победную 5-ю 👑 (Коронация)!'
       });
       return;
     }
 
-    // 2. If bot holds "Шантажист" and has 2+ gold -> steal 7th crown!
-    if (bot.gold >= 2 && bot.hand.includes('Шантажист')) {
+    // 2. If bot holds "Шантажист" (free now!) -> steal 5th crown!
+    if (bot.hand.includes('Шантажист')) {
       const target = selectBestBlackmailerTarget(bot, opponents);
       if (target) {
         useGameStore.getState().performAction({
@@ -854,20 +893,20 @@ export function makeBotMove(botId: string) {
           roleClaim: 'Шантажист',
           actorId: bot.id,
           targetId: target.id,
-          costGold: 2,
-          description: `Шантажирует ${target.name} и крадет победную 7-ю 👑!`
+          costGold: 0,
+          description: `Шантажирует ${target.name} и крадет победную 5-ю 👑!`
         });
         return;
       }
     }
 
-    // 3. Smart closing bluff: Heir (or Blackmailer if 2 gold)
+    // 3. Smart closing bluff: Heir (or Blackmailer)
     let closingBluffChance = 0.65;
     if (bot.reputation === 1) closingBluffChance = 0.25; // Careful at 1 HP
     if (bot.reputation === 3) closingBluffChance = 0.85;
 
     if (Math.random() < closingBluffChance) {
-      if (bot.gold >= 2 && Math.random() < 0.4) {
+      if (Math.random() < 0.45) {
         const target = selectBestBlackmailerTarget(bot, opponents);
         if (target) {
           useGameStore.getState().performAction({
@@ -876,8 +915,8 @@ export function makeBotMove(botId: string) {
             roleClaim: 'Шантажист',
             actorId: bot.id,
             targetId: target.id,
-            costGold: 2,
-            description: `Заявляет «Шантажист» против ${target.name} на 7-ю 👑!`
+            costGold: 0,
+            description: `Заявляет «Шантажист» против ${target.name} на 5-ю 👑!`
           });
           return;
         }
@@ -889,7 +928,7 @@ export function makeBotMove(botId: string) {
         roleClaim: 'Наследник',
         actorId: bot.id,
         costGold: 0,
-        description: 'Заявляет «Наследник» на победную 7-ю 👑!'
+        description: 'Заявляет «Наследник» на победную 5-ю 👑!'
       });
       return;
     }
@@ -898,10 +937,10 @@ export function makeBotMove(botId: string) {
   // --------------------------------------------------------------------------
   // PRIORITY 2: CRITICAL LEADER DISRUPTION
   // --------------------------------------------------------------------------
-  // If leader has 6+ crowns or is coronation candidate, stop them!
-  if (leader && leader.favor >= 6) {
-    // If bot has 6 gold, use Rumor to strip 1 crown!
-    if (bot.gold >= 6) {
+  // If leader has 4+ crowns or is coronation candidate, stop them!
+  if (leader && leader.favor >= 4) {
+    // If bot has 5 gold, use Rumor to strip 1 crown!
+    if (bot.gold >= 5) {
       const rumorTarget = selectBestRumorTarget(opponents);
       if (rumorTarget) {
         useGameStore.getState().performAction({
@@ -909,15 +948,15 @@ export function makeBotMove(botId: string) {
           name: '📜 Распустить слух',
           actorId: bot.id,
           targetId: rumorTarget.id,
-          costGold: 6,
-          description: `Заплатил 6 💰: ${rumorTarget.name} теряет 1 👑.`
+          costGold: 5,
+          description: `Заплатил 5 💰: ${rumorTarget.name} теряет 1 👑.`
         });
         return;
       }
     }
 
-    // If bot has 2+ gold and holds "Шантажист", steal the crown from leader!
-    if (bot.gold >= 2 && bot.hand.includes('Шантажист')) {
+    // If bot holds "Шантажист", steal the crown from leader!
+    if (bot.hand.includes('Шантажист')) {
       const target = selectBestBlackmailerTarget(bot, opponents);
       if (target) {
         useGameStore.getState().performAction({
@@ -926,7 +965,7 @@ export function makeBotMove(botId: string) {
           roleClaim: 'Шантажист',
           actorId: bot.id,
           targetId: target.id,
-          costGold: 2,
+          costGold: 0,
           description: `Шантажирует ${target.name}: отнимает 1 👑!`
         });
         return;
@@ -935,11 +974,28 @@ export function makeBotMove(botId: string) {
   }
 
   // --------------------------------------------------------------------------
-  // PRIORITY 3: FEAST (Normal Action: 3 Gold -> +1 Crown, MAX 6 CROWNS!)
+  // PRIORITY 2.5: REPUTATION RECOVERY (Normal Action: 5 Gold -> +1 ❤️, Max 3 ❤️)
   // --------------------------------------------------------------------------
-  // Can only buy up to 6 crowns. Cannot buy the 7th crown!
-  const feastChance = bot.favor >= 4 ? 0.65 : 0.40;
-  if (bot.favor < 6 && bot.gold >= 3 && Math.random() < feastChance) {
+  if (bot.reputation < 3 && bot.gold >= 5) {
+    const healChance = bot.reputation === 1 ? 0.85 : 0.40;
+    if (Math.random() < healChance) {
+      useGameStore.getState().performAction({
+        type: 'normal',
+        name: '❤️ Восстановить репутацию',
+        actorId: bot.id,
+        costGold: 5,
+        description: 'Заплатил 5 💰 и восстановил 1 ❤️ репутации.'
+      });
+      return;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // PRIORITY 3: FEAST (Normal Action: 3 Gold -> +1 Crown, MAX 4 CROWNS!)
+  // --------------------------------------------------------------------------
+  // Can only buy up to 4 crowns. Cannot buy the 5th crown!
+  const feastChance = bot.favor >= 3 ? 0.65 : 0.40;
+  if (bot.favor < 4 && bot.gold >= 3 && Math.random() < feastChance) {
     useGameStore.getState().performAction({
       type: 'normal',
       name: '🍷 Устроить пир',
@@ -953,7 +1009,7 @@ export function makeBotMove(botId: string) {
   // --------------------------------------------------------------------------
   // PRIORITY 4: HIGH GOLD RUMOR ON LEADER
   // --------------------------------------------------------------------------
-  if (bot.gold >= 6 && leader && leader.favor >= 3) {
+  if (bot.gold >= 5 && leader && leader.favor >= 2) {
     const rumorTarget = selectBestRumorTarget(opponents);
     if (rumorTarget) {
       useGameStore.getState().performAction({
@@ -961,8 +1017,8 @@ export function makeBotMove(botId: string) {
         name: '📜 Распустить слух',
         actorId: bot.id,
         targetId: rumorTarget.id,
-        costGold: 6,
-        description: `Заплатил 6 💰: ${rumorTarget.name} теряет 1 👑.`
+        costGold: 5,
+        description: `Заплатил 5 💰: ${rumorTarget.name} теряет 1 👑.`
       });
       return;
     }
@@ -993,7 +1049,7 @@ export function makeBotMove(botId: string) {
       return;
     }
 
-    if (handRoles.includes('Шантажист') && bot.gold >= 2) {
+    if (handRoles.includes('Шантажист')) {
       const target = selectBestBlackmailerTarget(bot, opponents);
       if (target) {
         useGameStore.getState().performAction({
@@ -1002,7 +1058,7 @@ export function makeBotMove(botId: string) {
           roleClaim: 'Шантажист',
           actorId: bot.id,
           targetId: target.id,
-          costGold: 2,
+          costGold: 0,
           description: `Шантажирует ${target.name}: отнимает 1 👑!`
         });
         return;
@@ -1070,7 +1126,6 @@ export function makeBotMove(botId: string) {
           roleClaim: 'Шпион',
           actorId: bot.id,
           targetId: target.id,
-          targetCardIndex: Math.floor(Math.random() * 2),
           costGold: 0,
           description: `Шпионит за картами ${target.name}.`
         });
@@ -1100,15 +1155,15 @@ export function makeBotMove(botId: string) {
   // --------------------------------------------------------------------------
   let bluffChance = archetype.bluffRate;
   if (bot.reputation === 1) bluffChance = 0.03; // Extremely safe: barely any bluffing at 1 HP!
-  if (bot.favor >= 5 && bot.reputation === 1) bluffChance = 0.01; // Protect lead at 1 HP!
+  if (bot.favor >= 4 && bot.reputation === 1) bluffChance = 0.01; // Protect lead at 1 HP!
 
   if (Math.random() < bluffChance) {
     // Choose an intelligent bluff role
     const possibleBluffs: Role[] = [];
 
-    if (bot.favor >= 4) possibleBluffs.push('Наследник');
+    if (bot.favor >= 3) possibleBluffs.push('Наследник');
     if (bot.gold < 3) possibleBluffs.push('Казначей', 'Рыцарь', 'Шут');
-    if (bot.gold >= 2 && leader && leader.favor > 0) possibleBluffs.push('Шантажист');
+    if (leader && leader.favor > 0) possibleBluffs.push('Шантажист');
     
     const richest = selectBestThiefTarget(bot, opponents);
     if (richest && richest.gold >= 2) possibleBluffs.push('Вор');
@@ -1131,7 +1186,7 @@ export function makeBotMove(botId: string) {
       }
     }
 
-    if (chosenBluff === 'Шантажист' && bot.gold >= 2) {
+    if (chosenBluff === 'Шантажист') {
       const target = selectBestBlackmailerTarget(bot, opponents);
       if (target) {
         useGameStore.getState().performAction({
@@ -1140,7 +1195,7 @@ export function makeBotMove(botId: string) {
           roleClaim: 'Шантажист',
           actorId: bot.id,
           targetId: target.id,
-          costGold: 2,
+          costGold: 0,
           description: `Заявляет «Шантажист» против ${target.name}.`
         });
         return;

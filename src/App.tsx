@@ -217,10 +217,10 @@ export default function App() {
         {/* Center Coronation Goal Progress Banner */}
         <div className="coronation-status-banner cinzel-font">
           <div className="coronation-goal-text">
-            <span>👑 ЦЕЛЬ: 7 КОРОН</span>
+            <span>👑 ЦЕЛЬ: 5 КОРОН</span>
           </div>
-          <div className="crown-segments-track" title="Для победы наберите 7 корон Благосклонности короля">
-            {Array.from({ length: 7 }).map((_, i) => (
+          <div className="crown-segments-track" title="Для победы наберите 5 корон Благосклонности короля">
+            {Array.from({ length: 5 }).map((_, i) => (
               <div 
                 key={i} 
                 className={`crown-segment ${(human?.favor ?? 0) > i ? 'filled' : ''}`}

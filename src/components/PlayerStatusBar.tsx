@@ -59,7 +59,7 @@ export function PlayerStatusBar({ player, isActive }: PlayerStatusBarProps) {
           <div className="res-pill crown-res">
             <span>👑</span>
             <span className="res-val">{player.favor}</span>
-            <span className="res-label">/ 7 корон</span>
+            <span className="res-label">/ 5 корон</span>
           </div>
 
           {/* Gold */}

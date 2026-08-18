@@ -92,8 +92,7 @@ export interface DuelOutcome {
 export interface SpyPeekData {
   actorId: string;
   targetId: string;
-  cardIndex: number;
-  seenRole: Role;
+  targetCards: Role[];
 }
 
 export interface FloatingResourceEvent {
@@ -161,7 +160,7 @@ export interface GameState {
   closeDuelOutcome: () => void;
 
   // Spy & outcome actions
-  completeSpyAction: (swapMyCard: boolean, myCardIndexToSwap?: number) => void;
+  completeSpyAction: (takeCardIndex: number | null) => void;
   closeRevealOutcome: () => void;
   
   endTurn: () => void;

@@ -82,8 +82,8 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
     borderColor: '#c084fc',
     artImage: '/cards/spy.jpg',
     bottomIcon: '👁️',
-    shortDescription: 'Посмотрите 1 карту игрока. Можно заменить свою.',
-    fullDescription: 'Выберите игрока и одну из его карт. Только вы увидите ее. После этого можете заменить одну свою карту на случайную из колоды.',
+    shortDescription: 'Посмотреть ОБЕ карты игрока и взять одну себе.',
+    fullDescription: 'Посмотрите обе карты выбранного игрока. Вы можете забрать одну из них себе (вместо карты Шпиона), тогда цель добирает карту из колоды. Либо не забирайте ничего и возьмите новую карту из колоды.',
     cost: 0,
     targeted: true
   },
@@ -96,9 +96,9 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
     borderColor: '#94a3b8',
     artImage: '/cards/heir.jpg',
     bottomIcon: '🗡️',
-    shortDescription: 'За 2 💰: украсть 1 👑 у игрока.',
-    fullDescription: 'Заплатите 2 💰. Выберите игрока (с 1+ 👑). Если действие проходит: у него -1 👑, у вас +1 👑. Может быть заблокирован Рыцарем.',
-    cost: 2,
+    shortDescription: 'Украсть 1 👑 у выбранного игрока.',
+    fullDescription: 'Выберите игрока (с 1+ 👑). Если действие проходит: у него -1 👑, у вас +1 👑. Может быть заблокирован Рыцарем на дуэли.',
+    cost: 0,
     targeted: true,
     blockableBy: 'Рыцарь'
   },

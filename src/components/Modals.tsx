@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
 import { ALL_ROLES, ROLE_INFO } from '../engine/roles';
 
@@ -21,93 +20,76 @@ export function Modals({
   } = useGameStore();
 
   const human = players.find(p => !p.isBot);
-  const [spyCardToSwapIndex, setSpyCardToSwapIndex] = useState<number>(0);
 
   if (!human) return null;
 
-  // 5. Spy Peek Modal (Human interactive action choice)
+  // 5. Spy Peek Modal (Human interactive action choice for both cards)
   if (turnPhase === 'SPY_PEEK' && spyPeekData) {
     const target = players.find(p => p.id === spyPeekData.targetId);
-    const info = ROLE_INFO[spyPeekData.seenRole];
+    const targetCards = spyPeekData.targetCards || ['Наследник', 'Казначей'];
 
     return (
       <div className="game-modal-overlay">
-        <div className="game-modal-content" style={{ maxWidth: '500px' }}>
+        <div className="game-modal-content" style={{ maxWidth: '580px' }}>
           <div className="modal-header-title cinzel-font">👁️ Тайное расследование Шпиона</div>
-          <div style={{ fontSize: '0.82rem', color: '#cbd5e1', textAlign: 'center' }}>
-            Вы тайно взглянули на карту игрока <strong style={{ color: 'var(--gold-light)' }}>{target?.name}</strong>:
+          <div style={{ fontSize: '0.84rem', color: '#cbd5e1', textAlign: 'center', marginBottom: '14px' }}>
+            Вы тайно взглянули на обе карты игрока <strong style={{ color: 'var(--gold-light)' }}>{target?.name}</strong>. Вы можете забрать одну из них себе (вместо своего Шпиона), либо просто оставить их и взять новую карту из колоды:
           </div>
 
-          {/* Secret Card View */}
-          <div style={{
-            background: info.gradient,
-            border: `2px solid ${info.borderColor}`,
-            borderRadius: '14px',
-            padding: '16px',
-            textAlign: 'center',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '4px' }}>{info.badge}</div>
-            <div className="cinzel-font" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--gold-light)' }}>
-              {info.name}
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#e2e8f0', marginTop: '6px' }}>
-              {info.shortDescription}
-            </div>
+          {/* Target's 2 Cards View */}
+          <div style={{ display: 'grid', gridTemplateColumns: targetCards.length > 1 ? '1fr 1fr' : '1fr', gap: '12px', marginBottom: '16px' }}>
+            {targetCards.map((cardRole, idx) => {
+              const info = ROLE_INFO[cardRole] || { badge: '🂠', name: cardRole, shortDescription: '', gradient: '', borderColor: '#d97706' };
+              return (
+                <div 
+                  key={idx}
+                  style={{
+                    background: info.gradient || 'linear-gradient(180deg, #1e293b, #0f172a)',
+                    border: `2px solid ${info.borderColor || '#fbbf24'}`,
+                    borderRadius: '14px',
+                    padding: '14px 10px',
+                    textAlign: 'center',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--gold-light)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>
+                      Карта #{idx + 1} у {target?.name}
+                    </div>
+                    <div style={{ fontSize: '2.4rem', marginBottom: '4px' }}>{info.badge}</div>
+                    <div className="cinzel-font" style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--gold-light)' }}>
+                      {info.name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#e2e8f0', marginTop: '6px', lineHeight: 1.25 }}>
+                      {info.shortDescription}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="action-deck-btn btn-gold"
+                    style={{ marginTop: '12px', padding: '8px 4px', fontSize: '0.76rem', fontWeight: 800 }}
+                    onClick={() => completeSpyAction(idx)}
+                  >
+                    Забрать карту #{idx + 1} себе
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '12px' }}>
-            <div style={{ fontSize: '0.78rem', color: 'var(--gold-light)', marginBottom: '8px', textAlign: 'center' }}>
-              Желаете заменить одну свою карту случайной из колоды?
-            </div>
-            
-            {/* Visual cards in human's hand */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-              {human.hand.map((card, idx) => {
-                const cardInfo = ROLE_INFO[card];
-                const isSelected = spyCardToSwapIndex === idx;
-
-                return (
-                  <button
-                    key={idx}
-                    className="role-select-card-desktop"
-                    style={{
-                      flex: 1,
-                      background: isSelected ? 'rgba(245, 158, 11, 0.25)' : 'rgba(15, 23, 42, 0.8)',
-                      borderColor: isSelected ? 'var(--gold-light)' : 'rgba(245, 158, 11, 0.3)',
-                      boxShadow: isSelected ? '0 0 14px rgba(245, 158, 11, 0.4)' : undefined,
-                      padding: '10px 8px',
-                      alignItems: 'center',
-                      textAlign: 'center'
-                    }}
-                    onClick={() => setSpyCardToSwapIndex(idx)}
-                  >
-                    <span style={{ fontSize: '0.65rem', color: 'var(--gold-light)', fontWeight: 'bold' }}>
-                      {isSelected ? '✓ ЗАМЕНИТЬ ЭТУ' : `Карта ${idx + 1}`}
-                    </span>
-                    <span style={{ fontSize: '1.6rem', margin: '2px 0' }}>{cardInfo?.badge}</span>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff' }}>{card}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                className="action-deck-btn btn-gold" 
-                style={{ flex: 1, padding: '10px' }}
-                onClick={() => completeSpyAction(true, spyCardToSwapIndex)}
-              >
-                Заменить выбранную карту
-              </button>
-              <button 
-                className="action-deck-btn btn-blue" 
-                style={{ flex: 1, padding: '10px' }}
-                onClick={() => completeSpyAction(false)}
-              >
-                Оставить свои карты
-              </button>
-            </div>
+            <button 
+              type="button"
+              className="action-deck-btn btn-blue" 
+              style={{ width: '100%', padding: '12px', fontSize: '0.84rem' }}
+              onClick={() => completeSpyAction(null)}
+            >
+              Не забирать карты (сбросить Шпиона и взять из колоды)
+            </button>
           </div>
         </div>
       </div>
@@ -152,16 +134,19 @@ export function Modals({
           
           <div style={{ fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.45, display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
-              <strong style={{ color: 'var(--gold-light)' }}>👑 Коронация и победа:</strong> Набрать 7 корон Благосклонности и удержать их до начала своего следующего хода (или остаться единственным выжившим). <span style={{ color: '#fef08a' }}>Внимание: победную 7-ю корону нельзя купить за монеты на Пиру — её можно получить только по праву крови («Наследник») или украсть («Шантажист»)!</span>
+              <strong style={{ color: 'var(--gold-light)' }}>👑 Коронация и победа:</strong> Набрать 5 корон Благосклонности и удержать их до начала своего следующего хода (или остаться единственным выжившим). <span style={{ color: '#fef08a' }}>Внимание: победную 5-ю корону нельзя купить за монеты на Пиру — её можно получить только по праву крови («Наследник») или украсть («Шантажист»)!</span>
             </div>
             <div>
-              <strong style={{ color: 'var(--red-heart)' }}>❤️ Репутация:</strong> 3 жизни. Теряются за пойманную ложь или ложные обвинения. При 0 ❤️ — изгнание со двора!
+              <strong style={{ color: 'var(--red-heart)' }}>❤️ Репутация:</strong> 3 жизни. Теряются за пойманную ложь или ложные обвинения. При 0 ❤️ — изгнание со двора! Можно восстанавливать обычным действием (5 💰 = +1 ❤️, макс. 3 ❤️).
             </div>
             <div>
               <strong style={{ color: '#60a5fa' }}>🎭 Главное правило блефа:</strong> Вы можете заявлять абсолютно любую роль. Ваши карты в руке — это страховка на случай проверки «Не верю!».
             </div>
             <div>
-              <strong style={{ color: '#a78bfa' }}>⚔️ Сброс карт и перемешивание колоды:</strong> Сыгранные, вскрытые при проверках и замененные карты **отправляются в сброс (кладбище)**, а не замешиваются сразу обратно. Игроки могут следить за вышедшими картами в Своде ролей (справа). **Как только карты в колоде заканчиваются, весь сброс тщательно перемешивается и становится новой колодой!**
+              <strong style={{ color: '#f87171' }}>🛑 Проверка останавливает действие:</strong> Любая проверка («Не верю!») останавливает и отменяет действие карты, даже если заявлялась чистая правда! Действие роли успешно совершается только если никто не усомнился.
+            </div>
+            <div>
+              <strong style={{ color: '#a78bfa' }}>⚔️ Сброс карт после розыгрыша:</strong> После розыгрыша заявленная карта в любом случае уходит в сброс (игрок берет новую из колоды), даже если она не проверялась. Когда колода заканчивается, сброс перемешивается.
             </div>
             
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', fontWeight: 'bold', color: 'var(--gold-light)' }}>

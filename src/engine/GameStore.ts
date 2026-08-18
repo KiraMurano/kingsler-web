@@ -10,7 +10,7 @@ import type {
   BotArchetype 
 } from './types';
 import { ALL_ROLES } from './roles';
-import { botMemory, evaluateBotDoubt } from './Bot';
+import { botMemory, evaluateBotDoubt, evaluateBotSpyTake } from './Bot';
 
 export function createInitialDeck(): Role[] {
   const deck: Role[] = [];
@@ -277,7 +277,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       activeSpeechReactions: {},
       floatingResourceEvents: [],
       winnerId: null,
-      history: ['👑 Новая партия началась! Каждый игрок получил по 2 💰 и 2 тайные карты. Цель: 7 👑.']
+      history: ['👑 Новая партия началась! Каждый игрок получил по 2 💰 и 2 тайные карты. Цель: 5 👑.']
     });
   },
 
@@ -295,8 +295,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       return; // Cannot afford
     }
 
-    // Victory crown (7th 👑) cannot be bought with coins on Feast!
-    if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= 6) {
+    // Victory crown (5th 👑) cannot be bought with coins on Feast!
+    if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= 4) {
+      return;
+    }
+
+    // Cannot restore reputation above max (3 ❤️)
+    if ((actionData.name.includes('Восстановить') || actionData.name.includes('репутаци')) && actor.reputation >= 3) {
       return;
     }
 
@@ -739,7 +744,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const doubterLoses = verbLoses(doubter.name);
 
     const message = wasTruth
-      ? `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «${claimedRole}»! ${doubterLoses} 1 ❤️.${drawNotice}${jesterBonus ? ' Шут получает +1 👑!' : ''}${reshuffleNotice}`
+      ? `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «${claimedRole}»! ${doubterLoses} 1 ❤️, но действие карты остановлено проверкой!${drawNotice}${jesterBonus ? ' Шут получает +1 👑!' : ''}${reshuffleNotice}`
       : `${doubter.name} ${doubterCaught} ${actorAcc} на лжи! На кону была карта «${revealedRole}» вместо «${claimedRole}». ${actorLoses} 1 ❤️, а действие отменяется.${drawNotice}${reshuffleNotice}`;
 
     const outcome: RevealOutcome = {
@@ -809,25 +814,53 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   closeRevealOutcome: () => {
-    const { revealOutcome, pendingAction } = get();
+    const { revealOutcome } = get();
     if (!revealOutcome) return;
 
     triggerSingleCardFlight(set, 'to_discard', revealOutcome.accusedId, revealOutcome.revealedRole);
     set({ revealOutcome: null });
 
-    if (revealOutcome.wasTruth && pendingAction) {
-      get()._proceedAfterDoubtPassed(pendingAction);
-    } else {
-      // Action was cancelled due to caught lie
-      delayTimeout = window.setTimeout(() => {
-        get().endTurn();
-      }, 1200);
-    }
+    // Rule 7: Any challenge stops the card action even if it was the truth!
+    delayTimeout = window.setTimeout(() => {
+      get()._checkCoronationAndEndTurn(revealOutcome.accusedId);
+    }, 1200);
   },
 
   _proceedAfterDoubtPassed: (action: Action) => {
     clearAllTimers();
-    triggerSingleCardFlight(set, 'to_hand', action.actorId, action.roleClaim);
+    triggerSingleCardFlight(set, 'to_discard', action.actorId, action.roleClaim);
+
+    // Rule 1: Staked card goes to discard pile and player draws a new card (except Spy which handles choice)
+    if (action.roleClaim !== 'Шпион') {
+      const { players, deck, discardPile } = get();
+      const actorIdx = players.findIndex(p => p.id === action.actorId);
+      const actor = players[actorIdx];
+      if (actor) {
+        const actorHand = actor.hand;
+        const stakedIdx = action.stakedCardIndex ?? (actorHand.indexOf(action.roleClaim!) !== -1 ? actorHand.indexOf(action.roleClaim!) : 0);
+        const playedCard = actorHand[stakedIdx] || actorHand[0];
+
+        const newDiscard = [...discardPile, playedCard];
+        const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, deck, newDiscard);
+        const newCard = drawn[0] || 'Наследник';
+
+        const newHand = [...actorHand];
+        newHand[stakedIdx] = newCard;
+        const newPlayers = [...players];
+        newPlayers[actorIdx] = { ...actor, hand: newHand };
+
+        const drawNotice = actor.id === 'p1' ? ` (карта «${playedCard}» ушла в сброс, получена «${newCard}»)` : '';
+        const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+
+        set(state => ({
+          players: newPlayers,
+          deck: newDeck,
+          discardPile: newDiscardPile,
+          history: [`🂠 ${actor.name} сыграл «${action.roleClaim}»${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
+        }));
+      }
+    }
+
     get()._resolveRoleActionEffect(action);
   },
 
@@ -841,10 +874,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       newPlayers[actorIdx] = actor;
       triggerResourceFloat(set, actor.id, '+1 💰', true);
     } else if (action.name.includes('Пир') || action.name.includes('пир')) {
-      if (actor.favor < 6) {
+      if (actor.favor < 4) {
         actor = { ...actor, favor: actor.favor + 1 };
         newPlayers[actorIdx] = actor;
         triggerResourceFloat(set, actor.id, '+1 👑', true);
+      }
+    } else if (action.name.includes('Восстановить') || action.name.includes('репутаци')) {
+      if (actor.reputation < 3) {
+        actor = { ...actor, reputation: Math.min(3, actor.reputation + 1) };
+        newPlayers[actorIdx] = actor;
+        triggerResourceFloat(set, actor.id, '+1 ❤️', true);
+        set(state => ({
+          players: newPlayers,
+          history: [`❤️ ${actor.name} восстановил 1 ❤️ репутации за 5 💰.`, ...state.history].slice(0, 50)
+        }));
       }
     } else if (action.name.includes('Слух') || action.name.includes('слух')) {
       if (action.targetId) {
@@ -944,30 +987,29 @@ export const useGameStore = create<GameState>((set, get) => ({
         get()._checkCoronationAndEndTurn(actor.id);
       }, 1800);
     } else if (role === 'Шпион' && action.targetId) {
-      // Look at target card
       const target = newPlayers.find(p => p.id === action.targetId);
-      const cardIdx = action.targetCardIndex ?? 0;
-      const seenRole = target?.hand[cardIdx] || target?.hand[0] || 'Наследник';
+      const targetCards: Role[] = target ? [...target.hand] : ['Наследник', 'Казначей'];
 
       if (!actor.isBot) {
-        // Show spy modal to human!
+        // Show spy modal to human with BOTH cards!
         set({
           spyPeekData: {
             actorId: actor.id,
             targetId: action.targetId,
-            cardIndex: cardIdx,
-            seenRole
+            targetCards
           },
           turnPhase: 'SPY_PEEK'
         });
       } else {
-        // Bot records seen card in memory
+        // Bot records both seen cards in memory
         if (target) {
-          botMemory.recordSpyPeek(actor.id, target.id, cardIdx, seenRole);
+          botMemory.recordSpyPeek(actor.id, target.id, 0, targetCards[0]);
+          if (targetCards.length > 1) {
+            botMemory.recordSpyPeek(actor.id, target.id, 1, targetCards[1]);
+          }
         }
-        delayTimeout = window.setTimeout(() => {
-          get().endTurn();
-        }, 1800);
+        const chosenTakeIndex = evaluateBotSpyTake(actor, targetCards);
+        get().completeSpyAction(chosenTakeIndex);
       }
     } else if (role === 'Интриган' && action.targetId) {
       const targetIdx = newPlayers.findIndex(p => p.id === action.targetId);
@@ -1003,47 +1045,110 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  completeSpyAction: (swapMyCard, myCardIndexToSwap = 0) => {
-    const { spyPeekData, players, deck, discardPile } = get();
-    if (!spyPeekData) return;
+  completeSpyAction: (takeCardIndex: number | null) => {
+    const { spyPeekData, pendingAction, players, deck, discardPile } = get();
+    const actorId = spyPeekData?.actorId || pendingAction?.actorId;
+    const targetId = spyPeekData?.targetId || pendingAction?.targetId;
 
-    if (swapMyCard) {
-      const actorIdx = players.findIndex(p => p.id === spyPeekData.actorId);
-      const actor = players[actorIdx];
-      const returned = actor.hand[myCardIndexToSwap];
-      
-      const newDiscard = [...discardPile, returned];
-      const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, deck, newDiscard);
-      const newCard = drawn[0] || 'Наследник';
-      
-      const newHand = [...actor.hand];
-      newHand[myCardIndexToSwap] = newCard; // In-place replacement at the chosen slot!
-      
-      const newPlayers = [...players];
-      newPlayers[actorIdx] = { ...actor, hand: newHand };
-      
-      const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+    if (!actorId || !targetId) {
+      set({ spyPeekData: null });
+      get().endTurn();
+      return;
+    }
 
-      set(state => ({ 
-        players: newPlayers, 
+    const newPlayers = [...players];
+    const actorIdx = newPlayers.findIndex(p => p.id === actorId);
+    const targetIdx = newPlayers.findIndex(p => p.id === targetId);
+    const actor = newPlayers[actorIdx];
+    const target = newPlayers[targetIdx];
+
+    if (!actor || !target) {
+      set({ spyPeekData: null });
+      get().endTurn();
+      return;
+    }
+
+    const actorStakedIdx = pendingAction?.stakedCardIndex ?? 0;
+    const actorPlayedCard = actor.hand[actorStakedIdx] || actor.hand[0];
+    let newDeck = deck;
+    let newDiscardPile = [...discardPile, actorPlayedCard];
+    let reshuffleNotice = '';
+
+    if (takeCardIndex !== null && target.hand[takeCardIndex]) {
+      // 1. Spy takes target's card!
+      const stolenRole = target.hand[takeCardIndex];
+
+      // Target draws 1 replacement card from deck
+      const { drawn, deck: dAfterTarget, discardPile: discAfterTarget, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, newDeck, newDiscardPile);
+      newDeck = dAfterTarget;
+      newDiscardPile = discAfterTarget;
+      const targetNewCard = drawn[0] || 'Наследник';
+      if (wasReshuffled) {
+        reshuffleNotice = ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.`;
+      }
+
+      // Update target's hand
+      const newTargetHand = [...target.hand];
+      newTargetHand[takeCardIndex] = targetNewCard;
+      newPlayers[targetIdx] = { ...target, hand: newTargetHand };
+
+      // Update spy's hand with stolen card
+      const newActorHand = [...actor.hand];
+      newActorHand[actorStakedIdx] = stolenRole;
+      newPlayers[actorIdx] = { ...actor, hand: newActorHand };
+
+      botMemory.invalidatePlayerHand(target.id);
+      botMemory.invalidatePlayerHand(actor.id);
+
+      const targetNotice = target.id === 'p1' ? ` У вас забрали «${stolenRole}», вам выдана новая карта: «${targetNewCard}».` : '';
+      const actorNotice = actor.id === 'p1' ? ` Вы забрали «${stolenRole}» у ${target.name}.` : '';
+
+      set(state => ({
+        players: newPlayers,
         deck: newDeck,
         discardPile: newDiscardPile,
-        history: [`${actor.name} сбросил карту через Шпиона (получил «${newCard}»).${reshuffleNotice}`, ...state.history].slice(0, 50)
+        history: [`👁️ ${actor.name} через Шпиона посмотрел карты ${declineGen(target.name)} и забрал себе «${stolenRole}»!${actorNotice}${targetNotice}${reshuffleNotice}`, ...state.history].slice(0, 50)
+      }));
+    } else {
+      // 2. Spy does NOT take target's card; Spy draws 1 new card from deck
+      const { drawn, deck: dAfterSpy, discardPile: discAfterSpy, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, newDeck, newDiscardPile);
+      newDeck = dAfterSpy;
+      newDiscardPile = discAfterSpy;
+      const actorNewCard = drawn[0] || 'Наследник';
+      if (wasReshuffled) {
+        reshuffleNotice = ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.`;
+      }
+
+      const newActorHand = [...actor.hand];
+      newActorHand[actorStakedIdx] = actorNewCard;
+      newPlayers[actorIdx] = { ...actor, hand: newActorHand };
+
+      botMemory.invalidatePlayerHand(actor.id);
+
+      const actorNotice = actor.id === 'p1' ? ` (вы получили новую карту: «${actorNewCard}»)` : '';
+
+      set(state => ({
+        players: newPlayers,
+        deck: newDeck,
+        discardPile: newDiscardPile,
+        history: [`👁️ ${actor.name} через Шпиона посмотрел карты ${declineGen(target.name)} и взял новую карту из колоды${actorNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
       }));
     }
 
     set({ spyPeekData: null });
-    get().endTurn();
+    delayTimeout = window.setTimeout(() => {
+      get()._checkCoronationAndEndTurn(actor.id);
+    }, 1800);
   },
 
   _checkCoronationAndEndTurn: (actorId: string) => {
     const { players, coronationCandidateId } = get();
     const actor = players.find(p => p.id === actorId);
 
-    if (actor && actor.favor >= 7 && coronationCandidateId !== actor.id) {
+    if (actor && actor.favor >= 5 && coronationCandidateId !== actor.id) {
       set(state => ({ 
         coronationCandidateId: actor.id,
-        history: [`👑 ${actor.name} НАЗНАЧЕН ФАВОРИТОМ КОРОЛЯ (7 👑)! У всех остался один круг, чтобы остановить его!`, ...state.history].slice(0, 50)
+        history: [`👑 ${actor.name} НАЗНАЧЕН ФАВОРИТОМ КОРОЛЯ (5 👑)! У всех остался один круг, чтобы остановить его!`, ...state.history].slice(0, 50)
       }));
     }
 
@@ -1075,7 +1180,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // Check Coronation win: if active player is the candidate and still has 7+ favor at the start of their turn
+    // Check Coronation win: if active player is the candidate and still has 5+ favor at the start of their turn
     const currentIndex = players.findIndex(p => p.id === activePlayerId);
     let nextIndex = (currentIndex + 1) % players.length;
     while (players[nextIndex].reputation <= 0) {
@@ -1084,18 +1189,18 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const nextPlayer = players[nextIndex];
     if (coronationCandidateId === nextPlayer.id) {
-      if (nextPlayer.favor >= 7) {
+      if (nextPlayer.favor >= 5) {
         set(state => ({ 
           winnerId: nextPlayer.id, 
           turnPhase: 'GAME_OVER',
-          history: [`👑 КОРОНАЦИЯ! ${nextPlayer.name} сохранил 7 корон и становится новым Королем!`, ...state.history].slice(0, 50)
+          history: [`👑 КОРОНАЦИЯ! ${nextPlayer.name} сохранил 5 корон и становится новым Королем!`, ...state.history].slice(0, 50)
         }));
         return;
       } else {
         // Lost favor during the round
         set(state => ({ 
           coronationCandidateId: null,
-          history: [`${nextPlayer.name} потерял благосклонность короля (меньше 7 👑)! Коронация отменена.`, ...state.history].slice(0, 50)
+          history: [`${nextPlayer.name} потерял благосклонность короля (меньше 5 👑)! Коронация отменена.`, ...state.history].slice(0, 50)
         }));
       }
     }
@@ -1104,15 +1209,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       activePlayerId: nextPlayer.id, 
       turnPhase: 'IDLE', 
       pendingAction: null, 
-      pendingDuelDefenderCardIndex: null,
-      pendingDuelDefenderRoleClaim: null,
-      duelOutcome: null,
-      activeSpeechReactions: {},
-      damagedPlayerIds: [],
-      timerSeconds: 0,
-      revealOutcome: null,
-      spyPeekData: null,
-      hasCardDeparted: false
+      pendingDuelDefenderCardIndex: null, 
+      pendingDuelDefenderRoleClaim: null, 
+      duelOutcome: null, 
+      activeSpeechReactions: {}, 
+      damagedPlayerIds: [], 
+      timerSeconds: 0, 
+      revealOutcome: null, 
+      spyPeekData: null, 
+      hasCardDeparted: false 
     });
   }
 }));

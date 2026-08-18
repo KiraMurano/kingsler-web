@@ -41,7 +41,7 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
           </button>
         </div>
 
-        {/* List of 4 Normal Actions */}
+        {/* List of Normal Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
           {/* 1. Income */}
           <button 
@@ -73,7 +73,7 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
             type="button"
             className="role-select-card-desktop"
             style={{ padding: '8px 12px' }}
-            disabled={human.gold < 3 || human.favor >= 6}
+            disabled={human.gold < 3 || human.favor >= 4}
             onClick={() => {
               onClose();
               performAction({
@@ -87,43 +87,71 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>🍷 Устроить пир</span>
-              <span style={{ fontSize: '0.68rem', color: human.favor >= 6 ? '#f87171' : '#fbbf24', fontWeight: 800 }}>
-                {human.favor >= 6 ? 'Лимит (макс. 6 👑)' : '3 💰'}
+              <span style={{ fontSize: '0.68rem', color: human.favor >= 4 ? '#f87171' : '#fbbf24', fontWeight: 800 }}>
+                {human.favor >= 4 ? 'Лимит (макс. 4 👑)' : '3 💰'}
               </span>
             </div>
             <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
-              Заплатите 3 💰 → получите +1 👑 (до 6 👑 максимум).
+              Заплатите 3 💰 → получите +1 👑 (до 4 👑 максимум, 5-я только за Наследника/Шантажиста).
             </div>
           </button>
 
-          {/* 3. Rumor */}
+          {/* 3. Restore Reputation (Heal) */}
           <button 
             type="button"
             className="role-select-card-desktop"
             style={{ padding: '8px 12px' }}
-            disabled={human.gold < 6}
+            disabled={human.gold < 5 || human.reputation >= 3}
+            onClick={() => {
+              onClose();
+              performAction({
+                type: 'normal',
+                name: '❤️ Восстановить репутацию',
+                actorId: human.id,
+                costGold: 5,
+                description: 'Платит 5 💰 и восстанавливает 1 ❤️ репутации.'
+              });
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 800, color: '#f43f5e', fontSize: '0.86rem' }}>❤️ Восстановить репутацию</span>
+              <span style={{ fontSize: '0.68rem', color: human.reputation >= 3 ? '#94a3b8' : '#fbbf24', fontWeight: 800 }}>
+                {human.reputation >= 3 ? 'Максимум (3 ❤️)' : '5 💰'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
+              Заплатите 5 💰 → восстановите 1 ❤️ репутации (макс. 3 ❤️).
+            </div>
+          </button>
+
+          {/* 4. Rumor */}
+          <button 
+            type="button"
+            className="role-select-card-desktop"
+            style={{ padding: '8px 12px' }}
+            disabled={human.gold < 5}
             onClick={() => {
               onClose();
               setTimeout(() => {
                 (window as any).__startTargeting({
                   type: 'normal',
                   name: '📜 Распустить слух',
-                  cost: 6,
-                  description: 'Заплатил 6 💰: выбранный игрок теряет -1 👑.'
+                  cost: 5,
+                  description: 'Заплатил 5 💰: выбранный игрок теряет -1 👑.'
                 });
               }, 50);
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>📜 Распустить слух</span>
-              <span style={{ fontSize: '0.68rem', color: '#fbbf24', fontWeight: 800 }}>6 💰</span>
+              <span style={{ fontSize: '0.68rem', color: '#fbbf24', fontWeight: 800 }}>5 💰</span>
             </div>
             <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
-              Заплатите 6 💰 → выбранный игрок теряет -1 👑. Нельзя заблокировать!
+              Заплатите 5 💰 → выбранный игрок теряет -1 👑. Нельзя оспорить или заблокировать!
             </div>
           </button>
 
-          {/* 4. Swap 1 Card */}
+          {/* 5. Swap 1 Card */}
           <div className="role-select-card-desktop" style={{ cursor: 'default', background: 'rgba(15, 23, 42, 0.8)', padding: '8px 12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>🔄 Сменить карту с руки</span>
