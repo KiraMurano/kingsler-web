@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
+import { ROLE_INFO } from '../engine/roles';
+import type { Role } from '../engine/types';
 
 interface ActionControlsProps {
   onOpenNormalActions: () => void;
@@ -22,6 +25,8 @@ export function ActionControls({
     endTurn 
   } = useGameStore();
 
+  const [selectingDuelCard, setSelectingDuelCard] = useState(false);
+
   const human = players.find(p => !p.isBot);
   const isEliminated = !human || human.reputation <= 0;
   const isMyTurn = !isEliminated && activePlayerId === human.id && turnPhase === 'IDLE';
@@ -31,9 +36,61 @@ export function ActionControls({
   // 1. TARGET REACTION WINDOW (Victim's exclusive decision)
   if (turnPhase === 'TARGET_REACTION_WINDOW' && !isEliminated) {
     const actor = players.find(p => p.id === pendingAction?.actorId);
-    const blockingRole = pendingAction?.roleClaim === 'Вор' ? 'Казначеем' : 'Рыцарем';
+    const requiredRole: Role = pendingAction?.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+    const blockingRoleDeclined = pendingAction?.roleClaim === 'Вор' ? 'Казначеем' : 'Рыцарем';
 
     if (isTarget) {
+      if (selectingDuelCard) {
+        return (
+          <div className="player-actions-toolbar" style={{ gap: '6px' }}>
+            <div style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
+              🛡️ Выберите карту из руки на Дуэль (заявляется «{requiredRole}»):
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
+              {human.hand.map((cardRole, idx) => {
+                const info = ROLE_INFO[cardRole];
+                const isTruth = cardRole === requiredRole;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`action-deck-btn ${isTruth ? 'btn-green' : 'btn-gold'}`}
+                    style={{
+                      padding: '6px 8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      border: isTruth ? '2px solid #4ade80' : '1px solid #d97706'
+                    }}
+                    onClick={() => {
+                      setSelectingDuelCard(false);
+                      targetDeclareDuel(human.id, idx);
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>{info?.badge}</span>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>{cardRole}</span>
+                    </div>
+                    <span style={{ fontSize: '0.62rem', color: isTruth ? '#bbf7d0' : '#fde68a', fontWeight: 700 }}>
+                      {isTruth ? '✨ ПРАВДА' : '🎭 БЛЕФ'}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className="action-deck-btn btn-blue"
+                style={{ padding: '6px 10px', fontSize: '0.72rem' }}
+                onClick={() => setSelectingDuelCard(false)}
+                title="Вернуться к выбору действия"
+              >
+                ◀ Назад
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="player-actions-toolbar">
           <div style={{ fontSize: '0.72rem', color: '#fef08a', fontWeight: 800, textAlign: 'center', marginBottom: '2px' }}>
@@ -42,8 +99,12 @@ export function ActionControls({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
             {/* Option 1: Accept */}
             <button 
+              type="button"
               className="action-deck-btn btn-blue"
-              onClick={() => targetAcceptAttack(human.id)}
+              onClick={() => {
+                setSelectingDuelCard(false);
+                targetAcceptAttack(human.id);
+              }}
               style={{ padding: '6px 4px' }}
             >
               <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>🏳️ Принять</span>
@@ -51,8 +112,12 @@ export function ActionControls({
             </button>
             {/* Option 2: Doubt */}
             <button 
+              type="button"
               className="action-deck-btn btn-red"
-              onClick={() => targetDoubtAttack(human.id)}
+              onClick={() => {
+                setSelectingDuelCard(false);
+                targetDoubtAttack(human.id);
+              }}
               style={{ padding: '6px 4px' }}
             >
               <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>⚔️ Не верю!</span>
@@ -60,12 +125,13 @@ export function ActionControls({
             </button>
             {/* Option 3: Duel */}
             <button 
+              type="button"
               className="action-deck-btn btn-gold"
-              onClick={() => targetDeclareDuel(human.id)}
+              onClick={() => setSelectingDuelCard(true)}
               style={{ padding: '6px 4px' }}
             >
               <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>🤺 Дуэль!</span>
-              <span className="action-deck-btn-sub">Блок {blockingRole}</span>
+              <span className="action-deck-btn-sub">Блок {blockingRoleDeclined}</span>
             </button>
           </div>
         </div>

@@ -6,9 +6,10 @@ interface CardProps {
   onClick?: () => void;
   isPlayable?: boolean;
   isSelected?: boolean;
+  hintText?: string;
 }
 
-export function Card({ role, onClick, isPlayable, isSelected }: CardProps) {
+export function Card({ role, onClick, isPlayable, isSelected, hintText }: CardProps) {
   const info = ROLE_INFO[role];
 
   return (
@@ -25,7 +26,7 @@ export function Card({ role, onClick, isPlayable, isSelected }: CardProps) {
       {/* Playable badge indicator when it's player's turn */}
       {isPlayable && (
         <div className="card-stake-hint cinzel-font">
-          СЫГРАТЬ
+          {hintText || 'СЫГРАТЬ'}
         </div>
       )}
 

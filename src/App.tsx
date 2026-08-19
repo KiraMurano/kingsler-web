@@ -89,6 +89,11 @@ export default function App() {
   const handleCardClick = (_role: Role, cardIndex: number) => {
     if (!human) return;
 
+    if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
+      targetDeclareDuel(human.id, cardIndex);
+      return;
+    }
+
     if (!isMyTurn) {
       const active = players.find(p => p.id === activePlayerId);
       showToast(`Сейчас ход придворного: ${active?.name || 'другого игрока'}`);
@@ -136,13 +141,15 @@ export default function App() {
       }
 
       // 3. Target reaction hotkeys
-      if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human?.id && human) {
+      if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction && pendingAction.targetId === human?.id && human) {
         if (e.key === '1') {
           targetAcceptAttack(human.id);
         } else if (e.key === '2' || e.key.toLowerCase() === 'd') {
           targetDoubtAttack(human.id);
         } else if (e.key === '3' || e.key.toLowerCase() === 'b') {
-          targetDeclareDuel(human.id);
+          const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+          const matchIdx = human.hand.indexOf(blockingRole);
+          targetDeclareDuel(human.id, matchIdx !== -1 ? matchIdx : 0);
         }
       }
 
@@ -309,11 +316,16 @@ export default function App() {
                       </div>
                     );
                   }
+                  const isTargetReaction = turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
+                  const isPlayable = isMyTurn || isTargetReaction;
+                  const hintText = isTargetReaction ? 'НА ДУЭЛЬ' : undefined;
+
                   return (
                     <Card 
                       key={idx} 
                       role={role} 
-                      isPlayable={isMyTurn}
+                      isPlayable={isPlayable}
+                      hintText={hintText}
                       isSelected={showRoleModal && selectedStakedCardIndex === idx}
                       onClick={() => handleCardClick(role, idx)}
                     />
