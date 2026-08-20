@@ -1,5 +1,5 @@
 import { useGameStore } from '../engine/GameStore';
-import { ROLE_INFO } from '../engine/roles';
+import { CARD_INFO } from '../engine/cards';
 
 export function StakedCardArena() {
   const { 
@@ -97,20 +97,22 @@ export function StakedCardArena() {
 
   const timerPercent = timerMaxSeconds > 0 ? (timerSeconds / timerMaxSeconds) * 100 : 0;
   const claimedRole = pendingAction?.roleClaim || pendingAction?.name || '';
-  const roleInfo = pendingAction?.roleClaim ? ROLE_INFO[pendingAction.roleClaim] : null;
+  const roleInfo = pendingAction?.roleClaim ? CARD_INFO[pendingAction.roleClaim] : null;
 
   // 1. DUEL CLASH ARENA VIEW (Attacker vs Defender cards side-by-side in center)
-  if (isDuelAttackerWindow || isDuelOutcome || (isDuelFlight && isDuelOutcome)) {
+  if (isDuelAttackerWindow || isDuelOutcome || isDuelFlight) {
     const defender = target;
     const defenderRole = pendingDuelDefenderRoleClaim || duelOutcome?.defenderClaim || 'Казначей';
-    const defenderInfo = ROLE_INFO[defenderRole];
-    const isFlippedDuel = !!isDuelOutcome;
+    const defenderInfo = CARD_INFO[defenderRole];
+    const isFlippedDuel = !!isDuelOutcome || (isDuelFlight && (cardFlightEvent?.attackerFlight === 'to_discard' || cardFlightEvent?.defenderFlight === 'to_discard'));
 
-    const attackerTrueRole = duelOutcome?.attackerRevealedRole || pendingAction?.roleClaim;
-    const attackerTrueInfo = attackerTrueRole ? ROLE_INFO[attackerTrueRole] : roleInfo;
+    const attackerTrueRole = duelOutcome?.attackerRevealedRole || cardFlightEvent?.attackerRevealedRole || pendingAction?.roleClaim;
+    const attackerTrueInfo = attackerTrueRole ? CARD_INFO[attackerTrueRole] : roleInfo;
+    const attackerWasTruth = duelOutcome ? duelOutcome.attackerWasTruth : (cardFlightEvent?.attackerWasTruth ?? false);
 
-    const defenderTrueRole = duelOutcome?.defenderRevealedRole || defenderRole;
-    const defenderTrueInfo = defenderTrueRole ? ROLE_INFO[defenderTrueRole] : defenderInfo;
+    const defenderTrueRole = duelOutcome?.defenderRevealedRole || cardFlightEvent?.defenderRevealedRole || defenderRole;
+    const defenderTrueInfo = defenderTrueRole ? CARD_INFO[defenderTrueRole] : defenderInfo;
+    const defenderWasTruth = duelOutcome ? duelOutcome.defenderWasTruth : (cardFlightEvent?.defenderWasTruth ?? false);
 
     return (
       <div className="staked-arena-center">
@@ -134,8 +136,8 @@ export function StakedCardArena() {
                     className="staked-card-face staked-card-front"
                     style={{
                       background: attackerTrueInfo?.gradient || '#1e3a8a',
-                      borderColor: duelOutcome?.attackerWasTruth ? '#22c55e' : '#ef4444',
-                      boxShadow: duelOutcome?.attackerWasTruth ? '0 0 35px #22c55e' : '0 0 35px #ef4444'
+                      borderColor: attackerWasTruth ? '#22c55e' : '#ef4444',
+                      boxShadow: attackerWasTruth ? '0 0 35px #22c55e' : '0 0 35px #ef4444'
                     }}
                   >
                     <div className="card-title-head cinzel-font" style={{ marginTop: '2px', fontSize: '0.72rem', lineHeight: '1.1' }}>
@@ -149,11 +151,11 @@ export function StakedCardArena() {
                       fontWeight: 900,
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      background: duelOutcome?.attackerWasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
+                      background: attackerWasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
                       color: '#fff',
                       whiteSpace: 'nowrap'
                     }}>
-                      {duelOutcome?.attackerWasTruth ? '✓ ПРАВДА' : '✗ БЛЕФ'}
+                      {attackerWasTruth ? '✓ ПРАВДА' : '✗ БЛЕФ'}
                     </div>
                   </div>
                 </div>
@@ -186,8 +188,8 @@ export function StakedCardArena() {
                     className="staked-card-face staked-card-front"
                     style={{
                       background: defenderTrueInfo?.gradient || '#78350f',
-                      borderColor: duelOutcome?.defenderWasTruth ? '#22c55e' : '#ef4444',
-                      boxShadow: duelOutcome?.defenderWasTruth ? '0 0 35px #22c55e' : '0 0 35px #ef4444'
+                      borderColor: defenderWasTruth ? '#22c55e' : '#ef4444',
+                      boxShadow: defenderWasTruth ? '0 0 35px #22c55e' : '0 0 35px #ef4444'
                     }}
                   >
                     <div className="card-title-head cinzel-font" style={{ marginTop: '2px', fontSize: '0.72rem', lineHeight: '1.1' }}>
@@ -201,11 +203,11 @@ export function StakedCardArena() {
                       fontWeight: 900,
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      background: duelOutcome?.defenderWasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
+                      background: defenderWasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
                       color: '#fff',
                       whiteSpace: 'nowrap'
                     }}>
-                      {duelOutcome?.defenderWasTruth ? '✓ ПРАВДА' : '✗ БЛЕФ'}
+                      {defenderWasTruth ? '✓ ПРАВДА' : '✗ БЛЕФ'}
                     </div>
                   </div>
                 </div>
@@ -244,9 +246,14 @@ export function StakedCardArena() {
   }
 
   // 2. STANDARD STAKED CARD ARENA (Single Card in Center)
-  const isFlipped = !!revealOutcome;
-  const revealedRole = revealOutcome ? revealOutcome.revealedRole : pendingAction?.roleClaim;
-  const revealedInfo = revealedRole ? ROLE_INFO[revealedRole] : roleInfo;
+  const isFlipped = !!revealOutcome || (isSingleFlight && cardFlightEvent?.flightType === 'to_discard');
+  const revealedRole = revealOutcome 
+    ? revealOutcome.revealedRole 
+    : (cardFlightEvent?.revealedRole || cardFlightEvent?.roleClaim || pendingAction?.roleClaim);
+  const wasTruth = revealOutcome 
+    ? revealOutcome.wasTruth 
+    : (cardFlightEvent?.wasTruth ?? false);
+  const revealedInfo = revealedRole ? CARD_INFO[revealedRole] : roleInfo;
 
   let phaseTitle = 'КАРТА НА КОНУ';
   let phaseDesc = pendingAction?.description || 'Двор обдумывает сомнения...';
@@ -255,7 +262,11 @@ export function StakedCardArena() {
     phaseTitle = 'АТАКА НА ИГРОКА';
     phaseDesc = `${actor?.name} атакует ${target.name}! Жертва выбирает реакцию.`;
   } else if (isRevealOutcome && revealOutcome) {
-    phaseTitle = revealOutcome.wasTruth ? '🛡️ ПРАВДА ДОКАЗАНА!' : '🎭 ПОЙМАН НА ЛЖИ!';
+    if (revealOutcome.wasTruth) {
+      phaseTitle = revealOutcome.vaBanqueBonus ? '🎲 ПРАВДА ПОД ВА-БАНКОМ (x2 ЭФФЕКТ)' : '🛡️ ПРАВДА ДОКАЗАНА (+1 ⚜️)';
+    } else {
+      phaseTitle = revealOutcome.vaBanqueBonus ? '🎭 ПОЙМАН НА ЛЖИ (+2 ⚜️)' : '🎭 ПОЙМАН НА ЛЖИ (+1 ⚜️)';
+    }
     phaseDesc = revealOutcome.message;
   }
 
@@ -277,8 +288,8 @@ export function StakedCardArena() {
                 className="staked-card-face staked-card-front"
                 style={{
                   background: revealedInfo?.gradient || '#1e3a8a',
-                  borderColor: revealOutcome?.wasTruth ? '#22c55e' : '#ef4444',
-                  boxShadow: revealOutcome?.wasTruth ? '0 0 45px rgba(34, 197, 94, 0.9)' : '0 0 45px rgba(239, 68, 68, 0.9)'
+                  borderColor: wasTruth ? '#22c55e' : '#ef4444',
+                  boxShadow: wasTruth ? '0 0 45px rgba(34, 197, 94, 0.9)' : '0 0 45px rgba(239, 68, 68, 0.9)'
                 }}
               >
                 <div className="card-title-head cinzel-font" style={{ marginTop: '2px', fontSize: '0.74rem', lineHeight: '1.1' }}>
@@ -294,12 +305,12 @@ export function StakedCardArena() {
                   fontWeight: 900,
                   padding: '2px 8px',
                   borderRadius: '4px',
-                  background: revealOutcome?.wasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
+                  background: wasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
                   color: '#fff',
                   letterSpacing: '0.5px',
                   whiteSpace: 'nowrap'
                 }}>
-                  {revealOutcome?.wasTruth ? '✨ ПРАВДА' : '🎭 БЛЕФ'}
+                  {wasTruth ? '✨ ПРАВДА' : '🎭 БЛЕФ'}
                 </div>
               </div>
             </div>

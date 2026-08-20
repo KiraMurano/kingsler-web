@@ -1,25 +1,35 @@
 import { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
-import { ALL_ROLES, ROLE_INFO } from '../engine/roles';
-import type { Role } from '../engine/types';
+import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_INFO } from '../engine/cards';
+import type { GameCard } from '../engine/types';
 
 interface CodexProps {
   onOpenRules: () => void;
-  onRestart: () => void;
+  onRestart?: () => void;
 }
 
-export function Codex({ onOpenRules, onRestart }: CodexProps) {
+export function Codex({ onOpenRules }: CodexProps) {
   const { deck, discardPile, players } = useGameStore();
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedCard, setSelectedCard] = useState<GameCard | null>(null);
+  const [activeTab, setActiveTab] = useState<'all' | 'roles' | 'plots' | 'instants'>('all');
   const [showDiscardView, setShowDiscardView] = useState(false);
 
   const human = players.find(p => !p.isBot);
 
-  // Count occurrences in discard pile for each role
-  const discardCounts = ALL_ROLES.reduce((acc, role) => {
-    acc[role] = discardPile.filter(r => r === role).length;
+  const allCardsList: GameCard[] = [...ALL_ROLES, ...ALL_PLOTS, ...ALL_INSTANTS];
+
+  // Count occurrences in discard pile
+  const discardCounts = allCardsList.reduce((acc, card) => {
+    acc[card] = discardPile.filter(r => r === card).length;
     return acc;
-  }, {} as Record<Role, number>);
+  }, {} as Record<GameCard, number>);
+
+  const displayedCards = allCardsList.filter(c => {
+    if (activeTab === 'roles') return ALL_ROLES.includes(c as any);
+    if (activeTab === 'plots') return ALL_PLOTS.includes(c as any);
+    if (activeTab === 'instants') return ALL_INSTANTS.includes(c as any);
+    return true;
+  });
 
   return (
     <aside className="codex-sidebar">
@@ -27,7 +37,7 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
       <div className="sidebar-header">
         <div className="sidebar-title cinzel-font">
           <span>📖</span>
-          <span>СВОД РОЛЕЙ</span>
+          <span>КОДЕКС КАРТ</span>
         </div>
         <button 
           className="nav-pill-btn" 
@@ -66,12 +76,80 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
         </div>
 
         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>Всего в игре: 24 карты (8 ролей × 3)</span>
-          <span style={{ color: '#93c5fd' }}>{showDiscardView ? 'Скрыть сброс ▲' : 'Счётчик карт ▼'}</span>
+          <span>В игре: 36 карт (18 ролей, 8 интриг, 10 инстантов)</span>
+          <span style={{ color: '#93c5fd' }}>{showDiscardView ? 'Скрыть ▲' : 'Счётчик ▼'}</span>
         </div>
       </div>
 
-      {/* Discard Pile Detailed Counter (When toggled) */}
+      {/* Tabs for Category filtering */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '2px', padding: '4px 8px', background: 'rgba(0,0,0,0.2)' }}>
+        <button
+          type="button"
+          className="codex-filter-tab"
+          style={{
+            padding: '4px 2px',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            background: activeTab === 'all' ? 'rgba(245, 158, 11, 0.25)' : 'transparent',
+            border: activeTab === 'all' ? '1px solid #f59e0b' : '1px solid transparent',
+            color: activeTab === 'all' ? '#fbbf24' : '#94a3b8',
+            borderRadius: '4px'
+          }}
+          onClick={() => setActiveTab('all')}
+        >
+          Все (15)
+        </button>
+        <button
+          type="button"
+          className="codex-filter-tab"
+          style={{
+            padding: '4px 2px',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            background: activeTab === 'roles' ? 'rgba(225, 29, 72, 0.25)' : 'transparent',
+            border: activeTab === 'roles' ? '1px solid #fb7185' : '1px solid transparent',
+            color: activeTab === 'roles' ? '#fda4af' : '#94a3b8',
+            borderRadius: '4px'
+          }}
+          onClick={() => setActiveTab('roles')}
+        >
+          👑 Роли (6)
+        </button>
+        <button
+          type="button"
+          className="codex-filter-tab"
+          style={{
+            padding: '4px 2px',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            background: activeTab === 'plots' ? 'rgba(202, 138, 4, 0.25)' : 'transparent',
+            border: activeTab === 'plots' ? '1px solid #facc15' : '1px solid transparent',
+            color: activeTab === 'plots' ? '#fde047' : '#94a3b8',
+            borderRadius: '4px'
+          }}
+          onClick={() => setActiveTab('plots')}
+        >
+          🎴 Интриги (4)
+        </button>
+        <button
+          type="button"
+          className="codex-filter-tab"
+          style={{
+            padding: '4px 2px',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            background: activeTab === 'instants' ? 'rgba(147, 51, 234, 0.25)' : 'transparent',
+            border: activeTab === 'instants' ? '1px solid #c084fc' : '1px solid transparent',
+            color: activeTab === 'instants' ? '#e9d5ff' : '#94a3b8',
+            borderRadius: '4px'
+          }}
+          onClick={() => setActiveTab('instants')}
+        >
+          ⚡ Инстанты (5)
+        </button>
+      </div>
+
+      {/* Discard Pile Detailed Counter */}
       {showDiscardView && (
         <div style={{
           background: 'rgba(15, 23, 42, 0.95)',
@@ -83,11 +161,12 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
           maxHeight: '140px',
           overflowY: 'auto'
         }}>
-          {ALL_ROLES.map(role => {
-            const count = discardCounts[role] || 0;
+          {allCardsList.map(card => {
+            const count = discardCounts[card] || 0;
+            const max = ALL_ROLES.includes(card as any) ? 3 : 2;
             return (
               <div 
-                key={role}
+                key={card}
                 style={{
                   fontSize: '0.68rem',
                   display: 'flex',
@@ -98,9 +177,9 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
                   borderRadius: '4px'
                 }}
               >
-                <span>{ROLE_INFO[role].badge} {role}:</span>
-                <span style={{ fontWeight: 800, color: count === 3 ? '#ef4444' : count > 0 ? '#fbbf24' : '#94a3b8' }}>
-                  {count} / 3 в сбросе
+                <span>{CARD_INFO[card].badge} {card}:</span>
+                <span style={{ fontWeight: 800, color: count === max ? '#ef4444' : count > 0 ? '#fbbf24' : '#94a3b8' }}>
+                  {count}/{max}
                 </span>
               </div>
             );
@@ -108,17 +187,18 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
         </div>
       )}
 
-      {/* List of 8 Court Roles */}
+      {/* List of Cards */}
       <div className="codex-roles-list">
-        {ALL_ROLES.map(role => {
-          const info = ROLE_INFO[role];
-          const isHeldByHuman = human?.hand.includes(role);
-          const isExpanded = selectedRole === role;
-          const inDiscard = discardCounts[role] || 0;
+        {displayedCards.map(card => {
+          const info = CARD_INFO[card];
+          const isHeldByHuman = human?.hand.includes(card);
+          const isExpanded = selectedCard === card;
+          const inDiscard = discardCounts[card] || 0;
+          const maxCopies = ALL_ROLES.includes(card as any) ? 3 : 2;
 
           return (
             <div 
-              key={role} 
+              key={card} 
               className="codex-role-card"
               style={{
                 borderColor: isHeldByHuman ? 'rgba(74, 222, 128, 0.45)' : undefined,
@@ -126,7 +206,7 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
                   ? 'linear-gradient(180deg, rgba(34, 197, 94, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%)' 
                   : undefined
               }}
-              onClick={() => setSelectedRole(isExpanded ? null : role)}
+              onClick={() => setSelectedCard(isExpanded ? null : card)}
             >
               <div className="codex-role-header">
                 <div className="codex-role-name">
@@ -137,58 +217,33 @@ export function Codex({ onOpenRules, onRestart }: CodexProps) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {inDiscard > 0 && (
                     <span style={{ fontSize: '0.6rem', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.15)', padding: '1px 4px', borderRadius: '4px' }}>
-                      🗑️ {inDiscard}/3
-                    </span>
-                  )}
-                  {info.cost > 0 && (
-                    <span style={{ fontSize: '0.65rem', color: '#fbbf24', fontWeight: 'bold' }}>
-                      {info.cost} 💰
+                      🗑️ {inDiscard}/{maxCopies}
                     </span>
                   )}
                   {isHeldByHuman && (
-                    <span style={{ fontSize: '0.58rem', color: '#4ade80', background: 'rgba(34, 197, 94, 0.2)', padding: '1px 4px', borderRadius: '4px', border: '1px solid rgba(34, 197, 94, 0.4)' }}>
-                      В РУКЕ
-                    </span>
+                    <span className="held-badge">У вас</span>
                   )}
                 </div>
               </div>
 
               <div className="codex-role-desc">
-                {isExpanded ? info.fullDescription : info.shortDescription}
+                {info.shortDescription}
               </div>
 
-              {info.blocksRole && (
-                <div className="codex-role-counter" style={{ color: '#4ade80' }}>
-                  🛡️ Блокирует роль: «{info.blocksRole}»
-                </div>
-              )}
-
-              {info.blockableBy && (
-                <div className="codex-role-counter" style={{ color: '#f87171' }}>
-                  ⚠️ Блокируется: «{info.blockableBy}»
+              {isExpanded && (
+                <div className="codex-role-details">
+                  <div style={{ color: 'var(--gold-light)', fontWeight: 800, marginBottom: '2px' }}>
+                    {info.title}
+                  </div>
+                  <div>{info.fullDescription}</div>
+                  <div style={{ marginTop: '4px', color: 'rgba(255,255,255,0.6)', fontSize: '0.66rem' }}>
+                    Тип: {info.category === 'role' ? '👑 Роль (3 копии)' : info.category === 'plot' ? '🎴 Интрига (2 копии, 1 ⚡)' : '⚡ Инстант (2 копии, 0 ⚡)'}
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
-      </div>
-
-      {/* Footer controls */}
-      <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(245, 158, 11, 0.2)', display: 'flex', gap: '8px' }}>
-        <button 
-          className="action-deck-btn btn-blue" 
-          style={{ flex: 1, padding: '6px', fontSize: '0.72rem' }}
-          onClick={onOpenRules}
-        >
-          📜 Регламент
-        </button>
-        <button 
-          className="action-deck-btn btn-red" 
-          style={{ flex: 1, padding: '6px', fontSize: '0.72rem' }}
-          onClick={onRestart}
-        >
-          🔄 Новая игра
-        </button>
       </div>
     </aside>
   );

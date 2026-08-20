@@ -2,25 +2,57 @@ import { create } from 'zustand';
 import type { 
   GameState, 
   Player, 
-  Role, 
   Action, 
+  GameCard, 
+  Role,
+  PlotType,
+  InstantType,
   RevealOutcome, 
   DuelOutcome, 
-  DuelResultType, 
-  BotArchetype 
+  DuelResultType,
+  BotArchetype
 } from './types';
-import { ALL_ROLES } from './roles';
-import { botMemory, evaluateBotDoubt, evaluateBotSpyTake } from './Bot';
+import { 
+  createInitialDeck, 
+  drawCardsFromDeck, 
+  isRole
+} from './cards';
+import { botMemory, evaluateBotDoubt } from './Bot';
 
-export function createInitialDeck(): Role[] {
-  const deck: Role[] = [];
-  ALL_ROLES.forEach(r => {
-    deck.push(r, r, r);
-  });
-  return shuffle(deck);
+// Russian grammatical inflection helpers
+function declineAcc(name: string): string {
+  if (name.endsWith('а')) return name.slice(0, -1) + 'у';
+  if (name.endsWith('я')) return name.slice(0, -1) + 'ю';
+  if (name.endsWith('й')) return name.slice(0, -1) + 'я';
+  if (name.endsWith('ь')) return name.slice(0, -1) + 'я';
+  if (!name.endsWith('о') && !name.endsWith('е') && !name.endsWith('и')) return name + 'а';
+  return name;
 }
 
-export function shuffle<T>(array: T[]): T[] {
+function declineGen(name: string): string {
+  if (name.endsWith('а')) return name.slice(0, -1) + 'ы';
+  if (name.endsWith('я')) return name.slice(0, -1) + 'и';
+  if (name.endsWith('й')) return name.slice(0, -1) + 'я';
+  if (name.endsWith('ь')) return name.slice(0, -1) + 'я';
+  if (!name.endsWith('о') && !name.endsWith('е') && !name.endsWith('и')) return name + 'а';
+  return name;
+}
+
+function verbDoubted(name: string): string {
+  if (name === 'Елена' || name === 'Анна' || name.endsWith('а') || name.endsWith('я')) {
+    return 'усомнилась';
+  }
+  return 'усомнился';
+}
+
+function verbCaught(name: string): string {
+  if (name === 'Елена' || name === 'Анна' || name.endsWith('а') || name.endsWith('я')) {
+    return 'поймала';
+  }
+  return 'поймал';
+}
+
+function shuffle<T>(array: T[]): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -29,135 +61,97 @@ export function shuffle<T>(array: T[]): T[] {
   return arr;
 }
 
-export function declineAcc(name: string): string {
-  if (name === 'Вы') return 'вас';
-  if (name === 'Маша') return 'Машу';
-  if (name === 'Саша') return 'Сашу';
-  if (name === 'Дима') return 'Диму';
-  if (name === 'Юля') return 'Юлю';
-  if (name === 'Антон') return 'Антона';
-  return name;
+export interface BotCandidate {
+  name: string;
+  avatar: string;
+  archetype: BotArchetype;
 }
 
-export function declineGen(name: string): string {
-  if (name === 'Вы') return 'вас';
-  if (name === 'Маша') return 'Маши';
-  if (name === 'Саша') return 'Саши';
-  if (name === 'Дима') return 'Димы';
-  if (name === 'Юля') return 'Юли';
-  if (name === 'Антон') return 'Антона';
-  return name;
-}
+export const ALL_BOT_CANDIDATES: BotCandidate[] = [
+  {
+    name: 'Барон Дима',
+    avatar: '🧔',
+    archetype: {
+      type: 'gambler',
+      title: 'Азартный игрок',
+      badge: '🎲',
+      description: 'Часто рискует и блефует. Удваивает ставки.',
+      bluffRate: 0.52,
+      doubtAggression: 1.15,
+      blockBluffRate: 0.50,
+      greed: 0.7,
+      targetAggression: 0.75
+    }
+  },
+  {
+    name: 'Графиня Елена',
+    avatar: '👩‍🦰',
+    archetype: {
+      type: 'cautious',
+      title: 'Осторожный стратег',
+      badge: '🛡️',
+      description: 'Редко блефует. Проверяет только при высокой уверенности.',
+      bluffRate: 0.15,
+      doubtAggression: 0.70,
+      blockBluffRate: 0.20,
+      greed: 0.3,
+      targetAggression: 0.4
+    }
+  },
+  {
+    name: 'Герцог Виктор',
+    avatar: '👨‍🦳',
+    archetype: {
+      type: 'pragmatic',
+      title: 'Прагматик',
+      badge: '⚖️',
+      description: 'Атакует только лидеров. Оценивает шансы математически.',
+      bluffRate: 0.30,
+      doubtAggression: 1.00,
+      blockBluffRate: 0.35,
+      greed: 0.5,
+      targetAggression: 0.9
+    }
+  },
+  {
+    name: 'Маркиз Вадим',
+    avatar: '👱‍♂️',
+    archetype: {
+      type: 'provocateur',
+      title: 'Провокатор',
+      badge: '🎭',
+      description: 'Ставит ловушки Шутом, плетет Интриги и провоцирует соперников.',
+      bluffRate: 0.48,
+      doubtAggression: 1.20,
+      blockBluffRate: 0.50,
+      greed: 0.65,
+      targetAggression: 0.8
+    }
+  },
+  {
+    name: 'Княгиня Анна',
+    avatar: '👸',
+    archetype: {
+      type: 'opportunist',
+      title: 'Оппортунист',
+      badge: '🗡️',
+      description: 'Крадет ресурсы в самый уязвимый момент.',
+      bluffRate: 0.38,
+      doubtAggression: 1.05,
+      blockBluffRate: 0.40,
+      greed: 0.9,
+      targetAggression: 0.85
+    }
+  }
+];
 
-export function verbDoubted(name: string): string {
-  if (name === 'Вы') return 'усомнились';
-  if (name === 'Маша' || name === 'Юля') return 'усомнилась';
-  return 'усомнился';
-}
-
-export function verbCaught(name: string): string {
-  if (name === 'Вы') return 'поймали';
-  if (name === 'Маша' || name === 'Юля') return 'поймала';
-  return 'поймал';
-}
-
-export function verbLoses(name: string): string {
-  if (name === 'Вы') return 'Вы теряете';
-  return `${name} теряет`;
-}
-
-// 5 Curated Personality Archetypes for Kinglier Bots
 export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
-  b1: {
-    type: 'gambler',
-    title: 'Азартная',
-    badge: '🎲',
-    description: 'Обожает блефовать и проверять других на кураже. Часто рискует.',
-    bluffRate: 0.55,
-    doubtAggression: 1.35,
-    blockBluffRate: 0.55,
-    greed: 0.6,
-    targetAggression: 0.7
-  },
-  b2: {
-    type: 'cautious',
-    title: 'Стратег',
-    badge: '🛡️',
-    description: 'Осторожен, избегает сомнительных авантюр, бережет свои жизни.',
-    bluffRate: 0.18,
-    doubtAggression: 0.75,
-    blockBluffRate: 0.20,
-    greed: 0.3,
-    targetAggression: 0.4
-  },
-  b3: {
-    type: 'pragmatic',
-    title: 'Тактик',
-    badge: '⚖️',
-    description: 'Считает вероятности и карты в сбросе. Блефует только при выгоде.',
-    bluffRate: 0.32,
-    doubtAggression: 1.05,
-    blockBluffRate: 0.35,
-    greed: 0.5,
-    targetAggression: 0.6
-  },
-  b4: {
-    type: 'provocateur',
-    title: 'Провокатор',
-    badge: '🎭',
-    description: 'Ставит психологические ловушки, провоцирует игроков на ошибки.',
-    bluffRate: 0.48,
-    doubtAggression: 1.20,
-    blockBluffRate: 0.50,
-    greed: 0.8,
-    targetAggression: 0.8
-  },
-  b5: {
-    type: 'opportunist',
-    title: 'Оппортунист',
-    badge: '🗡️',
-    description: 'Жестко атакует лидеров и отнимает у них короны в критический момент.',
-    bluffRate: 0.38,
-    doubtAggression: 1.15,
-    blockBluffRate: 0.40,
-    greed: 0.4,
-    targetAggression: 0.95
-  }
+  b1: ALL_BOT_CANDIDATES[0].archetype,
+  b2: ALL_BOT_CANDIDATES[1].archetype,
+  b3: ALL_BOT_CANDIDATES[2].archetype,
+  b4: ALL_BOT_CANDIDATES[3].archetype,
+  b5: ALL_BOT_CANDIDATES[4].archetype
 };
-
-export function drawCardsFromDeck(
-  count: number, 
-  currentDeck: Role[], 
-  currentDiscardPile: Role[]
-): { 
-  drawn: Role[]; 
-  deck: Role[]; 
-  discardPile: Role[]; 
-  wasReshuffled: boolean;
-  reshuffledCount: number;
-} {
-  let deck = [...currentDeck];
-  let discardPile = [...currentDiscardPile];
-  const drawn: Role[] = [];
-  let wasReshuffled = false;
-  let reshuffledCount = 0;
-
-  for (let i = 0; i < count; i++) {
-    if (deck.length === 0) {
-      if (discardPile.length > 0) {
-        reshuffledCount = discardPile.length;
-        deck = shuffle([...discardPile]);
-        discardPile = [];
-        wasReshuffled = true;
-      }
-    }
-    if (deck.length > 0) {
-      drawn.push(deck.pop()!);
-    }
-  }
-
-  return { drawn, deck, discardPile, wasReshuffled, reshuffledCount };
-}
 
 let gameTimerInterval: number | null = null;
 let delayTimeout: number | null = null;
@@ -185,36 +179,88 @@ function triggerResourceFloat(set: any, playerId: string, text: string, isGain: 
   }, 2400);
 }
 
-function triggerSingleCardFlight(set: any, flightType: 'to_discard' | 'to_hand', actorId: string, role?: Role) {
+function triggerSingleCardFlight(
+  set: any, 
+  flightType: 'to_discard' | 'to_hand' | 'to_plot', 
+  actorId?: string, 
+  roleClaim?: Role, 
+  revealedRole?: GameCard, 
+  wasTruth?: boolean
+) {
   const id = Math.random().toString(36).substring(7);
   set({
-    cardFlightEvent: { id, isDuel: false, flightType, actorId, role },
-    hasCardDeparted: true
+    hasCardDeparted: true,
+    cardFlightEvent: {
+      id,
+      isDuel: false,
+      flightType,
+      actorId,
+      roleClaim,
+      revealedRole,
+      wasTruth
+    }
   });
+
   window.setTimeout(() => {
-    set((state: GameState) => state.cardFlightEvent?.id === id ? { cardFlightEvent: null } : {});
-  }, 950);
+    set({
+      cardFlightEvent: null
+    });
+  }, 850);
 }
 
-function triggerDuelCardFlight(set: any, attackerFlight: 'to_discard' | 'to_hand', attackerId: string, defenderFlight: 'to_discard' | 'to_hand', defenderId: string) {
+function triggerDuelCardFlight(
+  set: any,
+  attackerFlight: 'to_discard' | 'to_hand',
+  attackerId: string,
+  defenderFlight: 'to_discard' | 'to_hand',
+  defenderId: string,
+  attackerRevealedRole?: GameCard,
+  attackerWasTruth?: boolean,
+  defenderRevealedRole?: GameCard,
+  defenderWasTruth?: boolean
+) {
   const id = Math.random().toString(36).substring(7);
   set({
-    cardFlightEvent: { id, isDuel: true, attackerFlight, attackerId, defenderFlight, defenderId },
-    hasCardDeparted: true
+    hasCardDeparted: true,
+    cardFlightEvent: {
+      id,
+      isDuel: true,
+      attackerFlight,
+      attackerId,
+      attackerRevealedRole,
+      attackerWasTruth,
+      defenderFlight,
+      defenderId,
+      defenderRevealedRole,
+      defenderWasTruth
+    }
   });
+
   window.setTimeout(() => {
-    set((state: GameState) => state.cardFlightEvent?.id === id ? { cardFlightEvent: null } : {});
-  }, 950);
+    set({
+      cardFlightEvent: null
+    });
+  }, 850);
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
   players: [],
   deck: [],
   discardPile: [],
-  activePlayerId: '',
+  activePlayerId: 'p1',
   turnPhase: 'IDLE',
+  turnSubPhase: 'NORMAL_ACTION_PHASE',
+  
+  hasUsedNormalActionThisTurn: false,
+  hasPlayedRoleThisTurn: false,
+  hasPlayedPlotThisTurn: false,
+  
   coronationCandidateId: null,
   pendingAction: null,
+  pendingDoubtDoubterId: null,
+  
+  isVaBanqueActive: false,
+  isVetoed: false,
   
   pendingDuelDefenderCardIndex: null,
   pendingDuelDefenderRoleClaim: null,
@@ -225,9 +271,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   revealOutcome: null,
   spyPeekData: null,
+  informantPeekData: null,
   
-  damagedPlayerIds: [],
-  screenDamageFlash: false,
   activeSpeechReactions: {},
   floatingResourceEvents: [],
   cardFlightEvent: null,
@@ -239,22 +284,44 @@ export const useGameStore = create<GameState>((set, get) => ({
   startGame: () => {
     clearAllTimers();
     botMemory.clear();
-    let deck = createInitialDeck();
+    const deck = createInitialDeck(); // 36 unified cards
     
-    // Draw 2 distinct cards for human player to ensure rich strategic options at start
+    // Draw 2 cards for human player
     const c1 = deck.pop()!;
-    let c2Idx = deck.findIndex((c: Role) => c !== c1);
-    if (c2Idx === -1) c2Idx = 0;
-    const [c2] = deck.splice(c2Idx, 1);
+    const c2 = deck.pop()!;
 
-    // 6 Players: all start on equal, clean, fresh footing (2 Gold, 0 Favor, 3 Reputation)
+    // Pick 3 random distinct bots from the candidate pool
+    const selectedBots = shuffle([...ALL_BOT_CANDIDATES]).slice(0, 3);
+
+    // 4 Players: 1 Human + 3 Bots (2 Gold, 0 Favor, 0 Seals, 2 Action Tokens)
     const players: Player[] = [
-      { id: 'p1', name: 'Вы', avatar: '/avatars/sasha.jpg', seatNumber: 1, isBot: false, gold: 2, favor: 0, reputation: 3, hand: [c1, c2] },
-      { id: 'b1', name: 'Маша', avatar: '/avatars/masha.jpg', seatNumber: 2, isBot: true, archetype: BOT_ARCHETYPES.b1, gold: 2, favor: 0, reputation: 3, hand: [deck.pop()!, deck.pop()!] },
-      { id: 'b2', name: 'Саша', avatar: '/avatars/sasha.jpg', seatNumber: 3, isBot: true, archetype: BOT_ARCHETYPES.b2, gold: 2, favor: 0, reputation: 3, hand: [deck.pop()!, deck.pop()!] },
-      { id: 'b3', name: 'Дима', avatar: '/avatars/dima.jpg', seatNumber: 4, isBot: true, archetype: BOT_ARCHETYPES.b3, gold: 2, favor: 0, reputation: 3, hand: [deck.pop()!, deck.pop()!] },
-      { id: 'b4', name: 'Юля', avatar: '/avatars/yulia.jpg', seatNumber: 5, isBot: true, archetype: BOT_ARCHETYPES.b4, gold: 2, favor: 0, reputation: 3, hand: [deck.pop()!, deck.pop()!] },
-      { id: 'b5', name: 'Антон', avatar: '/avatars/anton.jpg', seatNumber: 6, isBot: true, archetype: BOT_ARCHETYPES.b5, gold: 2, favor: 0, reputation: 3, hand: [deck.pop()!, deck.pop()!] },
+      { 
+        id: 'p1', 
+        name: 'Вы', 
+        avatar: '👑', 
+        seatNumber: 1, 
+        isBot: false, 
+        gold: 2, 
+        favor: 0, 
+        seals: 0,
+        actionTokens: 2,
+        hand: [c1, c2],
+        activePlot: null
+      },
+      ...selectedBots.map((b, idx) => ({
+        id: `b${idx + 1}`,
+        name: b.name,
+        avatar: b.avatar,
+        seatNumber: idx + 2,
+        isBot: true,
+        archetype: b.archetype,
+        gold: 2,
+        favor: 0,
+        seals: 0,
+        actionTokens: 2,
+        hand: [deck.pop()!, deck.pop()!],
+        activePlot: null
+      }))
     ];
 
     set({
@@ -263,8 +330,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       discardPile: [],
       activePlayerId: 'p1',
       turnPhase: 'IDLE',
+      turnSubPhase: 'NORMAL_ACTION_PHASE',
+      hasUsedNormalActionThisTurn: false,
+      hasPlayedRoleThisTurn: false,
+      hasPlayedPlotThisTurn: false,
       coronationCandidateId: null,
       pendingAction: null,
+      isVaBanqueActive: false,
+      isVetoed: false,
       pendingDuelDefenderCardIndex: null,
       pendingDuelDefenderRoleClaim: null,
       duelOutcome: null,
@@ -272,12 +345,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       timerMaxSeconds: 14,
       revealOutcome: null,
       spyPeekData: null,
-      damagedPlayerIds: [],
-      screenDamageFlash: false,
+      informantPeekData: null,
       activeSpeechReactions: {},
       floatingResourceEvents: [],
       winnerId: null,
-      history: ['👑 Новая партия началась! Каждый игрок получил по 2 💰 и 2 тайные карты. Цель: 5 👑.']
+      history: ['👑 Новая партия началась! В колоде 36 карт (роли, интриги, инстанты). У каждого по 2 💰, 2 карты и 2 ⚡ жетона действия.']
     });
   },
 
@@ -285,72 +357,199 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().startGame();
   },
 
+  addSealsToPlayer: (playerId: string, count: number) => {
+    if (count <= 0) return;
+    const { players, coronationCandidateId } = get();
+    const pIdx = players.findIndex(p => p.id === playerId);
+    if (pIdx === -1) return;
+
+    const player = players[pIdx];
+    if (player.favor >= 6) return;
+
+    const totalSeals = player.seals + count;
+    const gainedCrowns = Math.floor(totalSeals / 2);
+    const newFavor = player.favor + gainedCrowns;
+    const remainderSeals = newFavor >= 6 ? 0 : (totalSeals % 2);
+
+    const updatedPlayer: Player = {
+      ...player,
+      seals: remainderSeals,
+      favor: Math.min(6, newFavor)
+    };
+
+    const newPlayers = [...players];
+    newPlayers[pIdx] = updatedPlayer;
+
+    triggerResourceFloat(set, playerId, `+${count} ⚜️`, true);
+    if (gainedCrowns > 0) {
+      window.setTimeout(() => {
+        triggerResourceFloat(set, playerId, `+${gainedCrowns} 👑`, true);
+      }, 400);
+    }
+
+    const conversionNotice = gainedCrowns > 0
+      ? ` ⚜️ 2 печати трансформировались в +${gainedCrowns} 👑 для ${player.name}!`
+      : '';
+
+    set(state => ({
+      players: newPlayers,
+      history: [`⚜️ ${player.name} получает +${count} ⚜️ Королевскую печать.${conversionNotice}`, ...state.history].slice(0, 50)
+    }));
+
+    if (updatedPlayer.favor >= 6 && !coronationCandidateId) {
+      set(state => ({
+        coronationCandidateId: updatedPlayer.id,
+        history: [`👑 КРУГ КОРОНАЦИИ! ${updatedPlayer.name} набрал 6 👑 через печати! Если никто не собьёт его короны за круг, он станет Королём!`, ...state.history].slice(0, 50)
+      }));
+    }
+  },
+
+  _disruptPlayerPlotsOnLoss: (victimId: string, reason: string) => {
+    const { players } = get();
+    const vIdx = players.findIndex(p => p.id === victimId);
+    if (vIdx === -1) return;
+
+    const victim = players[vIdx];
+    if (victim.activePlot && victim.activePlot.type === 'Королевский приём') {
+      const newPlayers = [...players];
+      newPlayers[vIdx] = { ...victim, activePlot: null };
+      set(state => ({
+        players: newPlayers,
+        discardPile: [...state.discardPile, 'Королевский приём'],
+        history: [`💥 «Королевский приём» ${declineGen(victim.name)} сорван из-за ${reason}! Интрига сгорела.`, ...state.history].slice(0, 50)
+      }));
+      triggerResourceFloat(set, victim.id, '💥 Интрига сорвана', false);
+    }
+  },
+
+  _drawCardForPlayerWithInformantCheck: (_playerIndex: number): GameCard => {
+    const { deck, discardPile } = get();
+    const { drawn, deck: newDeck, discardPile: newDiscardPile } = drawCardsFromDeck(1, deck, discardPile);
+    const newCard = drawn[0] || 'Наследник';
+
+    set({ deck: newDeck, discardPile: newDiscardPile });
+    return newCard;
+  },
+
+  skipNormalActionPhase: () => {
+    const { turnPhase, turnSubPhase } = get();
+    if (turnPhase !== 'IDLE' || turnSubPhase !== 'NORMAL_ACTION_PHASE') return;
+    set({
+      turnSubPhase: 'CARD_PLAY_PHASE'
+    });
+  },
+
+  endTurnManually: () => {
+    const { turnPhase, activePlayerId, players } = get();
+    if (turnPhase !== 'IDLE') return;
+    const actor = players.find(p => p.id === activePlayerId);
+    if (!actor) return;
+    set(state => ({
+      history: [`⚡ ${actor.name} завершает свой ход, сохраняя ${actor.actionTokens} ⚡ на проверки.`, ...state.history].slice(0, 50)
+    }));
+    get().endTurn();
+  },
+
+  // --------------------------------------------------------------------------
+  // ACTION EXECUTION WITH ACTION TOKENS & 3-PHASE STRUCTURE
+  // --------------------------------------------------------------------------
+
   performAction: (actionData) => {
     clearAllTimers();
     const { players, activePlayerId } = get();
     const actor = players.find(p => p.id === activePlayerId);
-    if (!actor || actor.reputation <= 0) return;
+    if (!actor) return;
+
+    const withVaBanque = !!actionData.withVaBanque;
+    const tokensRequired = 1;
+
+    // Check action tokens
+    if (actor.actionTokens < tokensRequired) {
+      return; // No tokens left
+    }
 
     if (actor.gold < actionData.costGold) {
-      return; // Cannot afford
+      return; // Cannot afford gold cost
     }
 
-    // Victory crown (5th 👑) cannot be bought with coins on Feast!
-    if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= 4) {
-      return;
+    if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= 5) {
+      return; // Feast victory crown limit (cannot buy the 6th winning crown)
     }
 
-    // Cannot restore reputation above max (3 ❤️)
-    if ((actionData.name.includes('Восстановить') || actionData.name.includes('репутаци')) && actor.reputation >= 3) {
-      return;
-    }
-
-    const stakedCardIndex = actionData.stakedCardIndex !== undefined 
+    let actorHand = [...actor.hand];
+    let newDiscard = [...get().discardPile];
+    let stakedCardIndex = actionData.stakedCardIndex !== undefined 
       ? actionData.stakedCardIndex 
-      : (actionData.roleClaim && actor.hand.indexOf(actionData.roleClaim) !== -1 
-          ? actor.hand.indexOf(actionData.roleClaim) 
-          : 0);
+      : 0;
+
+    if (withVaBanque) {
+      const vbIdx = actorHand.indexOf('Ва-банк');
+      if (vbIdx !== -1) {
+        actorHand.splice(vbIdx, 1);
+        newDiscard.push('Ва-банк');
+        stakedCardIndex = 0;
+      }
+    }
 
     const action: Action = { 
       ...actionData, 
       id: Math.random().toString(36).substring(7),
-      stakedCardIndex
+      costTokens: tokensRequired,
+      stakedCardIndex,
+      withVaBanque
     };
     
-    // Deduct cost immediately
+    // Deduct Action Tokens & Gold cost immediately
+    set(state => ({
+      players: state.players.map(p => p.id === actor.id ? { 
+        ...p, 
+        hand: actorHand,
+        actionTokens: p.actionTokens - tokensRequired,
+        gold: p.gold - action.costGold 
+      } : p),
+      discardPile: newDiscard,
+      turnSubPhase: 'CARD_PLAY_PHASE',
+      hasUsedNormalActionThisTurn: action.type === 'normal' ? true : state.hasUsedNormalActionThisTurn,
+      hasPlayedRoleThisTurn: action.type === 'role' ? true : state.hasPlayedRoleThisTurn,
+      isVaBanqueActive: withVaBanque,
+      isVetoed: false
+    }));
+
     if (action.costGold > 0) {
-      set(state => ({
-        players: state.players.map(p => p.id === actor.id ? { ...p, gold: p.gold - action.costGold } : p)
-      }));
       triggerResourceFloat(set, actor.id, `-${action.costGold} 💰`, false);
+    }
+    triggerResourceFloat(set, actor.id, `-${tokensRequired} ⚡`, false);
+    if (withVaBanque) {
+      triggerResourceFloat(set, actor.id, '🎲 ВА-БАНК (x2)', true);
     }
 
     const roleName = action.roleClaim ? `«${action.roleClaim}»` : action.name;
     const target = action.targetId ? players.find(p => p.id === action.targetId) : null;
     const targetInfo = target ? ` на ${declineAcc(target.name)}` : '';
     const stakeNotice = action.roleClaim ? ' (карта на кону)' : '';
+    const vbNotice = withVaBanque ? ' 🎲 [ВА-БАНК x2 при проверке!]' : '';
     
     const speechText = action.type === 'normal' 
       ? `«${action.name}»` 
-      : `«Заявляю: ${action.roleClaim}!${target ? ` Цель: ${target.name}` : ''}»`;
+      : `«Заявляю: ${action.roleClaim}!${withVaBanque ? ' ВА-БАНК!' : ''}${target ? ` Цель: ${target.name}` : ''}»`;
 
     set(state => ({
       hasCardDeparted: false,
       activeSpeechReactions: { [actor.id]: speechText },
-      history: [`${actor.name} заявляет: ${roleName}${targetInfo}${stakeNotice}`, ...state.history].slice(0, 50)
+      history: [`${actor.name} заявляет: ${roleName}${targetInfo}${stakeNotice}${vbNotice} (потрачено ${tokensRequired} ⚡).`, ...state.history].slice(0, 50)
     }));
 
-    // 1. Normal actions execute with a 1.6-second visual delay
+    // 1. Normal actions execute after 1.5s
     if (action.type === 'normal') {
       set({ pendingAction: action, turnPhase: 'IDLE' });
       delayTimeout = window.setTimeout(() => {
         get()._executeNormalAction(action);
-      }, 1600);
+      }, 1500);
       return;
     }
 
-    // 2. Targeted Attack Actions (Вор / Шантажист / Рыцарь) trigger victim TARGET_REACTION_WINDOW
-    const isTargetedAttack = (action.roleClaim === 'Вор' || action.roleClaim === 'Шантажист' || action.roleClaim === 'Рыцарь') && !!action.targetId;
+    // 2. Targeted Attack Actions (Вор / Шантажист)
+    const isTargetedAttack = (action.roleClaim === 'Вор' || action.roleClaim === 'Шантажист') && !!action.targetId;
     if (isTargetedAttack) {
       const maxSec = 14;
       set({ 
@@ -365,7 +564,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (cur <= 1) {
           clearAllTimers();
           if (get().turnPhase === 'TARGET_REACTION_WINDOW') {
-            // Target timeout defaults to accepting the attack
             get().targetAcceptAttack(action.targetId!);
           }
         } else {
@@ -375,7 +573,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // 3. Non-targeted Role Actions trigger standard court DOUBT_WINDOW
+    // 3. Non-targeted Role Actions trigger court DOUBT_WINDOW
     const maxSec = 14;
     set({ 
       pendingAction: action, 
@@ -395,6 +593,174 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({ timerSeconds: cur - 1 });
       }
     }, 1000);
+  },
+
+  playPlotAction: (plotType: PlotType, cardIndex: number, targetPlayerId?: string) => {
+    clearAllTimers();
+    const { players, activePlayerId, discardPile } = get();
+    const actor = players.find(p => p.id === activePlayerId);
+    if (!actor || actor.actionTokens < 1) return;
+
+    const playedCard = actor.hand[cardIndex];
+    if (playedCard !== plotType) return;
+
+    // Remove plot card from hand without immediate refill (deferred draw at end of turn)
+    const newHand = [...actor.hand];
+    newHand.splice(cardIndex, 1);
+
+    const oldPlot = actor.activePlot;
+    const updatedDiscard = oldPlot ? [...discardPile, oldPlot.type] : discardPile;
+
+    const newPlotData = {
+      id: Math.random().toString(36).substring(7),
+      type: plotType,
+      targetPlayerId,
+      charges: plotType === 'Сеть информаторов' ? 2 : undefined
+    };
+
+    const newPlayers = players.map(p => p.id === actor.id ? {
+      ...p,
+      actionTokens: p.actionTokens - 1,
+      hand: newHand,
+      activePlot: newPlotData
+    } : p);
+
+    triggerSingleCardFlight(set, 'to_plot', actor.id, undefined, plotType);
+    triggerResourceFloat(set, actor.id, '-1 ⚡', false);
+
+    const target = targetPlayerId ? players.find(p => p.id === targetPlayerId) : null;
+    const targetText = target ? ` (цель: ${target.name})` : '';
+
+    set(state => ({
+      players: newPlayers,
+      discardPile: updatedDiscard,
+      hasPlayedPlotThisTurn: true,
+      turnSubPhase: 'CARD_PLAY_PHASE',
+      history: [`🎴 ${actor.name} разыгрывает Интригу «${plotType}»${targetText} (потрачен 1 ⚡).`, ...state.history].slice(0, 50)
+    }));
+
+    delayTimeout = window.setTimeout(() => {
+      get()._checkEndgameAndAdvanceTurn();
+    }, 1500);
+  },
+
+  playInstant: (playerId: string, instantType: InstantType, cardIndex: number, targetPlayerId?: string) => {
+    const { players, pendingAction, discardPile, activePlayerId } = get();
+    const actor = players.find(p => p.id === playerId);
+    if (!actor || actor.actionTokens < 1) return;
+
+    const card = actor.hand[cardIndex];
+    if (card !== instantType) return;
+
+    // Remove instant from hand to discard (deferred draw at end of turn)
+    const newHand = [...actor.hand];
+    newHand.splice(cardIndex, 1);
+    const updatedDiscard = [...discardPile, instantType];
+
+    const updatedPlayers = players.map(p => p.id === actor.id ? { 
+      ...p, 
+      actionTokens: p.actionTokens - 1,
+      hand: newHand 
+    } : p);
+    triggerResourceFloat(set, actor.id, '-1 ⚡', false);
+
+    const isOwnTurn = actor.id === activePlayerId;
+
+    if (instantType === 'Ва-банк') {
+      set(state => ({
+        players: updatedPlayers,
+        discardPile: updatedDiscard,
+        isVaBanqueActive: true,
+        history: [`🎲 ${actor.name} играет инстант ⚡ «ВА-БАНК» (потрачен 1 ⚡)! Награда за этот спор удваивается (2 ⚜️ = 1 👑)!`, ...state.history].slice(0, 50)
+      }));
+      triggerResourceFloat(set, actor.id, '⚡ ВА-БАНК! (x2)', true);
+    } else if (instantType === 'Право вето') {
+      set(state => ({
+        players: updatedPlayers,
+        discardPile: updatedDiscard,
+        isVetoed: true,
+        history: [`🚫 ${actor.name} играет инстант ⚡ «ПРАВО ВЕТО» (потрачен 1 ⚡)! Эффект действия отменён!`, ...state.history].slice(0, 50)
+      }));
+      triggerResourceFloat(set, actor.id, '🚫 ПРАВО ВЕТО!', false);
+
+      if (get().turnPhase === 'VETO_WINDOW') {
+        clearAllTimers();
+        delayTimeout = window.setTimeout(() => {
+          get().proceedAfterVetoWindow();
+        }, 1200);
+      }
+    } else if (instantType === 'Перенаправление' && targetPlayerId) {
+      const newTarget = players.find(p => p.id === targetPlayerId);
+      if (pendingAction && newTarget) {
+        const updatedAction = { ...pendingAction, targetId: targetPlayerId };
+        set(state => ({
+          players: updatedPlayers,
+          discardPile: updatedDiscard,
+          pendingAction: updatedAction,
+          turnPhase: 'TARGET_REACTION_WINDOW',
+          timerSeconds: 14,
+          timerMaxSeconds: 14,
+          history: [`🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ» (потрачен 1 ⚡)! Новая цель атаки: ${newTarget.name}!`, ...state.history].slice(0, 50)
+        }));
+      }
+    } else if (instantType === 'Дворцовый переполох' && targetPlayerId) {
+      const targetIdx = updatedPlayers.findIndex(p => p.id === targetPlayerId);
+      if (targetIdx !== -1) {
+        const victim = updatedPlayers[targetIdx];
+        const { drawn: newTwo, deck: d2, discardPile: disc2 } = drawCardsFromDeck(2, get().deck, [...updatedDiscard, ...victim.hand]);
+        updatedPlayers[targetIdx] = { ...victim, hand: newTwo };
+
+        botMemory.invalidatePlayerHand(victim.id);
+
+        set(state => ({
+          players: updatedPlayers,
+          deck: d2,
+          discardPile: disc2,
+          history: [`⚡ ${actor.name} играет инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (потрачен 1 ⚡)! ${victim.name} сбрасывает руку и берет 2 новые карты!`, ...state.history].slice(0, 50)
+        }));
+        triggerResourceFloat(set, victim.id, '🔄 Смена руки!', false);
+      }
+      if (isOwnTurn) {
+        set({ turnSubPhase: 'CARD_PLAY_PHASE' });
+        delayTimeout = window.setTimeout(() => {
+          get()._checkEndgameAndAdvanceTurn();
+        }, 1200);
+      }
+    } else if (instantType === 'Шпион' && targetPlayerId) {
+      const target = updatedPlayers.find(p => p.id === targetPlayerId);
+      if (target) {
+        if (!actor.isBot) {
+          set(state => ({
+            players: updatedPlayers,
+            discardPile: updatedDiscard,
+            turnSubPhase: 'CARD_PLAY_PHASE',
+            spyPeekData: {
+              actorId: actor.id,
+              targetId: target.id,
+              targetCards: [...target.hand]
+            },
+            turnPhase: 'SPY_PEEK',
+            history: [`👁️ ${actor.name} играет инстант ⚡ «ШПИОН» (потрачен 1 ⚡) и тайно изучает карты ${declineGen(target.name)}!`, ...state.history].slice(0, 50)
+          }));
+        } else {
+          if (isRole(target.hand[0])) botMemory.recordSpyPeek(actor.id, target.id, 0, target.hand[0]);
+          if (target.hand.length > 1 && isRole(target.hand[1])) {
+            botMemory.recordSpyPeek(actor.id, target.id, 1, target.hand[1]);
+          }
+          set(state => ({
+            players: updatedPlayers,
+            discardPile: updatedDiscard,
+            turnSubPhase: 'CARD_PLAY_PHASE',
+            history: [`👁️ ${actor.name} играет инстант ⚡ «ШПИОН» (потрачен 1 ⚡) и тайно изучает карты ${declineGen(target.name)}!`, ...state.history].slice(0, 50)
+          }));
+          if (isOwnTurn) {
+            delayTimeout = window.setTimeout(() => {
+              get()._checkEndgameAndAdvanceTurn();
+            }, 1200);
+          }
+        }
+      }
+    }
   },
 
   // --------------------------------------------------------------------------
@@ -444,7 +810,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { pendingAction, turnPhase } = get();
     if (turnPhase !== 'TARGET_REACTION_WINDOW' || !pendingAction || pendingAction.targetId !== targetId) return;
 
-    // Direct doubt by target
     get().doubtAction(targetId);
   },
 
@@ -455,7 +820,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const actor = players.find(p => p.id === pendingAction.actorId);
     const target = players.find(p => p.id === targetId);
-    if (!actor || !target || target.reputation <= 0) return;
+    if (!actor || !target) return;
 
     const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
 
@@ -467,9 +832,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       timerMaxSeconds: 14,
       activeSpeechReactions: {
         ...state.activeSpeechReactions,
-        [target.id]: `«К барьеру! Блокирую ${blockingRole === 'Казначей' ? 'Казначеем' : 'Рыцарем'}!»`
+        [target.id]: `«ДУЭЛЬ! Мой щит — ${blockingRole}!»`
       },
-      history: [`🤺 ${target.name} заявляет «${blockingRole}» и бросает вызов ${actor.name} на дуэль!`, ...state.history].slice(0, 50)
+      history: [`🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}»!`, ...state.history].slice(0, 50)
     }));
 
     gameTimerInterval = window.setInterval(() => {
@@ -477,7 +842,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (cur <= 1) {
         clearAllTimers();
         if (get().turnPhase === 'DUEL_ATTACKER_WINDOW') {
-          // Attacker timed out -> defaults to retreat
           get().attackerAcceptDuel(actor.id);
         }
       } else {
@@ -495,44 +859,32 @@ export const useGameStore = create<GameState>((set, get) => ({
     const defender = players.find(p => p.id === pendingAction.targetId);
     if (!actor || !defender) return;
 
-    // Trigger dual flight: Attacker to discard, Defender back to hand!
-    triggerDuelCardFlight(set, 'to_discard', actor.id, 'to_hand', defender.id);
+    const actorHand = [...actor.hand];
+    const stakedIdx = pendingAction.stakedCardIndex ?? 0;
+    const discardedCard = actorHand[stakedIdx] || actorHand[0] || 'Наследник';
+    actorHand.splice(stakedIdx, 1);
 
-    // Attacker retreats:
-    // Attacker's card is placed in discard pile + new card drawn
-    const actorHand = actor.hand;
-    const actorStakedIdx = pendingAction.stakedCardIndex ?? (actorHand.indexOf(pendingAction.roleClaim!) !== -1 ? actorHand.indexOf(pendingAction.roleClaim!) : 0);
-    const returnedCard = actorHand[actorStakedIdx] || actorHand[0];
-    
-    const newDiscard = [...get().discardPile, returnedCard];
-    const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, get().deck, newDiscard);
-    const newlyDrawnCard = drawn[0] || 'Наследник';
+    const newPlayers = players.map(p => p.id === actor.id ? { ...p, hand: actorHand } : p);
+    const newDiscard = [...get().discardPile, discardedCard];
 
-    const newPlayers = [...players];
-    const actorIdx = newPlayers.findIndex(p => p.id === actor.id);
-    const newActorHand = [...actorHand];
-    newActorHand[actorStakedIdx] = newlyDrawnCard;
-    newPlayers[actorIdx] = { ...actor, hand: newActorHand };
-
-    const drawNotice = actor.id === 'p1' ? ` Ваша карта ушла в сброс, выдана новая: «${newlyDrawnCard}».` : '';
-    const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+    triggerSingleCardFlight(set, 'to_discard', actor.id, pendingAction.roleClaim, discardedCard);
 
     set(state => ({
       players: newPlayers,
-      deck: newDeck,
-      discardPile: newDiscardPile,
+      discardPile: newDiscard,
       turnPhase: 'IDLE',
+      turnSubPhase: 'CARD_PLAY_PHASE',
       pendingAction: null,
-      pendingDuelDefenderCardIndex: null,
-      pendingDuelDefenderRoleClaim: null,
-      timerSeconds: 0,
-      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: '«Отступаю перед дуэлью...»' },
-      history: [`🏳️ ${actor.name} отступает перед вызовом на дуэль! Атака отменена, никто не теряет ❤️.${drawNotice}${reshuffleNotice}`, ...state.history].slice(0, 50)
+      activeSpeechReactions: {
+        ...state.activeSpeechReactions,
+        [actor.id]: '«Я отступаю... в этот раз.»'
+      },
+      history: [`🏳️ ${actor.name} отступает перед щитом ${defender.name} (карта атаки сброшена).`, ...state.history].slice(0, 50)
     }));
 
     delayTimeout = window.setTimeout(() => {
-      get().endTurn();
-    }, 1800);
+      get()._checkEndgameAndAdvanceTurn();
+    }, 1200);
   },
 
   attackerAcceptDuel: (attackerId: string) => {
@@ -544,67 +896,56 @@ export const useGameStore = create<GameState>((set, get) => ({
     const defender = players.find(p => p.id === pendingAction.targetId);
     if (!actor || !defender) return;
 
-    const actorHand = actor.hand;
-    const actorStakedIdx = pendingAction.stakedCardIndex ?? (actorHand.indexOf(pendingAction.roleClaim!) !== -1 ? actorHand.indexOf(pendingAction.roleClaim!) : 0);
+    const actorHand = [...actor.hand];
+    const actorStakedIdx = pendingAction.stakedCardIndex ?? 0;
     const actorRevealedRole = actorHand[actorStakedIdx] || actorHand[0] || 'Наследник';
     const actorWasTruth = actorRevealedRole === pendingAction.roleClaim;
 
-    const defenderHand = defender.hand;
-    const defenderStakedIdx = pendingDuelDefenderCardIndex ?? (defenderHand.indexOf(pendingDuelDefenderRoleClaim) !== -1 ? defenderHand.indexOf(pendingDuelDefenderRoleClaim) : 0);
-    const defenderRevealedRole = defenderHand[defenderStakedIdx] || defenderHand[0] || 'Наследник';
+    const defenderHand = [...defender.hand];
+    const defStakedIdx = pendingDuelDefenderCardIndex ?? 0;
+    const defenderRevealedRole = defenderHand[defStakedIdx] || defenderHand[0] || 'Наследник';
     const defenderWasTruth = defenderRevealedRole === pendingDuelDefenderRoleClaim;
 
-    const newPlayers = [...players];
-    const actorIdx = newPlayers.findIndex(p => p.id === actor.id);
-    const defenderIdx = newPlayers.findIndex(p => p.id === defender.id);
+    actorHand.splice(actorStakedIdx, 1);
+    defenderHand.splice(defStakedIdx, 1);
 
+    const newPlayers = players.map(p => {
+      if (p.id === actor.id) return { ...p, hand: actorHand };
+      if (p.id === defender.id) return { ...p, hand: defenderHand };
+      return p;
+    });
+
+    const isVaBanqueActive = get().isVaBanqueActive;
     let resultType: DuelResultType = 'clash_blocked';
+    let sealsWinnerId: string | undefined = undefined;
+    let bothLostCoin = false;
     let message = '';
-    const damagedIds: string[] = [];
 
     if (actorWasTruth && defenderWasTruth) {
-      // 1. Both Truth: Attack Blocked, 0 damage
       resultType = 'clash_blocked';
-      message = `⚔️ ЧЕСТНАЯ ДУЭЛЬ! ${actor.name} («${pendingAction.roleClaim}») встретил честный щит ${defender.name} («${pendingDuelDefenderRoleClaim}»)! Атака заблокирована, никто не теряет ❤️.`;
+      get().addSealsToPlayer(actor.id, 1);
+      get().addSealsToPlayer(defender.id, 1);
+      message = `🛡️ ЧЕСТНАЯ ДУЭЛЬ! Оба игрока сказали правду (${actor.name}: «${actorRevealedRole}», ${defender.name}: «${defenderRevealedRole}»). Атака заблокирована, КАЖДЫЙ получает по +1 ⚜️!${isVaBanqueActive ? ' (Ва-банк нейтрализован щитом)' : ''}`;
     } else if (actorWasTruth && !defenderWasTruth) {
-      // 2. Attacker Truth, Defender Bluff: Defender -1 HP, Attack succeeds!
       resultType = 'attacker_breakthrough';
-      newPlayers[defenderIdx] = { ...defender, reputation: Math.max(0, defender.reputation - 1) };
-      damagedIds.push(defender.id);
-      message = `💥 ПРОБИТИЕ ЗАЩИТЫ! ${actor.name} действительно «${pendingAction.roleClaim}», а ${defender.name} блефовал картой «${defenderRevealedRole}»! ${defender.name} теряет 1 ❤️, атака проходит!`;
+      if (!isVaBanqueActive) {
+        sealsWinnerId = actor.id;
+        get().addSealsToPlayer(actor.id, 1);
+      }
+      message = `💥 ПРОБИТИЕ ЗАЩИТЫ${isVaBanqueActive ? ' ПОД ВА-БАНКОМ' : ''}! ${actor.name} сказал правду («${actorRevealedRole}»), а ${defender.name} блефовал(а) («${defenderRevealedRole}»). ${isVaBanqueActive ? 'Защитник проиграл дуэль: атака проходит с удвоением (4 💰 / 2 👑, печати отменены)!' : `${actor.name} получает +1 ⚜️, атака проходит!`}`;
     } else if (!actorWasTruth && defenderWasTruth) {
-      // 3. Attacker Bluff, Defender Truth: Attacker -1 HP, Attack cancelled!
       resultType = 'defender_counter';
-      newPlayers[actorIdx] = { ...actor, reputation: Math.max(0, actor.reputation - 1) };
-      damagedIds.push(actor.id);
-      message = `🛡️ КОНТРАТАКА! ${defender.name} выставил настоящего «${pendingDuelDefenderRoleClaim}», а ${actor.name} блефовал картой «${actorRevealedRole}»! ${actor.name} теряет 1 ❤️, атака отменена!`;
+      sealsWinnerId = defender.id;
+      const defSeals = isVaBanqueActive ? 2 : 1;
+      get().addSealsToPlayer(defender.id, defSeals);
+      message = `🛡️ КОНТРАТАКА ЩИТОМ${isVaBanqueActive ? ' ПОД ВА-БАНКОМ' : ''}! ${defender.name} подтвердил(а) защиту («${defenderRevealedRole}»), а ${actor.name} блефовал(а) («${actorRevealedRole}»). Атакующий проиграл дуэль под Ва-банком: ${defender.name} получает +${defSeals} ⚜️, атака отбита!`;
     } else {
-      // 4. Both Bluff: Mutual Bluff! BOTH -1 HP, Attack cancelled!
       resultType = 'mutual_bluff';
-      newPlayers[actorIdx] = { ...actor, reputation: Math.max(0, actor.reputation - 1) };
-      newPlayers[defenderIdx] = { ...defender, reputation: Math.max(0, defender.reputation - 1) };
-      damagedIds.push(actor.id, defender.id);
-      message = `🤡 ВЗАИМНЫЙ ПОЗОР! Оба игрока блефовали! (${actor.name} поставил «${actorRevealedRole}», а ${defender.name} поставил «${defenderRevealedRole}»). Оба теряют по 1 ❤️, атака отменена!`;
+      bothLostCoin = false;
+      message = `🤡 ОБА ПОПАЛИСЬ! Оба игрока блефовали (${actor.name}: «${actorRevealedRole}», ${defender.name}: «${defenderRevealedRole}»). Атака отменена, никто ничего не получает и не теряет!`;
     }
 
-    // Both cards were revealed to the table and go into DISCARD PILE!
-    const newDiscard = [...get().discardPile, actorRevealedRole, defenderRevealedRole];
-    const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(2, get().deck, newDiscard);
-    const newActorDrawn = drawn[0] || 'Наследник';
-    const newDefenderDrawn = drawn[1] || 'Наследник';
-
-    const updatedActorHand = [...newPlayers[actorIdx].hand];
-    updatedActorHand[actorStakedIdx] = newActorDrawn;
-    newPlayers[actorIdx] = { ...newPlayers[actorIdx], hand: updatedActorHand };
-
-    const updatedDefenderHand = [...newPlayers[defenderIdx].hand];
-    updatedDefenderHand[defenderStakedIdx] = newDefenderDrawn;
-    newPlayers[defenderIdx] = { ...newPlayers[defenderIdx], hand: updatedDefenderHand };
-
-    botMemory.recordRevealedCard(actor.id, actorRevealedRole);
-    botMemory.recordRevealedCard(defender.id, defenderRevealedRole);
-
-    const duelOutcome: DuelOutcome = {
+    const outcome: DuelOutcome = {
       attackerId: actor.id,
       defenderId: defender.id,
       attackerClaim: pendingAction.roleClaim!,
@@ -614,55 +955,53 @@ export const useGameStore = create<GameState>((set, get) => ({
       attackerWasTruth: actorWasTruth,
       defenderWasTruth,
       resultType,
+      sealsWinnerId,
+      bothLostCoin,
       message
     };
 
-    const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
-    const isHumanDamaged = damagedIds.includes('p1');
-
     set(state => ({
       players: newPlayers,
-      deck: newDeck,
-      discardPile: newDiscardPile,
-      duelOutcome,
+      duelOutcome: outcome,
       turnPhase: 'DUEL_OUTCOME',
-      damagedPlayerIds: damagedIds,
-      screenDamageFlash: isHumanDamaged,
       activeSpeechReactions: {
         ...state.activeSpeechReactions,
         [actor.id]: actorWasTruth ? '«Принимаю дуэль! Чистая сталь!»' : '«Принимаю! Посмотрим, кто дрогнет!»',
         [defender.id]: defenderWasTruth ? '«Мой щит непоколебим!»' : '«Я рискнул и ответил вызовом!»'
       },
-      history: [message + reshuffleNotice, ...state.history].slice(0, 50)
+      history: [message, ...state.history].slice(0, 50)
     }));
 
-    // Auto-advance non-blocking after 3.8 seconds so players can see the visual duel resolution directly on the table
     delayTimeout = window.setTimeout(() => {
-      set({ damagedPlayerIds: [], screenDamageFlash: false });
       get().closeDuelOutcome();
-    }, 3800);
+    }, 4000);
   },
 
   closeDuelOutcome: () => {
     const { duelOutcome, pendingAction } = get();
-    if (!duelOutcome || !pendingAction) {
-      set({ duelOutcome: null });
-      get().endTurn();
-      return;
-    }
+    if (!duelOutcome || !pendingAction) return;
 
-    // Both cards in duel were revealed -> BOTH cards fly to DISCARD!
-    triggerDuelCardFlight(set, 'to_discard', duelOutcome.attackerId, 'to_discard', duelOutcome.defenderId);
+    triggerDuelCardFlight(
+      set,
+      'to_discard',
+      duelOutcome.attackerId,
+      'to_discard',
+      duelOutcome.defenderId,
+      duelOutcome.attackerRevealedRole,
+      duelOutcome.attackerWasTruth,
+      duelOutcome.defenderRevealedRole,
+      duelOutcome.defenderWasTruth
+    );
+
     const breakthrough = duelOutcome.resultType === 'attacker_breakthrough';
     set({ duelOutcome: null });
 
     if (breakthrough) {
-      // Attack was breakthrough -> execute effect (steal gold or crown)
-      get()._resolveRoleActionEffect(pendingAction);
+      get()._triggerVetoWindowOrResolveEffect(pendingAction);
     } else {
       delayTimeout = window.setTimeout(() => {
-        get().endTurn();
-      }, 1200);
+        get()._checkEndgameAndAdvanceTurn();
+      }, 800);
     }
   },
 
@@ -677,15 +1016,60 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     const actor = players.find(p => p.id === pendingAction.actorId);
     const doubter = players.find(p => p.id === doubterId);
-    if (!actor || !doubter || doubter.reputation <= 0) return;
+    if (!actor || !doubter) return;
+
+    // Doubter must spend 1 Action Token!
+    if (doubter.actionTokens < 1) {
+      return; // Cannot doubt without action token
+    }
+
+    // Deduct 1 Action Token from doubter immediately
+    let newPlayers = players.map(p => p.id === doubter.id ? { ...p, actionTokens: p.actionTokens - 1 } : p);
+    triggerResourceFloat(set, doubter.id, '-1 ⚡', false);
+
+    // Informant Network trigger: all holders receive +1 💰 for every check at court!
+    const informantHolders = newPlayers.filter(p => p.activePlot?.type === 'Сеть информаторов');
+    if (informantHolders.length > 0) {
+      newPlayers = newPlayers.map(p => p.activePlot?.type === 'Сеть информаторов' ? { ...p, gold: p.gold + 1 } : p);
+      informantHolders.forEach(p => {
+        triggerResourceFloat(set, p.id, '+1 💰 Информаторы', true);
+      });
+    }
+
+    const informantLogs = informantHolders.map(p => `👁️ «Сеть информаторов» приносит +1 💰 для ${p.name} за проверку при дворе!`);
+
+    set(state => ({
+      players: newPlayers,
+      pendingDoubtDoubterId: doubter.id,
+      activeSpeechReactions: {
+        ...state.activeSpeechReactions,
+        [doubter.id]: '«Не верю! Проверяю!»'
+      },
+      history: [
+        ...informantLogs,
+        `⚡ ${doubter.name} сомневается в «${pendingAction.roleClaim}» от ${actor.name} и кричит: «НЕ ВЕРЮ!» (потрачен 1 ⚡).`,
+        ...state.history
+      ].slice(0, 50)
+    }));
+
+    delayTimeout = window.setTimeout(() => {
+      get()._executeRevealOutcome(doubter.id);
+    }, 1200);
+  },
+
+  _executeRevealOutcome: (doubterId: string) => {
+    clearAllTimers();
+    const { pendingAction, players, isVaBanqueActive } = get();
+    if (!pendingAction || !pendingAction.roleClaim) return;
+
+    const actor = players.find(p => p.id === pendingAction.actorId);
+    const doubter = players.find(p => p.id === doubterId);
+    if (!actor || !doubter) return;
 
     const claimedRole = pendingAction.roleClaim;
-    const actorHand = actor.hand;
-    let stakedIndex = pendingAction.stakedCardIndex;
-    if (stakedIndex === undefined || stakedIndex < 0 || stakedIndex >= actorHand.length) {
-      stakedIndex = actorHand.indexOf(claimedRole);
-      if (stakedIndex === -1) stakedIndex = 0;
-    }
+    const actorHand = [...actor.hand];
+    let stakedIndex = pendingAction.stakedCardIndex ?? 0;
+    if (stakedIndex < 0 || stakedIndex >= actorHand.length) stakedIndex = 0;
 
     const revealedRole = actorHand[stakedIndex] || actorHand[0] || 'Наследник';
     const wasTruth = revealedRole === claimedRole;
@@ -695,57 +1079,136 @@ export const useGameStore = create<GameState>((set, get) => ({
     const doubterIdx = newPlayers.findIndex(p => p.id === doubter.id);
 
     let jesterBonus = false;
-    const damagedId = wasTruth ? doubter.id : actor.id;
+    let blackBookApplied = false;
+    let sealsWinnerId: string | undefined = undefined;
+    let sealsCount = 0;
+    let dossierBonusPlayerId: string | undefined = undefined;
+    const doubterPlot = doubter.activePlot;
 
     if (wasTruth) {
-      // Truth! Doubter loses 1 HP
-      newPlayers[doubterIdx] = { 
-        ...doubter, 
-        reputation: Math.max(0, doubter.reputation - 1) 
-      };
+      // Failed check: Black Book is discarded without reward
+      if (doubterPlot && doubterPlot.type === 'Чёрная книга') {
+        newPlayers[doubterIdx] = { ...newPlayers[doubterIdx], activePlot: null };
+        set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
+      }
 
       if (claimedRole === 'Шут') {
-        newPlayers[actorIdx] = { ...actor, favor: actor.favor + 1 };
-        jesterBonus = true;
-        triggerResourceFloat(set, actor.id, '+1 👑', true);
+        if (actor.favor < 6) {
+          const nextFavor = Math.min(6, actor.favor + 1);
+          const gained = nextFavor - actor.favor;
+          newPlayers[actorIdx] = { ...actor, favor: nextFavor };
+          jesterBonus = true;
+          triggerResourceFloat(set, actor.id, `+${gained} 👑`, true);
+        }
+
+        if (newPlayers[actorIdx].favor >= 6 && !get().coronationCandidateId) {
+          set(state => ({
+            coronationCandidateId: actor.id,
+            history: [`👑 КРУГ КОРОНАЦИИ! ${actor.name} через ловушку Шута набрал 6 👑! Если никто не собьёт его короны за круг, он победит!`, ...state.history].slice(0, 50)
+          }));
+        }
+      } else {
+        // Under Va-banque, truth does NOT grant seals to actor (0 seals, only x2 role effect)
+        if (!isVaBanqueActive) {
+          sealsWinnerId = actor.id;
+          sealsCount = 1;
+        }
       }
     } else {
-      // Lie! Actor loses 1 HP
-      newPlayers[actorIdx] = { 
-        ...actor, 
-        reputation: Math.max(0, actor.reputation - 1) 
-      };
+      // Caught bluffing!
+      // Check Black Book (Чёрная книга) for doubter: grants +1 👑 directly, NO seals!
+      if (doubterPlot && doubterPlot.type === 'Чёрная книга') {
+        blackBookApplied = true;
+        if (doubter.favor < 6) {
+          const nextFavor = Math.min(6, doubter.favor + 1);
+          const gained = nextFavor - doubter.favor;
+          newPlayers[doubterIdx] = { 
+            ...newPlayers[doubterIdx], 
+            favor: nextFavor, 
+            activePlot: null 
+          };
+          triggerResourceFloat(set, doubter.id, `+${gained} 👑 Чёрная книга!`, true);
+        } else {
+          newPlayers[doubterIdx] = { 
+            ...newPlayers[doubterIdx], 
+            activePlot: null 
+          };
+        }
+        set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
+
+        if (newPlayers[doubterIdx].favor >= 6 && !get().coronationCandidateId) {
+          set(state => ({
+            coronationCandidateId: doubter.id,
+            history: [`👑 КРУГ КОРОНАЦИИ! ${doubter.name} через Чёрную книгу набрал(а) 6 👑! Если никто не собьёт короны за круг, он(а) победит!`, ...state.history].slice(0, 50)
+          }));
+        }
+      } else {
+        // Normal doubt / Va-banque doubt: awards seals
+        sealsWinnerId = doubter.id;
+        sealsCount = isVaBanqueActive ? 2 : 1;
+      }
+
+      // Check Dossier (Досье) on the accused actor: awards +1 👑 directly!
+      const dossierOwner = newPlayers.find(p => p.activePlot?.type === 'Досье' && p.activePlot.targetPlayerId === actor.id);
+      if (dossierOwner) {
+        dossierBonusPlayerId = dossierOwner.id;
+        const dIdx = newPlayers.findIndex(p => p.id === dossierOwner.id);
+        const dNextFavor = Math.min(6, dossierOwner.favor + 1);
+        const dGained = dNextFavor - dossierOwner.favor;
+        newPlayers[dIdx] = { 
+          ...newPlayers[dIdx], 
+          favor: dNextFavor, 
+          activePlot: null 
+        };
+        triggerResourceFloat(set, dossierOwner.id, `+${dGained} 👑 Досье!`, true);
+        set(state => ({ discardPile: [...state.discardPile, 'Досье'] }));
+
+        if (newPlayers[dIdx].favor >= 6 && !get().coronationCandidateId) {
+          set(state => ({
+            coronationCandidateId: dossierOwner.id,
+            history: [`👑 КРУГ КОРОНАЦИИ! ${dossierOwner.name} через Досье набрал(а) 6 👑! Если никто не собьёт короны за круг, он(а) победит!`, ...state.history].slice(0, 50)
+          }));
+        }
+      }
     }
 
-    // IN BOTH CASES: The staked card was revealed to all and goes into the DISCARD PILE!
-    const returnedCard = revealedRole;
-    const newDiscard = [...get().discardPile, returnedCard];
-    const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, get().deck, newDiscard);
-    const newlyDrawnCard = drawn[0] || 'Наследник';
+    // Remove revealed card from hand to discard
+    actorHand.splice(stakedIndex, 1);
+    newPlayers[actorIdx] = { ...newPlayers[actorIdx], hand: actorHand };
+    const newDiscard = [...get().discardPile, revealedRole];
 
-    const newHand = [...newPlayers[actorIdx].hand];
-    newHand[stakedIndex] = newlyDrawnCard;
-    newPlayers[actorIdx] = { ...newPlayers[actorIdx], hand: newHand };
+    if (isRole(revealedRole)) botMemory.recordRevealedCard(actor.id, revealedRole);
 
-    botMemory.recordRevealedCard(actor.id, revealedRole);
-
-    const drawNotice = actor.id === 'p1' 
-      ? ` Ваша карта «${revealedRole}» отправлена в сброс, и вам выдана новая карта: «${newlyDrawnCard}».`
-      : '';
-
-    const reshuffleNotice = wasReshuffled 
-      ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и сформировал новую колоду.` 
-      : '';
+    const vaBanqueNotice = isVaBanqueActive ? ' 🎲 (Сыгран ВА-БАНК!)' : '';
+    const blackBookNotice = (doubterPlot?.type === 'Чёрная книга' && !wasTruth) ? ' 📕 (Сработала Чёрная книга!)' : '';
+    const dossierNotice = dossierBonusPlayerId ? ` 📜 (Досье принесло +1 👑 для ${players.find(p => p.id === dossierBonusPlayerId)?.name}!)` : '';
 
     const actorAcc = declineAcc(actor.name);
     const doubterDoubted = verbDoubted(doubter.name);
     const doubterCaught = verbCaught(doubter.name);
-    const actorLoses = verbLoses(actor.name);
-    const doubterLoses = verbLoses(doubter.name);
 
-    const message = wasTruth
-      ? `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «${claimedRole}»! ${doubterLoses} 1 ❤️, но действие карты остановлено проверкой!${drawNotice}${jesterBonus ? ' Шут получает +1 👑!' : ''}${reshuffleNotice}`
-      : `${doubter.name} ${doubterCaught} ${actorAcc} на лжи! На кону была карта «${revealedRole}» вместо «${claimedRole}». ${actorLoses} 1 ❤️, а действие отменяется.${drawNotice}${reshuffleNotice}`;
+    let message = '';
+    if (wasTruth) {
+      if (claimedRole === 'Шут') {
+        if (isVaBanqueActive) {
+          message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «Шут»! Ловушка под Ва-банком: ${actor.name} получает +4 💰 и +1 👑 (печати отменены)!${vaBanqueNotice}`;
+        } else {
+          message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «Шут»! Ловушка сработала: ${actor.name} получает +1 👑!`;
+        }
+      } else {
+        if (isVaBanqueActive) {
+          message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «${claimedRole}»! Эффект роли удваивается (печати отменены)!${vaBanqueNotice}`;
+        } else {
+          message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «${claimedRole}»! ${actor.name} получает +1 ⚜️, и действие исполняется!`;
+        }
+      }
+    } else {
+      if (blackBookApplied) {
+        message = `${doubter.name} ${doubterCaught} ${actorAcc} на лжи! На кону была карта «${revealedRole}» вместо «${claimedRole}». Сработала «Чёрная книга»: ${doubter.name} получает +1 👑 напрямую (без печатей)!${vaBanqueNotice}${dossierNotice}`;
+      } else {
+        message = `${doubter.name} ${doubterCaught} ${actorAcc} на лжи! На кону была карта «${revealedRole}» вместо «${claimedRole}». ${doubter.name} получает +${sealsCount} ⚜️, а действие отменяется.${vaBanqueNotice}${blackBookNotice}${dossierNotice}`;
+      }
+    }
 
     const outcome: RevealOutcome = {
       accuserId: doubter.id,
@@ -753,45 +1216,46 @@ export const useGameStore = create<GameState>((set, get) => ({
       claimedRole,
       wasTruth,
       revealedRole,
+      sealsWinnerId,
+      actionExecuted: wasTruth && (claimedRole !== 'Шут' || isVaBanqueActive),
       jesterBonus,
+      vaBanqueBonus: isVaBanqueActive,
+      dossierBonusPlayerId,
       message
     };
 
-    const isHumanDamaged = damagedId === 'p1';
-
     set(state => ({
       players: newPlayers,
-      deck: newDeck,
-      discardPile: newDiscardPile,
+      discardPile: newDiscard,
       revealOutcome: outcome,
       turnPhase: 'REVEAL_OUTCOME',
-      damagedPlayerIds: [damagedId],
-      screenDamageFlash: isHumanDamaged,
+      pendingDoubtDoubterId: null,
       activeSpeechReactions: {
         ...state.activeSpeechReactions,
-        [doubter.id]: '«Не верю! Проверяю!»',
-        [actor.id]: wasTruth ? '«Вот моя карта! Честная правда!»' : '«Увы... раскрыли блеф!»'
+        [actor.id]: wasTruth ? (claimedRole === 'Шут' ? '«Ха-ха! Попались на Шута!»' : '«Вот моя карта! Чистая правда!»') : '«Увы... раскрыли блеф!»'
       },
       history: [outcome.message, ...state.history].slice(0, 50)
     }));
 
-    // Auto-advance non-blocking after 3.6 seconds so players can see the visual reveal on the table
+    if (sealsWinnerId && sealsCount > 0) {
+      get().addSealsToPlayer(sealsWinnerId, sealsCount);
+    }
+
     delayTimeout = window.setTimeout(() => {
-      set({ damagedPlayerIds: [], screenDamageFlash: false });
       get().closeRevealOutcome();
-    }, 3600);
+    }, 2800);
   },
 
   passDoubt: (playerId) => {
     clearAllTimers();
-    const { turnPhase, pendingAction, players, coronationCandidateId, discardPile } = get();
+    const { turnPhase, pendingAction, players, discardPile, coronationCandidateId } = get();
     if (turnPhase !== 'DOUBT_WINDOW' || !pendingAction || !pendingAction.roleClaim) return;
 
     const actor = players.find(p => p.id === pendingAction.actorId);
     if (!actor) return;
 
-    // Check if any observing bot wants to doubt using intelligent evaluator
-    const bots = players.filter(p => p.isBot && p.id !== pendingAction.actorId && p.id !== playerId && p.reputation > 0);
+    // Check observing bots who have >= 1 Action Token
+    const bots = players.filter(p => p.isBot && p.id !== pendingAction.actorId && p.id !== playerId && p.actionTokens >= 1);
     const botDoubter = bots.find(b => {
       const decision = evaluateBotDoubt(
         b, 
@@ -814,54 +1278,104 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   closeRevealOutcome: () => {
-    const { revealOutcome } = get();
+    const { revealOutcome, pendingAction } = get();
     if (!revealOutcome) return;
 
-    triggerSingleCardFlight(set, 'to_discard', revealOutcome.accusedId, revealOutcome.revealedRole);
+    triggerSingleCardFlight(
+      set, 
+      'to_discard', 
+      revealOutcome.accusedId, 
+      revealOutcome.claimedRole, 
+      revealOutcome.revealedRole, 
+      revealOutcome.wasTruth
+    );
     set({ revealOutcome: null });
 
-    // Rule 7: Any challenge stops the card action even if it was the truth!
-    delayTimeout = window.setTimeout(() => {
-      get()._checkCoronationAndEndTurn(revealOutcome.accusedId);
-    }, 1200);
+    if (revealOutcome.wasTruth && (revealOutcome.claimedRole !== 'Шут' || revealOutcome.vaBanqueBonus) && pendingAction) {
+      get()._triggerVetoWindowOrResolveEffect(pendingAction, true);
+    } else {
+      delayTimeout = window.setTimeout(() => {
+        get()._checkEndgameAndAdvanceTurn();
+      }, 800);
+    }
+  },
+
+  closeInformantPeek: () => {
+    set({ informantPeekData: null, turnPhase: 'IDLE' });
   },
 
   _proceedAfterDoubtPassed: (action: Action) => {
     clearAllTimers();
-    triggerSingleCardFlight(set, 'to_discard', action.actorId, action.roleClaim);
 
-    // Rule 1: Staked card goes to discard pile and player draws a new card (except Spy which handles choice)
-    if (action.roleClaim !== 'Шпион') {
-      const { players, deck, discardPile } = get();
-      const actorIdx = players.findIndex(p => p.id === action.actorId);
-      const actor = players[actorIdx];
-      if (actor) {
-        const actorHand = actor.hand;
-        const stakedIdx = action.stakedCardIndex ?? (actorHand.indexOf(action.roleClaim!) !== -1 ? actorHand.indexOf(action.roleClaim!) : 0);
-        const playedCard = actorHand[stakedIdx] || actorHand[0];
+    triggerSingleCardFlight(set, 'to_hand', action.actorId, action.roleClaim);
 
-        const newDiscard = [...discardPile, playedCard];
-        const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, deck, newDiscard);
-        const newCard = drawn[0] || 'Наследник';
+    set(state => ({
+      history: [`🂠 Действие «${action.roleClaim}» от ${state.players.find(p => p.id === action.actorId)?.name || 'игрока'} не оспорено двором (карта остаётся в руке).`, ...state.history].slice(0, 50)
+    }));
 
-        const newHand = [...actorHand];
-        newHand[stakedIdx] = newCard;
-        const newPlayers = [...players];
-        newPlayers[actorIdx] = { ...actor, hand: newHand };
+    get()._triggerVetoWindowOrResolveEffect(action, false);
+  },
 
-        const drawNotice = actor.id === 'p1' ? ` (карта «${playedCard}» ушла в сброс, получена «${newCard}»)` : '';
-        const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+  _triggerVetoWindowOrResolveEffect: (action: Action, isAfterTruthChallenge = false) => {
+    clearAllTimers();
+    const { isVetoed, players } = get();
 
-        set(state => ({
-          players: newPlayers,
-          deck: newDeck,
-          discardPile: newDiscardPile,
-          history: [`🂠 ${actor.name} сыграл «${action.roleClaim}»${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
-        }));
-      }
+    if (isVetoed) {
+      set(state => ({
+        history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
+      }));
+      delayTimeout = window.setTimeout(() => {
+        get()._checkEndgameAndAdvanceTurn();
+      }, 1200);
+      return;
     }
 
-    get()._resolveRoleActionEffect(action);
+    // Check if any opponent holds Royal Veto and has >= 1 action token
+    const hasVetoHolder = players.some(p => p.id !== action.actorId && p.hand.includes('Право вето') && p.actionTokens >= 1);
+
+    if (hasVetoHolder) {
+      set({
+        turnPhase: 'VETO_WINDOW',
+        timerSeconds: 4,
+        timerMaxSeconds: 4
+      });
+
+      gameTimerInterval = window.setInterval(() => {
+        const cur = get().timerSeconds;
+        if (cur <= 1) {
+          clearAllTimers();
+          if (get().turnPhase === 'VETO_WINDOW') {
+            get().proceedAfterVetoWindow();
+          }
+        } else {
+          set({ timerSeconds: cur - 1 });
+        }
+      }, 1000);
+    } else {
+      delayTimeout = window.setTimeout(() => {
+        get()._resolveRoleActionEffect(action, isAfterTruthChallenge);
+      }, 800);
+    }
+  },
+
+  proceedAfterVetoWindow: () => {
+    clearAllTimers();
+    const { pendingAction, isVetoed } = get();
+    if (!pendingAction) {
+      get()._checkEndgameAndAdvanceTurn();
+      return;
+    }
+
+    if (isVetoed) {
+      set(state => ({
+        history: [`🚫 Действие «${pendingAction.roleClaim || pendingAction.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
+      }));
+      delayTimeout = window.setTimeout(() => {
+        get()._checkEndgameAndAdvanceTurn();
+      }, 1200);
+    } else {
+      get()._resolveRoleActionEffect(pendingAction);
+    }
   },
 
   _executeNormalAction: (action: Action) => {
@@ -874,20 +1388,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       newPlayers[actorIdx] = actor;
       triggerResourceFloat(set, actor.id, '+1 💰', true);
     } else if (action.name.includes('Пир') || action.name.includes('пир')) {
-      if (actor.favor < 4) {
+      if (actor.favor < 5) {
         actor = { ...actor, favor: actor.favor + 1 };
         newPlayers[actorIdx] = actor;
         triggerResourceFloat(set, actor.id, '+1 👑', true);
-      }
-    } else if (action.name.includes('Восстановить') || action.name.includes('репутаци')) {
-      if (actor.reputation < 3) {
-        actor = { ...actor, reputation: Math.min(3, actor.reputation + 1) };
-        newPlayers[actorIdx] = actor;
-        triggerResourceFloat(set, actor.id, '+1 ❤️', true);
-        set(state => ({
-          players: newPlayers,
-          history: [`❤️ ${actor.name} восстановил 1 ❤️ репутации за 5 💰.`, ...state.history].slice(0, 50)
-        }));
       }
     } else if (action.name.includes('Слух') || action.name.includes('слух')) {
       if (action.targetId) {
@@ -895,9 +1399,19 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (targetIdx !== -1 && newPlayers[targetIdx].favor > 0) {
           newPlayers[targetIdx] = { ...newPlayers[targetIdx], favor: newPlayers[targetIdx].favor - 1 };
           triggerResourceFloat(set, action.targetId, '-1 👑', false);
+
+          get()._disruptPlayerPlotsOnLoss(action.targetId, 'распущенных слухов');
+
+          if (get().coronationCandidateId === action.targetId && newPlayers[targetIdx].favor < 6) {
+            set(state => ({
+              coronationCandidateId: null,
+              history: [`⚖️ Коронация ${newPlayers[targetIdx].name} сорвана слухами! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
+            }));
+          }
         }
       }
     } else if (action.name.includes('Сменить') || action.name.includes('сменить')) {
+      // 🔄 Сменить карту: this action explicitly draws a new card immediately in Phase 2 so player can use it in Phase 3
       const cardIdx = action.stakedCardIndex ?? 0;
       const returnedCard = actor.hand[cardIdx] || actor.hand[0];
       
@@ -918,306 +1432,242 @@ export const useGameStore = create<GameState>((set, get) => ({
         deck: newDeck,
         discardPile: newDiscardPile,
         players: newPlayers,
-        history: [`🔄 ${actor.name} сбросил карту и взял новую через обычное действие${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
+        history: [`🔄 ${actor.name} сбросил карту и бесплатно взял новую из колоды${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
       }));
     }
 
     set({ players: newPlayers });
     
     delayTimeout = window.setTimeout(() => {
-      get()._checkCoronationAndEndTurn(actor.id);
-    }, 1800);
+      get()._checkEndgameAndAdvanceTurn();
+    }, 1200);
   },
 
-  _resolveRoleActionEffect: (action: Action) => {
+  _resolveRoleActionEffect: (action: Action, isAfterTruthChallenge = false) => {
     let newPlayers = [...get().players];
     const actorIdx = newPlayers.findIndex(p => p.id === action.actorId);
     let actor = newPlayers[actorIdx];
     const role = action.roleClaim;
+    const isVB = isAfterTruthChallenge && get().isVaBanqueActive;
 
     if (role === 'Наследник') {
-      actor = { ...actor, favor: actor.favor + 1 };
+      const crowns = isVB ? 2 : 1;
+      const targetFavor = Math.min(6, actor.favor + crowns);
+      const actualGained = targetFavor - actor.favor;
+      actor = { ...actor, favor: targetFavor };
       newPlayers[actorIdx] = actor;
-      triggerResourceFloat(set, actor.id, '+1 👑', true);
+      triggerResourceFloat(set, actor.id, `+${actualGained} 👑${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
       set({ players: newPlayers });
       delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
+        get()._checkEndgameAndAdvanceTurn();
       }, 1800);
     } else if (role === 'Казначей') {
-      actor = { ...actor, gold: actor.gold + 3 };
+      const gold = isVB ? 6 : 3;
+      actor = { ...actor, gold: actor.gold + gold };
       newPlayers[actorIdx] = actor;
-      triggerResourceFloat(set, actor.id, '+3 💰', true);
+      triggerResourceFloat(set, actor.id, `+${gold} 💰${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
       set({ players: newPlayers });
       delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
+        get()._checkEndgameAndAdvanceTurn();
       }, 1800);
     } else if (role === 'Рыцарь' || role === 'Шут') {
-      actor = { ...actor, gold: actor.gold + 2 };
+      const gold = isVB ? 4 : 2;
+      actor = { ...actor, gold: actor.gold + gold };
       newPlayers[actorIdx] = actor;
-      triggerResourceFloat(set, actor.id, '+2 💰', true);
+      triggerResourceFloat(set, actor.id, `+${gold} 💰${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
       set({ players: newPlayers });
       delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
+        get()._checkEndgameAndAdvanceTurn();
       }, 1800);
     } else if (role === 'Вор' && action.targetId) {
       const targetIdx = newPlayers.findIndex(p => p.id === action.targetId);
       if (targetIdx !== -1) {
-        const stolen = Math.min(2, newPlayers[targetIdx].gold);
+        const maxStolen = isVB ? 4 : 2;
+        const stolen = Math.min(maxStolen, newPlayers[targetIdx].gold);
         newPlayers[targetIdx] = { ...newPlayers[targetIdx], gold: newPlayers[targetIdx].gold - stolen };
         actor = { ...actor, gold: actor.gold + stolen };
         newPlayers[actorIdx] = actor;
         triggerResourceFloat(set, action.targetId, `-${stolen} 💰`, false);
-        triggerResourceFloat(set, actor.id, `+${stolen} 💰`, true);
+        triggerResourceFloat(set, actor.id, `+${stolen} 💰${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
+
+        if (stolen > 0) {
+          get()._disruptPlayerPlotsOnLoss(action.targetId, 'кражи Вора');
+        }
       }
       set({ players: newPlayers });
       delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
+        get()._checkEndgameAndAdvanceTurn();
       }, 1800);
     } else if (role === 'Шантажист' && action.targetId) {
       const targetIdx = newPlayers.findIndex(p => p.id === action.targetId);
       if (targetIdx !== -1 && newPlayers[targetIdx].favor > 0) {
-        newPlayers[targetIdx] = { ...newPlayers[targetIdx], favor: newPlayers[targetIdx].favor - 1 };
-        actor = { ...actor, favor: actor.favor + 1 };
+        const maxSteal = isVB ? 2 : 1;
+        const stolen = Math.min(maxSteal, newPlayers[targetIdx].favor);
+        newPlayers[targetIdx] = { ...newPlayers[targetIdx], favor: newPlayers[targetIdx].favor - stolen };
+        triggerResourceFloat(set, action.targetId, `-${stolen} 👑`, false);
+
+        get()._disruptPlayerPlotsOnLoss(action.targetId, 'шантажа');
+
+        const nextFavor = Math.min(6, actor.favor + stolen);
+        const actualGained = nextFavor - actor.favor;
+        actor = { ...actor, favor: nextFavor };
         newPlayers[actorIdx] = actor;
-        triggerResourceFloat(set, action.targetId, '-1 👑', false);
-        triggerResourceFloat(set, actor.id, '+1 👑', true);
+        triggerResourceFloat(set, actor.id, `+${actualGained} 👑${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
+
+        if (get().coronationCandidateId === action.targetId && newPlayers[targetIdx].favor < 6) {
+          set(state => ({
+            coronationCandidateId: null,
+            history: [`⚖️ Коронация ${newPlayers[targetIdx].name} сорвана шантажом! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
+          }));
+        }
       }
       set({ players: newPlayers });
       delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
-      }, 1800);
-    } else if (role === 'Шпион' && action.targetId) {
-      const target = newPlayers.find(p => p.id === action.targetId);
-      const targetCards: Role[] = target ? [...target.hand] : ['Наследник', 'Казначей'];
-
-      if (!actor.isBot) {
-        // Show spy modal to human with BOTH cards!
-        set({
-          spyPeekData: {
-            actorId: actor.id,
-            targetId: action.targetId,
-            targetCards
-          },
-          turnPhase: 'SPY_PEEK'
-        });
-      } else {
-        // Bot records both seen cards in memory
-        if (target) {
-          botMemory.recordSpyPeek(actor.id, target.id, 0, targetCards[0]);
-          if (targetCards.length > 1) {
-            botMemory.recordSpyPeek(actor.id, target.id, 1, targetCards[1]);
-          }
-        }
-        const chosenTakeIndex = evaluateBotSpyTake(actor, targetCards);
-        get().completeSpyAction(chosenTakeIndex);
-      }
-    } else if (role === 'Интриган' && action.targetId) {
-      const targetIdx = newPlayers.findIndex(p => p.id === action.targetId);
-      if (targetIdx !== -1) {
-        const target = newPlayers[targetIdx];
-        const returnedCards = [...target.hand];
-        
-        const newDiscard = [...get().discardPile, ...returnedCards];
-        const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(2, get().deck, newDiscard);
-        const c1 = drawn[0] || 'Наследник';
-        const c2 = drawn[1] || 'Наследник';
-        
-        newPlayers[targetIdx] = { ...target, hand: [c1, c2] };
-        botMemory.invalidatePlayerHand(target.id);
-        
-        const targetNotice = target.id === 'p1' ? ` Ваши новые карты: «${c1}» и «${c2}».` : '';
-        const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
-
-        set(state => ({
-          players: newPlayers,
-          deck: newDeck,
-          discardPile: newDiscardPile,
-          history: [`🎭 ${actor.name} через «Интригана» сбросил и заменил обе карты у ${declineGen(target.name)}!${targetNotice}${reshuffleNotice}`, ...state.history].slice(0, 50)
-        }));
-      }
-      delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
+        get()._checkEndgameAndAdvanceTurn();
       }, 1800);
     } else {
       delayTimeout = window.setTimeout(() => {
-        get()._checkCoronationAndEndTurn(actor.id);
+        get()._checkEndgameAndAdvanceTurn();
       }, 1800);
     }
   },
 
-  completeSpyAction: (takeCardIndex: number | null) => {
-    const { spyPeekData, pendingAction, players, deck, discardPile } = get();
-    const actorId = spyPeekData?.actorId || pendingAction?.actorId;
-    const targetId = spyPeekData?.targetId || pendingAction?.targetId;
-
-    if (!actorId || !targetId) {
-      set({ spyPeekData: null });
-      get().endTurn();
-      return;
-    }
-
-    const newPlayers = [...players];
-    const actorIdx = newPlayers.findIndex(p => p.id === actorId);
-    const targetIdx = newPlayers.findIndex(p => p.id === targetId);
-    const actor = newPlayers[actorIdx];
-    const target = newPlayers[targetIdx];
-
-    if (!actor || !target) {
-      set({ spyPeekData: null });
-      get().endTurn();
-      return;
-    }
-
-    const actorStakedIdx = pendingAction?.stakedCardIndex ?? 0;
-    const actorPlayedCard = actor.hand[actorStakedIdx] || actor.hand[0];
-    let newDeck = deck;
-    let newDiscardPile = [...discardPile, actorPlayedCard];
-    let reshuffleNotice = '';
-
-    if (takeCardIndex !== null && target.hand[takeCardIndex]) {
-      // 1. Spy takes target's card!
-      const stolenRole = target.hand[takeCardIndex];
-
-      // Target draws 1 replacement card from deck
-      const { drawn, deck: dAfterTarget, discardPile: discAfterTarget, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, newDeck, newDiscardPile);
-      newDeck = dAfterTarget;
-      newDiscardPile = discAfterTarget;
-      const targetNewCard = drawn[0] || 'Наследник';
-      if (wasReshuffled) {
-        reshuffleNotice = ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.`;
-      }
-
-      // Update target's hand
-      const newTargetHand = [...target.hand];
-      newTargetHand[takeCardIndex] = targetNewCard;
-      newPlayers[targetIdx] = { ...target, hand: newTargetHand };
-
-      // Update spy's hand with stolen card
-      const newActorHand = [...actor.hand];
-      newActorHand[actorStakedIdx] = stolenRole;
-      newPlayers[actorIdx] = { ...actor, hand: newActorHand };
-
-      botMemory.invalidatePlayerHand(target.id);
-      botMemory.invalidatePlayerHand(actor.id);
-
-      const targetNotice = target.id === 'p1' ? ` У вас забрали «${stolenRole}», вам выдана новая карта: «${targetNewCard}».` : '';
-      const actorNotice = actor.id === 'p1' ? ` Вы забрали «${stolenRole}» у ${target.name}.` : '';
-
-      set(state => ({
-        players: newPlayers,
-        deck: newDeck,
-        discardPile: newDiscardPile,
-        history: [`👁️ ${actor.name} через Шпиона посмотрел карты ${declineGen(target.name)} и забрал себе «${stolenRole}»!${actorNotice}${targetNotice}${reshuffleNotice}`, ...state.history].slice(0, 50)
-      }));
-    } else {
-      // 2. Spy does NOT take target's card; Spy draws 1 new card from deck
-      const { drawn, deck: dAfterSpy, discardPile: discAfterSpy, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, newDeck, newDiscardPile);
-      newDeck = dAfterSpy;
-      newDiscardPile = discAfterSpy;
-      const actorNewCard = drawn[0] || 'Наследник';
-      if (wasReshuffled) {
-        reshuffleNotice = ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.`;
-      }
-
-      const newActorHand = [...actor.hand];
-      newActorHand[actorStakedIdx] = actorNewCard;
-      newPlayers[actorIdx] = { ...actor, hand: newActorHand };
-
-      botMemory.invalidatePlayerHand(actor.id);
-
-      const actorNotice = actor.id === 'p1' ? ` (вы получили новую карту: «${actorNewCard}»)` : '';
-
-      set(state => ({
-        players: newPlayers,
-        deck: newDeck,
-        discardPile: newDiscardPile,
-        history: [`👁️ ${actor.name} через Шпиона посмотрел карты ${declineGen(target.name)} и взял новую карту из колоды${actorNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
-      }));
-    }
-
+  completeSpyAction: () => {
     set({ spyPeekData: null });
-    delayTimeout = window.setTimeout(() => {
-      get()._checkCoronationAndEndTurn(actor.id);
-    }, 1800);
+    get()._checkEndgameAndAdvanceTurn();
   },
 
-  _checkCoronationAndEndTurn: (actorId: string) => {
-    const { players, coronationCandidateId } = get();
-    const actor = players.find(p => p.id === actorId);
+  _checkEndgameAndAdvanceTurn: () => {
+    const { players, coronationCandidateId, activePlayerId, hasPlayedRoleThisTurn, hasPlayedPlotThisTurn } = get();
+    const actor = players.find(p => p.id === activePlayerId);
 
-    if (actor && actor.favor >= 5 && coronationCandidateId !== actor.id) {
+    if (actor && actor.favor >= 6 && !coronationCandidateId) {
       set(state => ({ 
         coronationCandidateId: actor.id,
-        history: [`👑 ${actor.name} НАЗНАЧЕН ФАВОРИТОМ КОРОЛЯ (5 👑)! У всех остался один круг, чтобы остановить его!`, ...state.history].slice(0, 50)
+        history: [`👑 КРУГ КОРОНАЦИИ! ${actor.name} набрал ${actor.favor} 👑! Если никто не собьёт его короны за полный круг, он победит!`, ...state.history].slice(0, 50)
       }));
     }
 
-    get().endTurn();
+    // Check if actor has tokens left and can still make plays
+    if (!actor || actor.actionTokens <= 0 || (hasPlayedRoleThisTurn && hasPlayedPlotThisTurn && actor.hand.length === 0)) {
+      get().endTurn();
+    } else {
+      // Return to IDLE in Phase 3 so active player can take a 2nd action or finish turn
+      set({
+        turnPhase: 'IDLE',
+        turnSubPhase: 'CARD_PLAY_PHASE',
+        pendingAction: null,
+        isVaBanqueActive: false,
+        isVetoed: false
+      });
+    }
   },
 
   endTurn: () => {
     clearAllTimers();
-    const { players, activePlayerId, coronationCandidateId } = get();
-    
-    // Check if 0 survivors left (Simultaneous mutual bluff elimination in a 1v1 duel) -> DRAW!
-    const alivePlayers = players.filter(p => p.reputation > 0);
-    if (alivePlayers.length === 0) {
-      set(state => ({ 
-        winnerId: 'draw', 
-        turnPhase: 'GAME_OVER',
-        history: ['👑 НИЧЬЯ! Последние претенденты одновременно пали в позоре. Престол пуст, в королевстве смута!', ...state.history].slice(0, 50)
+    const { players, activePlayerId, coronationCandidateId, deck, discardPile } = get();
+
+    // 1. Refill any players who have < 2 cards in hand (deferred card draw)
+    let curDeck = deck;
+    let curDiscard = discardPile;
+    const refilledPlayers = players.map(p => {
+      if (p.hand.length < 2) {
+        const needed = 2 - p.hand.length;
+        const { drawn, deck: newD, discardPile: newDisc } = drawCardsFromDeck(needed, curDeck, curDiscard);
+        curDeck = newD;
+        curDiscard = newDisc;
+        return { ...p, hand: [...p.hand, ...drawn] };
+      }
+      return p;
+    });
+
+    const currentIndex = refilledPlayers.findIndex(p => p.id === activePlayerId);
+    const nextIndex = (currentIndex + 1) % refilledPlayers.length;
+    const nextPlayer = refilledPlayers[nextIndex];
+
+    // 2. Refill nextPlayer action tokens to 2 at turn start
+    const updatedPlayers = refilledPlayers.map(p => {
+      if (p.id === nextPlayer.id) {
+        return { ...p, actionTokens: 2 };
+      }
+      return p;
+    });
+
+    // 3. Phase 1 Morning Triggers: Check Royal Reception / Informant Network expiry at start of nextPlayer's turn
+    let coronationTriggeredByReception = false;
+    let nextPlayerUpdated = updatedPlayers[nextIndex];
+
+    if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Королевский приём') {
+      const newFavor = Math.min(6, nextPlayerUpdated.favor + 1);
+      nextPlayerUpdated = {
+        ...nextPlayerUpdated,
+        favor: newFavor,
+        activePlot: null
+      };
+      updatedPlayers[nextIndex] = nextPlayerUpdated;
+      triggerResourceFloat(set, nextPlayerUpdated.id, '+1 👑 Бал удался!', true);
+
+      curDiscard = [...curDiscard, 'Королевский приём'];
+      set(state => ({
+        history: [`👑 Королевский приём ${declineGen(nextPlayerUpdated.name)} успешно состоялся! Получено +1 👑!`, ...state.history].slice(0, 50)
       }));
-      return;
-    }
 
-    // Check if only 1 survivor left (elimination win)
-    if (alivePlayers.length === 1) {
-      set(state => ({ 
-        winnerId: alivePlayers[0].id, 
-        turnPhase: 'GAME_OVER',
-        history: [`👑 ${alivePlayers[0].name} — единственный не опозоренный придворный! ПОБЕДА!`, ...state.history].slice(0, 50)
+      if (newFavor >= 6 && !coronationCandidateId) {
+        coronationTriggeredByReception = true;
+      }
+    } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Сеть информаторов') {
+      nextPlayerUpdated = {
+        ...nextPlayerUpdated,
+        activePlot: null
+      };
+      updatedPlayers[nextIndex] = nextPlayerUpdated;
+      curDiscard = [...curDiscard, 'Сеть информаторов'];
+      set(state => ({
+        history: [`👁️ Действие «Сети информаторов» ${declineGen(nextPlayerUpdated.name)} завершилось после полного круга.`, ...state.history].slice(0, 50)
       }));
-      return;
     }
 
-    // Check Coronation win: if active player is the candidate and still has 5+ favor at the start of their turn
-    const currentIndex = players.findIndex(p => p.id === activePlayerId);
-    let nextIndex = (currentIndex + 1) % players.length;
-    while (players[nextIndex].reputation <= 0) {
-      nextIndex = (nextIndex + 1) % players.length;
-    }
-
-    const nextPlayer = players[nextIndex];
-    if (coronationCandidateId === nextPlayer.id) {
-      if (nextPlayer.favor >= 5) {
-        set(state => ({ 
-          winnerId: nextPlayer.id, 
+    // 4. Check Coronation victory if candidate held >= 6 crowns for entire round
+    if (coronationCandidateId && nextPlayer.id === coronationCandidateId) {
+      if (nextPlayerUpdated.favor >= 6) {
+        set(state => ({
+          players: updatedPlayers,
+          deck: curDeck,
+          discardPile: curDiscard,
+          winnerId: nextPlayer.id,
           turnPhase: 'GAME_OVER',
-          history: [`👑 КОРОНАЦИЯ! ${nextPlayer.name} сохранил 5 корон и становится новым Королем!`, ...state.history].slice(0, 50)
+          history: [`👑 КОРОНАЦИЯ СОСТОЯЛАСЬ! ${nextPlayer.name} удержал(а) ${nextPlayerUpdated.favor} 👑 целый круг и становится полноправным Королём Kinglier!`, ...state.history].slice(0, 50)
         }));
         return;
       } else {
-        // Lost favor during the round
-        set(state => ({ 
-          coronationCandidateId: null,
-          history: [`${nextPlayer.name} потерял благосклонность короля (меньше 5 👑)! Коронация отменена.`, ...state.history].slice(0, 50)
-        }));
+        set({ coronationCandidateId: null });
       }
     }
 
+    const newCandidateId = coronationTriggeredByReception ? nextPlayerUpdated.id : coronationCandidateId;
+
     set({ 
+      players: updatedPlayers,
+      deck: curDeck,
+      discardPile: curDiscard,
       activePlayerId: nextPlayer.id, 
       turnPhase: 'IDLE', 
+      turnSubPhase: 'NORMAL_ACTION_PHASE',
+      hasUsedNormalActionThisTurn: false,
+      hasPlayedRoleThisTurn: false,
+      hasPlayedPlotThisTurn: false,
+      coronationCandidateId: newCandidateId,
       pendingAction: null, 
+      isVaBanqueActive: false,
+      isVetoed: false,
       pendingDuelDefenderCardIndex: null, 
       pendingDuelDefenderRoleClaim: null, 
       duelOutcome: null, 
       activeSpeechReactions: {}, 
-      damagedPlayerIds: [], 
       timerSeconds: 0, 
       revealOutcome: null, 
       spyPeekData: null, 
-      hasCardDeparted: false 
+      informantPeekData: null,
     });
   }
 }));

@@ -10,7 +10,7 @@ import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
-import type { Role } from './engine/types';
+import type { Role, PlotType, InstantType, GameCard } from './engine/types';
 
 // Start intelligent bot engine once
 startBotEngine();
@@ -22,10 +22,11 @@ export default function App() {
     turnPhase,
     pendingAction,
     coronationCandidateId,
-    screenDamageFlash,
     startGame, 
     restartGame,
     performAction,
+    playPlotAction,
+    playInstant,
     doubtAction,
     passDoubt,
     targetAcceptAttack,
@@ -33,6 +34,7 @@ export default function App() {
     targetDeclareDuel,
     attackerRetreatDuel,
     attackerAcceptDuel,
+    hasPlayedRoleThisTurn,
     endTurn
   } = useGameStore();
 
@@ -40,13 +42,19 @@ export default function App() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isVaBanqueComboLaunch, setIsVaBanqueComboLaunch] = useState(false);
   
   const [pendingTargetAction, setPendingTargetAction] = useState<{
-    type: 'normal' | 'role';
+    type: 'normal' | 'role' | 'plot' | 'instant';
     name: string;
     cost: number;
     roleClaim?: Role;
+    plotType?: PlotType;
+    instantType?: InstantType;
+    isPlotDirect?: boolean;
+    isInstantDirect?: boolean;
     stakedCardIndex?: number;
+    withVaBanque?: boolean;
   } | null>(null);
 
   const [selectedStakedCardIndex, setSelectedStakedCardIndex] = useState<number>(0);
@@ -58,6 +66,7 @@ export default function App() {
     (window as any).__startTargeting = (act: any) => {
       setPendingTargetAction(act);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const human = players.find(p => !p.isBot);
@@ -71,35 +80,122 @@ export default function App() {
 
   const handleConfirmTarget = (targetId: string, cardIndex = 0) => {
     if (!pendingTargetAction || !human) return;
-    performAction({
-      type: pendingTargetAction.type,
-      name: pendingTargetAction.name,
-      roleClaim: pendingTargetAction.roleClaim,
-      stakedCardIndex: pendingTargetAction.stakedCardIndex,
-      actorId: human.id,
-      targetId,
-      targetCardIndex: cardIndex,
-      costGold: pendingTargetAction.cost,
-      description: `Действие ${pendingTargetAction.name} направлено на игрока.`
-    });
+
+    if (pendingTargetAction.isPlotDirect && pendingTargetAction.plotType) {
+      playPlotAction(pendingTargetAction.plotType, pendingTargetAction.stakedCardIndex ?? 0, targetId);
+    } else if (pendingTargetAction.isInstantDirect && pendingTargetAction.instantType) {
+      playInstant(human.id, pendingTargetAction.instantType, pendingTargetAction.stakedCardIndex ?? 0, targetId);
+    } else {
+      const withVB = !!pendingTargetAction.withVaBanque;
+      performAction({
+        type: pendingTargetAction.type,
+        name: pendingTargetAction.name,
+        roleClaim: pendingTargetAction.roleClaim,
+        stakedCardIndex: pendingTargetAction.stakedCardIndex,
+        actorId: human.id,
+        targetId,
+        targetCardIndex: cardIndex,
+        withVaBanque: withVB,
+        costGold: pendingTargetAction.cost,
+        costTokens: 1,
+        description: `Действие ${pendingTargetAction.name} направлено на игрока.`
+      });
+    }
     setPendingTargetAction(null);
   };
 
-  // Click on a Card in player's hand to stake it and open role popup directly over it
-  const handleCardClick = (_role: Role, cardIndex: number) => {
+  // Click on a Card in player's hand to stake it or trigger direct instant
+  const handleCardClick = (card: GameCard, cardIndex: number) => {
     if (!human) return;
 
+    // 1. If clicking card in VETO_WINDOW:
+    if (turnPhase === 'VETO_WINDOW') {
+      if (card === 'Право вето' && human.actionTokens >= 1) {
+        playInstant(human.id, 'Право вето', cardIndex);
+        return;
+      }
+    }
+
+    // 2. If in TARGET_REACTION_WINDOW:
     if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
+      if (card === 'Перенаправление' && human.actionTokens >= 1) {
+        setPendingTargetAction({
+          type: 'instant',
+          name: 'Перенаправление',
+          instantType: 'Перенаправление',
+          isInstantDirect: true,
+          stakedCardIndex: cardIndex,
+          cost: 0
+        });
+        return;
+      }
       targetDeclareDuel(human.id, cardIndex);
       return;
     }
 
+    // 3. If playing Instant or Va-banque combo during own turn:
+    if (isMyTurn) {
+      if (card === 'Ва-банк') {
+        if (human.actionTokens < 1) {
+          showToast('Недостаточно жетонов действия (нужен 1 ⚡)');
+          return;
+        }
+        if (hasPlayedRoleThisTurn) {
+          showToast('Лимит: 1 действие Роли за ход уже сыграно');
+          return;
+        }
+        const otherIdx = cardIndex === 0 ? 1 : 0;
+        const validOtherIdx = human.hand[otherIdx] ? otherIdx : 0;
+        setSelectedStakedCardIndex(validOtherIdx);
+        setIsVaBanqueComboLaunch(true);
+        setShowRoleModal(true);
+        return;
+      }
+
+      if (card === 'Шпион') {
+        if (human.actionTokens < 1) {
+          showToast('Недостаточно жетонов действия (нужен 1 ⚡)');
+          return;
+        }
+        setPendingTargetAction({
+          type: 'instant',
+          name: 'Шпион',
+          instantType: 'Шпион',
+          isInstantDirect: true,
+          stakedCardIndex: cardIndex,
+          cost: 0
+        });
+        return;
+      }
+
+      if (card === 'Дворцовый переполох') {
+        if (human.actionTokens < 1) {
+          showToast('Недостаточно жетонов действия (нужен 1 ⚡)');
+          return;
+        }
+        setPendingTargetAction({
+          type: 'instant',
+          name: 'Дворцовый переполох',
+          instantType: 'Дворцовый переполох',
+          isInstantDirect: true,
+          stakedCardIndex: cardIndex,
+          cost: 0
+        });
+        return;
+      }
+    }
+
     if (!isMyTurn) {
+      if (card === 'Право вето' && human.actionTokens >= 1) {
+        playInstant(human.id, 'Право вето', cardIndex);
+        return;
+      }
       const active = players.find(p => p.id === activePlayerId);
       showToast(`Сейчас ход придворного: ${active?.name || 'другого игрока'}`);
       return;
     }
 
+    setIsVaBanqueComboLaunch(false);
     setSelectedStakedCardIndex(cardIndex);
     setShowRoleModal(true);
   };
@@ -107,7 +203,6 @@ export default function App() {
   // Keyboard Shortcuts Listener for Desktop Experience
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       if (e.key === 'Escape') {
@@ -132,7 +227,7 @@ export default function App() {
       }
 
       // 2. Doubt window hotkeys
-      if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== human?.id && human && human.reputation > 0) {
+      if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== human?.id && human) {
         if (e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'в') {
           doubtAction(human.id);
         } else if (e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 'м') {
@@ -165,7 +260,23 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMyTurn, showNormalModal, showRoleModal, pendingTargetAction, turnPhase, pendingAction, human]);
+  }, [
+    isMyTurn, 
+    showNormalModal, 
+    showRoleModal, 
+    pendingTargetAction, 
+    turnPhase, 
+    pendingAction, 
+    human,
+    endTurn,
+    doubtAction,
+    passDoubt,
+    targetAcceptAttack,
+    targetDoubtAttack,
+    targetDeclareDuel,
+    attackerRetreatDuel,
+    attackerAcceptDuel
+  ]);
 
   if (players.length === 0) {
     return (
@@ -179,7 +290,11 @@ export default function App() {
   let turnBannerTitle = isMyTurn ? 'ВАШ ХОД' : `ХОД ПРИДВОРНОГО: ${activePlayer?.name?.toUpperCase() || ''}`;
   let turnBannerDesc = isMyTurn ? 'Сыграйте карту или выберите действие' : 'Обдумывает стратегию...';
 
-  if (turnPhase === 'TARGET_REACTION_WINDOW') {
+  if (coronationCandidateId) {
+    const candidate = players.find(p => p.id === coronationCandidateId);
+    turnBannerTitle = '👑 КРУГ КОРОНАЦИИ!';
+    turnBannerDesc = `${candidate?.name || 'Лидер'} удерживает ${candidate?.favor || 5} 👑! Сбейте его влияние, пока круг не замкнулся!`;
+  } else if (turnPhase === 'TARGET_REACTION_WINDOW') {
     const target = players.find(p => p.id === pendingAction?.targetId);
     turnBannerTitle = 'ЦЕЛЕВАЯ АТАКА';
     turnBannerDesc = `${target?.name || 'Жертва'} выбирает защиту от ${pendingAction?.roleClaim}`;
@@ -189,19 +304,15 @@ export default function App() {
   } else if (turnPhase === 'DOUBT_WINDOW') {
     turnBannerTitle = 'ОКНО СОМНЕНИЙ ДВОРА';
     turnBannerDesc = `Заявлена роль «${pendingAction?.roleClaim}». Кто усомнится?`;
-  } else if (coronationCandidateId) {
-    const cand = players.find(p => p.id === coronationCandidateId);
-    turnBannerTitle = 'КРУГ КОРОНАЦИИ';
-    turnBannerDesc = `👑 ${cand?.name} — Фаворит короля! Остановите его!`;
+  } else if (turnPhase === 'VETO_WINDOW') {
+    turnBannerTitle = '🚫 ОКНО ВЕТО!';
+    turnBannerDesc = `Применяется «${pendingAction?.roleClaim || pendingAction?.name}»! Любой игрок может сыграть Право вето (1 ⚡).`;
   }
 
   return (
-    <div className={`desktop-viewport ${screenDamageFlash ? 'screen-damage-active screen-shake-anim' : ''}`}>
+    <div className="desktop-viewport">
       {/* Background ambient lighting */}
       <div className="ambient-glow-overlay" />
-
-      {/* Screen Damage Red Vignette Overlay */}
-      {screenDamageFlash && <div className="screen-damage-vignette" />}
 
       {/* Toast Notice */}
       {toastMessage && (
@@ -217,17 +328,17 @@ export default function App() {
           <span className="brand-crest">👑</span>
           <div>
             <div className="brand-title cinzel-font gold-gradient-text">KINGLIER</div>
-            <div className="brand-subtitle">Королевский Двор Блефа</div>
+            <div className="brand-subtitle">39 Карт • 6 Ролей • Интриги • Инстанты • 2 ⚡ Жетона</div>
           </div>
         </div>
 
         {/* Center Coronation Goal Progress Banner */}
         <div className="coronation-status-banner cinzel-font">
           <div className="coronation-goal-text">
-            <span>👑 ЦЕЛЬ: 5 КОРОН</span>
+            <span>👑 ЦЕЛЬ: 6 КОРОН (2 ⚜️ = 1 👑)</span>
           </div>
-          <div className="crown-segments-track" title="Для победы наберите 5 корон Благосклонности короля">
-            {Array.from({ length: 5 }).map((_, i) => (
+          <div className="crown-segments-track" title="Для победы удержите 6 корон круг">
+            {Array.from({ length: 6 }).map((_, i) => (
               <div 
                 key={i} 
                 className={`crown-segment ${(human?.favor ?? 0) > i ? 'filled' : ''}`}
@@ -265,7 +376,7 @@ export default function App() {
         {/* Center Column: Grand Oval Table & Player Command Deck */}
         <main className="arena-center">
           {/* Top Turn Stage Banner */}
-          <div className="current-turn-stage-banner">
+          <div className={`current-turn-stage-banner ${coronationCandidateId ? 'final-round-active-banner' : ''}`}>
             <span className="turn-banner-title cinzel-font">
               {turnBannerTitle}
             </span>
@@ -284,7 +395,7 @@ export default function App() {
 
           {/* Bottom Player Command Station */}
           <footer className="player-command-station">
-            {/* Player Dashboard (Name, Hearts, Gold, Crowns) */}
+            {/* Player Dashboard (Name, Crowns, Gold, Seals, Tokens) */}
             {human && (
               <PlayerStatusBar 
                 player={human}
@@ -292,18 +403,22 @@ export default function App() {
               />
             )}
 
-            {/* Large Interactive Desktop Hand Cards with Direct Floating Role Popup */}
-            {human && human.reputation > 0 && (
+            {/* Large Interactive Desktop Hand Cards */}
+            {human && (
               <div className="player-hand-desktop">
                 {/* Floating Role Claim Popup directly above hand cards */}
                 {showRoleModal && (
                   <RoleClaimPopup 
                     stakedCardIndex={selectedStakedCardIndex}
-                    onClose={() => setShowRoleModal(false)}
+                    initialWithVaBanque={isVaBanqueComboLaunch}
+                    onClose={() => {
+                      setShowRoleModal(false);
+                      setIsVaBanqueComboLaunch(false);
+                    }}
                   />
                 )}
 
-                {human.hand.map((role, idx) => {
+                {human.hand.map((card, idx) => {
                   const isStakedOnTable = pendingAction && pendingAction.type === 'role' && pendingAction.actorId === human.id && turnPhase !== 'IDLE' && (pendingAction.stakedCardIndex === idx);
                   if (isStakedOnTable) {
                     return (
@@ -311,7 +426,7 @@ export default function App() {
                         <div className="staked-placeholder-inner">
                           <span style={{ fontSize: '1.4rem' }}>🂠</span>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fbbf24' }}>НА КОНУ</span>
-                          <span style={{ fontSize: '0.58rem', color: '#94a3b8' }}>«{pendingAction.roleClaim || role}»</span>
+                          <span style={{ fontSize: '0.58rem', color: '#94a3b8' }}>«{pendingAction.roleClaim || card}»</span>
                         </div>
                       </div>
                     );
@@ -323,11 +438,11 @@ export default function App() {
                   return (
                     <Card 
                       key={idx} 
-                      role={role} 
+                      role={card} 
                       isPlayable={isPlayable}
                       hintText={hintText}
                       isSelected={showRoleModal && selectedStakedCardIndex === idx}
-                      onClick={() => handleCardClick(role, idx)}
+                      onClick={() => handleCardClick(card, idx)}
                     />
                   );
                 })}

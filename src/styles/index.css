@@ -268,7 +268,7 @@ html, body {
 }
 
 .sidebar-header {
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
   border-bottom: 1px solid rgba(245, 158, 11, 0.25);
   display: flex;
@@ -277,67 +277,171 @@ html, body {
 }
 
 .sidebar-title {
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 800;
   color: var(--gold-light);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+
+.chronicle-final-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(90deg, #e11d48, #9f1239);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #fb7185;
+  box-shadow: 0 0 10px rgba(225, 29, 72, 0.6);
+  animation: final-round-pulse 1.8s infinite ease-in-out;
 }
 
 .chronicle-feed {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.3) rgba(15, 23, 42, 0.5);
+}
+
+.chronicle-feed::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chronicle-feed::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.chronicle-feed::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
 }
 
 .chronicle-item {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-left: 3px solid var(--gold-primary);
   border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 0.76rem;
+  padding: 6px 8px;
+  font-size: 0.74rem;
   line-height: 1.35;
   color: #cbd5e1;
-  transition: all 0.2s;
-  animation: slide-in-chronicle 0.3s ease;
+  transition: all 0.2s ease;
+  animation: slide-in-chronicle 0.25s ease-out;
 }
 
 .chronicle-item:hover {
-  background: rgba(30, 41, 59, 0.8);
+  background: rgba(30, 41, 59, 0.85);
   border-color: rgba(245, 158, 11, 0.35);
   transform: translateX(2px);
 }
 
+.chronicle-item-icon {
+  font-size: 1rem;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.chronicle-item-content {
+  flex: 1;
+  word-break: break-word;
+}
+
+.chronicle-text {
+  font-weight: 500;
+}
+
 .chronicle-item.highlight-latest {
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0.8) 100%);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.18) 0%, rgba(15, 23, 42, 0.85) 100%);
   border-left-color: var(--gold-light);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.25);
   color: #fef08a;
+  border-top-color: rgba(245, 158, 11, 0.3);
+}
+
+.chronicle-item.final-event {
+  border-left-color: #fb7185;
+  background: linear-gradient(90deg, rgba(225, 29, 72, 0.25) 0%, rgba(15, 23, 42, 0.85) 100%);
+  color: #ffe4e6;
+  box-shadow: 0 0 12px rgba(225, 29, 72, 0.3);
 }
 
 .chronicle-item.danger-event {
-  border-left-color: var(--red-heart);
-  background: rgba(69, 10, 10, 0.4);
+  border-left-color: #f87171;
+  background: rgba(88, 28, 28, 0.35);
+  color: #fecaca;
 }
 
 .chronicle-item.truth-event {
-  border-left-color: var(--green-truth);
+  border-left-color: #4ade80;
   background: rgba(20, 83, 45, 0.35);
+  color: #bbf7d0;
 }
 
 .chronicle-item.duel-event {
-  border-left-color: var(--purple-royal);
+  border-left-color: #c084fc;
   background: rgba(59, 7, 100, 0.4);
+  color: #e9d5ff;
+}
+
+.chronicle-item.attack-event {
+  border-left-color: #38bdf8;
+  background: rgba(7, 89, 133, 0.3);
+  color: #bae6fd;
 }
 
 @keyframes slide-in-chronicle {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.chronicle-footer {
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.chronicle-footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.chronicle-ratio-pill {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #e9d5ff;
+  background: rgba(192, 132, 252, 0.15);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.chronicle-help-btn {
+  background: transparent;
+  border: none;
+  color: var(--gold-light);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.chronicle-help-btn:hover {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fff;
+  text-decoration: underline;
 }
 
 /* ==========================================================================
@@ -460,6 +564,19 @@ html, body {
 
 .turn-banner-actor {
   color: var(--gold-light);
+}
+
+.current-turn-stage-banner.final-round-active-banner {
+  background: linear-gradient(90deg, transparent 0%, rgba(136, 19, 55, 0.95) 20%, rgba(225, 29, 72, 0.95) 50%, rgba(136, 19, 55, 0.95) 80%, transparent 100%);
+  border-top: 1px solid #fb7185;
+  border-bottom: 1px solid #fb7185;
+  box-shadow: 0 0 25px rgba(225, 29, 72, 0.6);
+  animation: final-round-pulse 2s infinite ease-in-out;
+}
+
+@keyframes final-round-pulse {
+  0%, 100% { box-shadow: 0 0 25px rgba(225, 29, 72, 0.5); }
+  50% { box-shadow: 0 0 45px rgba(251, 113, 133, 0.85); }
 }
 
 .turn-banner-desc {
@@ -715,11 +832,17 @@ html, body {
   margin-top: 2px;
 }
 
-.bot-hearts-strip {
+.bot-seals-strip {
   display: flex;
+  align-items: center;
   gap: 2px;
   font-size: 0.65rem;
   margin-top: 1px;
+}
+
+.seal-indicators {
+  display: inline-flex;
+  gap: 2px;
 }
 
 /* Bot Hand Cards (Mini Back-Faced Tarot Cards) */
@@ -1013,8 +1136,12 @@ html, body {
    CARD FLIGHT EXIT ANIMATIONS (Original card lifting off table)
    -------------------------------------------------------------------------- */
 .flight-to-discard {
-  animation: fly-out-to-discard 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important;
+  animation: fly-out-to-discard 0.75s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important;
   pointer-events: none;
+}
+
+.flight-to-discard .staked-card-inner {
+  transition: none !important;
 }
 
 @keyframes fly-out-to-discard {
@@ -1024,12 +1151,12 @@ html, body {
     box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
   }
   40% {
-    transform: translate(140px, -70px) scale(0.85) rotate(18deg);
+    transform: translate(160px, -50px) scale(0.85) rotate(6deg);
     opacity: 0.95;
     box-shadow: 0 0 35px rgba(168, 85, 247, 0.85);
   }
   100% {
-    transform: translate(460px, -110px) scale(0.35) rotate(50deg);
+    transform: translate(480px, -90px) scale(0.35) rotate(12deg);
     opacity: 0;
     box-shadow: 0 0 50px rgba(168, 85, 247, 1);
   }
@@ -1059,36 +1186,24 @@ html, body {
   }
 }
 
-/* 3. Fly out to Bot Seats */
-.flight-to-bot-5 { animation: fly-to-bot-yulia 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
-.flight-to-bot-2 { animation: fly-to-bot-masha 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
-.flight-to-bot-6 { animation: fly-to-bot-anton 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
-.flight-to-bot-3 { animation: fly-to-bot-sasha 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
-.flight-to-bot-4 { animation: fly-to-bot-dima 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
+/* 3. Fly out to Bot Seats (Seat 2 = Left, Seat 3 = Top, Seat 4 = Right) */
+.flight-to-bot-2 { animation: fly-to-bot-left 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
+.flight-to-bot-3 { animation: fly-to-bot-top 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
+.flight-to-bot-4 { animation: fly-to-bot-right 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; pointer-events: none; }
 
-@keyframes fly-to-bot-yulia {
+@keyframes fly-to-bot-left {
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
   100% { transform: translate(-340px, -40px) scale(0.3) rotate(-35deg); opacity: 0; }
 }
 
-@keyframes fly-to-bot-masha {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(-200px, -180px) scale(0.3) rotate(-20deg); opacity: 0; }
-}
-
-@keyframes fly-to-bot-anton {
+@keyframes fly-to-bot-top {
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
   100% { transform: translate(0, -200px) scale(0.3) rotate(0deg); opacity: 0; }
 }
 
-@keyframes fly-to-bot-sasha {
+@keyframes fly-to-bot-right {
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(180px, -180px) scale(0.3) rotate(20deg); opacity: 0; }
-}
-
-@keyframes fly-to-bot-dima {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(320px, -40px) scale(0.3) rotate(35deg); opacity: 0; }
+  100% { transform: translate(340px, -40px) scale(0.3) rotate(35deg); opacity: 0; }
 }
 
 .flight-feedback-pill {
@@ -1315,9 +1430,9 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 370px;
-  min-width: 370px;
-  max-width: 370px;
+  width: 380px;
+  min-width: 320px;
+  max-width: 380px;
   flex-shrink: 0;
 }
 
@@ -1341,7 +1456,9 @@ html, body {
 .player-meta-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
 }
 
 .player-title-row {
@@ -1370,24 +1487,41 @@ html, body {
   white-space: nowrap;
 }
 
-.player-resource-pills {
+.player-resource-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.player-resource-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.player-resource-row .res-pill {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
 }
 
 .res-pill {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 3px 7px;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 3px 6px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.res-pill.token-res {
+  border-color: rgba(56, 189, 248, 0.5);
 }
 
 .res-pill.crown-res {
@@ -1398,6 +1532,11 @@ html, body {
 .res-pill.gold-res {
   border-color: rgba(251, 191, 36, 0.5);
   color: #fbbf24;
+}
+
+.res-pill.seal-res {
+  border-color: rgba(192, 132, 252, 0.5);
+  color: #e9d5ff;
 }
 
 .res-val {
@@ -1415,16 +1554,16 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  width: 320px;
-  min-width: 320px;
-  max-width: 320px;
+  width: 330px;
+  min-width: 330px;
+  max-width: 340px;
   flex-shrink: 0;
   position: relative;
 }
 
 .desktop-tarot-card {
-  width: 140px;
-  height: 195px;
+  width: 148px;
+  height: 236px;
   border-radius: 14px;
   border: 2px solid var(--gold-border);
   box-shadow: var(--shadow-card);
@@ -1453,33 +1592,39 @@ html, body {
   border-color: rgba(245, 158, 11, 0.8);
 }
 
-.card-stake-hint {
+.card-top-category-badge {
   position: absolute;
   top: 6px;
-  background: rgba(245, 158, 11, 0.95);
-  color: #000;
-  font-size: 0.58rem;
+  left: 6px;
+  font-size: 0.52rem;
   font-weight: 900;
-  padding: 2px 8px;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
   border-radius: 4px;
-  letter-spacing: 0.5px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  z-index: 5;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
 .card-title-head {
-  font-size: 0.84rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
   text-align: center;
   color: var(--gold-light);
-  margin-top: 14px;
+  margin-top: 18px;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  max-width: 100%;
+  padding: 0 2px;
+  white-space: nowrap;
 }
 
 .card-art-circle {
-  width: 76px;
-  height: 76px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   border: 1.5px solid var(--gold-primary);
   overflow: hidden;
@@ -1489,6 +1634,8 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
+  margin: 4px 0;
+  flex-shrink: 0;
 }
 
 .card-art-img-desktop {
@@ -1498,13 +1645,24 @@ html, body {
 }
 
 .card-short-desc {
-  font-size: 0.65rem;
-  line-height: 1.2;
+  font-size: 0.68rem;
+  line-height: 1.25;
   text-align: center;
   color: #e2e8f0;
+  min-height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 2px;
+}
+
+.card-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 2px 4px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Right: Action Buttons Toolbar (Fixed-Width Anchored Toolbar) */

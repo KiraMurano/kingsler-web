@@ -1,5 +1,5 @@
 import { useGameStore } from '../engine/GameStore';
-import { ROLE_INFO } from '../engine/roles';
+import { CARD_INFO } from '../engine/cards';
 
 interface NormalActionsPopupProps {
   onClose: () => void;
@@ -11,9 +11,10 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
 
   if (!human) return null;
 
+  const hasTokens = human.actionTokens >= 1;
+
   return (
     <>
-      {/* Invisible backdrop for click-outside dismissal without blurring cards */}
       <div className="popup-click-outside-backdrop" onClick={onClose} />
 
       <div 
@@ -27,7 +28,7 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
               Обычные действия двора
             </div>
             <div className="role-popup-subtitle">
-              Доступны всегда, не требуют роли и их нельзя оспорить
+              Стоят 1 ⚡ жетон действия, доступны всегда и их нельзя оспорить
             </div>
           </div>
 
@@ -48,6 +49,7 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
             type="button"
             className="role-select-card-desktop"
             style={{ padding: '8px 12px' }}
+            disabled={!hasTokens}
             onClick={() => {
               onClose();
               performAction({
@@ -55,13 +57,14 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
                 name: '🪙 Просить содержание',
                 actorId: human.id,
                 costGold: 0,
+                costTokens: 1,
                 description: 'Получает 1 💰 из казны.'
               });
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>🪙 Просить содержание</span>
-              <span style={{ fontSize: '0.68rem', color: '#4ade80', fontWeight: 800 }}>Бесплатно</span>
+              <span style={{ fontSize: '0.68rem', color: '#4ade80', fontWeight: 800 }}>1 ⚡ (0 💰)</span>
             </div>
             <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
               Получите +1 💰 золотой в личную казну.
@@ -73,7 +76,7 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
             type="button"
             className="role-select-card-desktop"
             style={{ padding: '8px 12px' }}
-            disabled={human.gold < 3 || human.favor >= 4}
+            disabled={!hasTokens || human.gold < 3 || human.favor >= 5}
             onClick={() => {
               onClose();
               performAction({
@@ -81,55 +84,28 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
                 name: '🍷 Устроить пир',
                 actorId: human.id,
                 costGold: 3,
+                costTokens: 1,
                 description: 'Платит 3 💰 и получает +1 👑.'
               });
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>🍷 Устроить пир</span>
-              <span style={{ fontSize: '0.68rem', color: human.favor >= 4 ? '#f87171' : '#fbbf24', fontWeight: 800 }}>
-                {human.favor >= 4 ? 'Лимит (макс. 4 👑)' : '3 💰'}
+              <span style={{ fontSize: '0.68rem', color: human.favor >= 5 ? '#f87171' : '#fbbf24', fontWeight: 800 }}>
+                {human.favor >= 5 ? 'Лимит (макс. 5 👑)' : '1 ⚡ + 3 💰'}
               </span>
             </div>
             <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
-              Заплатите 3 💰 → получите +1 👑 (до 4 👑 максимум, 5-я только за Наследника/Шантажиста).
+              Заплатите 3 💰 → получите +1 👑 (до 5 👑 максимум, 6-я победная только за действия/споры).
             </div>
           </button>
 
-          {/* 3. Restore Reputation (Heal) */}
+          {/* 3. Rumor */}
           <button 
             type="button"
             className="role-select-card-desktop"
             style={{ padding: '8px 12px' }}
-            disabled={human.gold < 5 || human.reputation >= 3}
-            onClick={() => {
-              onClose();
-              performAction({
-                type: 'normal',
-                name: '❤️ Восстановить репутацию',
-                actorId: human.id,
-                costGold: 5,
-                description: 'Платит 5 💰 и восстанавливает 1 ❤️ репутации.'
-              });
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 800, color: '#f43f5e', fontSize: '0.86rem' }}>❤️ Восстановить репутацию</span>
-              <span style={{ fontSize: '0.68rem', color: human.reputation >= 3 ? '#94a3b8' : '#fbbf24', fontWeight: 800 }}>
-                {human.reputation >= 3 ? 'Максимум (3 ❤️)' : '5 💰'}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
-              Заплатите 5 💰 → восстановите 1 ❤️ репутации (макс. 3 ❤️).
-            </div>
-          </button>
-
-          {/* 4. Rumor */}
-          <button 
-            type="button"
-            className="role-select-card-desktop"
-            style={{ padding: '8px 12px' }}
-            disabled={human.gold < 5}
+            disabled={!hasTokens || human.gold < 5}
             onClick={() => {
               onClose();
               setTimeout(() => {
@@ -144,21 +120,21 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>📜 Распустить слух</span>
-              <span style={{ fontSize: '0.68rem', color: '#fbbf24', fontWeight: 800 }}>5 💰</span>
+              <span style={{ fontSize: '0.68rem', color: '#fbbf24', fontWeight: 800 }}>1 ⚡ + 5 💰</span>
             </div>
             <div style={{ fontSize: '0.68rem', color: '#cbd5e1' }}>
-              Заплатите 5 💰 → выбранный игрок теряет -1 👑. Нельзя оспорить или заблокировать!
+              Заплатите 5 💰 → выбранный игрок теряет -1 👑. Срывает Королевский приём! Нельзя оспорить.
             </div>
           </button>
 
-          {/* 5. Swap 1 Card */}
+          {/* 4. Swap 1 Card (Free in Gold, 1 Action Token) */}
           <div className="role-select-card-desktop" style={{ cursor: 'default', background: 'rgba(15, 23, 42, 0.8)', padding: '8px 12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
               <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.86rem' }}>🔄 Сменить карту с руки</span>
-              <span style={{ fontSize: '0.68rem', color: '#4ade80', fontWeight: 800 }}>Бесплатно</span>
+              <span style={{ fontSize: '0.68rem', color: '#38bdf8', fontWeight: 800 }}>1 ⚡ (Бесплатно)</span>
             </div>
             <div style={{ fontSize: '0.66rem', color: '#cbd5e1', marginBottom: '6px' }}>
-              Сбросить 1 карту в сброс и взять новую из колоды:
+              Сбросить выбранную карту и бесплатно взять новую из общей колоды:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               {human.hand.map((cardRole, idx) => (
@@ -166,7 +142,8 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
                   key={idx}
                   type="button"
                   className="action-deck-btn btn-blue"
-                  style={{ padding: '6px 4px', height: 'auto', borderRadius: '8px' }}
+                  disabled={!hasTokens}
+                  style={{ padding: '6px 4px', height: 'auto', borderRadius: '8px', opacity: !hasTokens ? 0.4 : 1 }}
                   onClick={() => {
                     onClose();
                     performAction({
@@ -175,12 +152,13 @@ export function NormalActionsPopup({ onClose }: NormalActionsPopupProps) {
                       stakedCardIndex: idx,
                       actorId: human.id,
                       costGold: 0,
-                      description: `Сбросил карту ${idx + 1} («${cardRole}») и взял новую.`
+                      costTokens: 1,
+                      description: `Сбросил карту ${idx + 1} («${cardRole}») и бесплатно взял новую.`
                     });
                   }}
                 >
                   <span style={{ fontSize: '0.58rem', color: '#93c5fd' }}>Сбросить #{idx + 1}:</span>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>{ROLE_INFO[cardRole]?.badge} {cardRole}</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff' }}>{CARD_INFO[cardRole]?.badge} {cardRole}</span>
                 </button>
               ))}
             </div>

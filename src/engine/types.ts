@@ -1,12 +1,5 @@
-export type Role = 
-  | 'Наследник' 
-  | 'Казначей' 
-  | 'Вор' 
-  | 'Шпион' 
-  | 'Шантажист' 
-  | 'Рыцарь' 
-  | 'Шут' 
-  | 'Интриган';
+import type { Role, PlotType, InstantType, GameCard } from './cards';
+export type { Role, PlotType, InstantType, GameCard } from './cards';
 
 export type BotPersonalityType = 'gambler' | 'cautious' | 'pragmatic' | 'provocateur' | 'opportunist';
 
@@ -22,6 +15,13 @@ export interface BotArchetype {
   targetAggression: number;// Preference for attacking leaders vs weakest (0.0 - 1.0)
 }
 
+export interface ActivePlotData {
+  id: string;
+  type: PlotType;
+  targetPlayerId?: string;
+  charges?: number; // For Informant Network (starts at 2)
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -30,12 +30,14 @@ export interface Player {
   isBot: boolean;
   archetype?: BotArchetype;
   gold: number;
-  favor: number;
-  reputation: number; // 0 to 3
-  hand: Role[];
+  favor: number;       // Crowns 👑 (0 to 5, 5 = win condition)
+  seals: number;       // Royal Seals ⚜️ (0 or 1, 2 seals = 1 crown)
+  actionTokens: number;// Action tokens (0 to 2, refilled to 2 at turn start)
+  hand: GameCard[];
+  activePlot: ActivePlotData | null;
 }
 
-export type ActionType = 'normal' | 'role';
+export type ActionType = 'normal' | 'role' | 'plot' | 'instant';
 
 export interface Action {
   id: string;
@@ -45,19 +47,25 @@ export interface Action {
   targetId?: string;
   targetCardIndex?: number; // For Spy
   roleClaim?: Role;
+  plotType?: PlotType;
+  instantType?: InstantType;
   stakedCardIndex?: number; // Face-down staked card from hand (0 or 1)
   costGold: number;
+  costTokens: number;
+  withVaBanque?: boolean;   // Played together with Va-banque instant modifier (x2 on challenge)
   description: string;
 }
 
 export type TurnPhase = 
-  | 'IDLE'                   // Active player choosing action
+  | 'IDLE'                   // Active player choosing action (Role / Normal / Plot)
   | 'TARGET_REACTION_WINDOW' // Targeted victim choosing: Accept / Doubt / Duel
   | 'DUEL_ATTACKER_WINDOW'   // Attacker choosing: Retreat / Accept Duel
   | 'DOUBT_WINDOW'          // Non-targeted role or court check after accept
+  | 'VETO_WINDOW'           // Court instant window before effect application
   | 'REVEAL_OUTCOME'        // Showing card reveal / challenge result modal
   | 'DUEL_OUTCOME'          // Showing simultaneous 2-card duel clash result modal
   | 'SPY_PEEK'              // Spy is looking at target's card
+  | 'INFORMANT_PEEK'        // Informant Network owner peeking at opponent's new card
   | 'GAME_OVER';
 
 export interface RevealOutcome {
@@ -65,34 +73,46 @@ export interface RevealOutcome {
   accusedId: string;
   claimedRole: Role;
   wasTruth: boolean;
-  revealedRole: Role;
+  revealedRole: GameCard;
+  sealsWinnerId?: string;
+  actionExecuted?: boolean;
   jesterBonus?: boolean;
+  vaBanqueBonus?: boolean;
+  dossierBonusPlayerId?: string;
   message: string;
 }
 
 export type DuelResultType = 
-  | 'clash_blocked'        // Both truth: attack blocked, 0 damage
-  | 'attacker_breakthrough'// Attacker truth, Defender bluff: defender -1 ❤️, attack succeeds
-  | 'defender_counter'    // Attacker bluff, Defender truth: attacker -1 ❤️, attack cancelled
-  | 'mutual_bluff';       // Both bluff: both -1 ❤️, attack cancelled
+  | 'clash_blocked'        // Both truth: attack blocked, both get +1 ⚜️
+  | 'attacker_breakthrough'// Attacker truth, Defender bluff: attack succeeds, attacker +1 ⚜️ (0 ⚜️ under Va-banque)
+  | 'defender_counter'    // Attacker bluff, Defender truth: attack cancelled, defender +1 ⚜️ (+2 ⚜️ under Va-banque)
+  | 'mutual_bluff';       // Both bluff: attack cancelled, nobody gains or loses anything
 
 export interface DuelOutcome {
   attackerId: string;
   defenderId: string;
   attackerClaim: Role;
   defenderClaim: Role;
-  attackerRevealedRole: Role;
-  defenderRevealedRole: Role;
+  attackerRevealedRole: GameCard;
+  defenderRevealedRole: GameCard;
   attackerWasTruth: boolean;
   defenderWasTruth: boolean;
   resultType: DuelResultType;
+  sealsWinnerId?: string;
+  bothLostCoin?: boolean;
   message: string;
 }
 
 export interface SpyPeekData {
   actorId: string;
   targetId: string;
-  targetCards: Role[];
+  targetCards: GameCard[];
+}
+
+export interface InformantPeekData {
+  observerId: string;
+  targetId: string;
+  newCard: GameCard;
 }
 
 export interface FloatingResourceEvent {
@@ -105,23 +125,45 @@ export interface FloatingResourceEvent {
 export interface CardFlightEvent {
   id: string;
   isDuel?: boolean;
-  flightType?: 'to_discard' | 'to_hand';
+  flightType?: 'to_discard' | 'to_hand' | 'to_plot';
   actorId?: string;
-  role?: Role;
+  roleClaim?: Role;
+  revealedRole?: GameCard;
+  wasTruth?: boolean;
   attackerFlight?: 'to_discard' | 'to_hand';
   attackerId?: string;
+  attackerRevealedRole?: GameCard;
+  attackerWasTruth?: boolean;
   defenderFlight?: 'to_discard' | 'to_hand';
   defenderId?: string;
+  defenderRevealedRole?: GameCard;
+  defenderWasTruth?: boolean;
 }
+
+export type TurnSubPhase = 'NORMAL_ACTION_PHASE' | 'CARD_PLAY_PHASE';
 
 export interface GameState {
   players: Player[];
-  deck: Role[];
-  discardPile: Role[];
+  deck: GameCard[];
+  discardPile: GameCard[];
   activePlayerId: string;
   turnPhase: TurnPhase;
+  turnSubPhase: TurnSubPhase;
+  
+  // Track actions executed within current turn
+  hasUsedNormalActionThisTurn: boolean;
+  hasPlayedRoleThisTurn: boolean;
+  hasPlayedPlotThisTurn: boolean;
+  
+  // Coronation Circle State
   coronationCandidateId: string | null;
+  
   pendingAction: Action | null;
+  pendingDoubtDoubterId: string | null;
+  
+  // Instant modifiers
+  isVaBanqueActive: boolean;
+  isVetoed: boolean;
   
   // Duel state
   pendingDuelDefenderCardIndex: number | null;
@@ -133,10 +175,9 @@ export interface GameState {
   
   revealOutcome: RevealOutcome | null;
   spyPeekData: SpyPeekData | null;
+  informantPeekData: InformantPeekData | null;
   
   // Animation & Visual Feedback States
-  damagedPlayerIds: string[];
-  screenDamageFlash: boolean;
   activeSpeechReactions: Record<string, string>;
   floatingResourceEvents: FloatingResourceEvent[];
   cardFlightEvent: CardFlightEvent | null;
@@ -148,8 +189,13 @@ export interface GameState {
   // Action methods
   startGame: () => void;
   performAction: (action: Omit<Action, 'id'>) => void;
+  skipNormalActionPhase: () => void;
+  endTurnManually: () => void;
+  playPlotAction: (plotType: PlotType, cardIndex: number, targetPlayerId?: string) => void;
+  playInstant: (playerId: string, instantType: InstantType, cardIndex: number, targetPlayerId?: string) => void;
   doubtAction: (doubterId: string) => void;
   passDoubt: (playerId: string) => void;
+  proceedAfterVetoWindow: () => void;
   
   // Duel methods for targeted attacks
   targetAcceptAttack: (targetId: string) => void;
@@ -160,15 +206,21 @@ export interface GameState {
   closeDuelOutcome: () => void;
 
   // Spy & outcome actions
-  completeSpyAction: (takeCardIndex: number | null) => void;
+  completeSpyAction: (takeCardIndex?: number | null) => void;
+  closeInformantPeek: () => void;
   closeRevealOutcome: () => void;
   
   endTurn: () => void;
   restartGame: () => void;
 
   // Internal helper methods
+  addSealsToPlayer: (playerId: string, count: number) => void;
   _executeNormalAction: (action: Action) => void;
   _proceedAfterDoubtPassed: (action: Action) => void;
-  _resolveRoleActionEffect: (action: Action) => void;
-  _checkCoronationAndEndTurn: (actorId: string) => void;
+  _triggerVetoWindowOrResolveEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
+  _executeRevealOutcome: (doubterId: string) => void;
+  _resolveRoleActionEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
+  _checkEndgameAndAdvanceTurn: () => void;
+  _disruptPlayerPlotsOnLoss: (playerId: string, reason: string) => void;
+  _drawCardForPlayerWithInformantCheck: (playerIndex: number) => GameCard;
 }

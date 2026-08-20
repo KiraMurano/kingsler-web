@@ -21,16 +21,14 @@ export function PlayerAvatar({
     turnPhase, 
     duelOutcome, 
     revealOutcome,
-    damagedPlayerIds,
     activeSpeechReactions,
-    floatingResourceEvents 
+    floatingResourceEvents,
+    players
   } = useGameStore();
 
-  const isEliminated = player.reputation <= 0;
-  const isTakingDamage = damagedPlayerIds.includes(player.id);
   const playerFloats = floatingResourceEvents.filter(e => e.playerId === player.id);
 
-  // Derive dynamic speech / reaction bubble for this player (Only during active action/phase!)
+  // Derive dynamic speech / reaction bubble for this player
   let speechText: string | null = null;
 
   if (turnPhase !== 'IDLE') {
@@ -40,6 +38,8 @@ export function PlayerAvatar({
       if (isActive && pendingAction && pendingAction.actorId === player.id) {
         if (pendingAction.type === 'normal') {
           speechText = `«${pendingAction.name}»`;
+        } else if (pendingAction.type === 'plot') {
+          speechText = `«Интрига: ${pendingAction.plotType}»`;
         } else {
           speechText = `«Заявляю: ${pendingAction.roleClaim}!»`;
         }
@@ -58,17 +58,20 @@ export function PlayerAvatar({
   // Check if this player currently has a card staked on the table
   const hasCardStakedOnTable = pendingAction && pendingAction.type === 'role' && pendingAction.actorId === player.id && turnPhase !== 'IDLE';
 
+  const targetPlayer = player.activePlot?.targetPlayerId 
+    ? players.find(p => p.id === player.activePlot?.targetPlayerId) 
+    : null;
+
   return (
     <div 
-      className={`bot-seat-node ${isTakingDamage ? 'node-taking-damage' : ''}`}
+      className="bot-seat-node"
       style={{
-        opacity: isEliminated ? 0.35 : 1,
         cursor: isTargetable ? 'pointer' : 'default',
         ...style
       }}
       onClick={isTargetable ? onTarget : undefined}
     >
-      {/* Floating Resource Badges (+3 💰, -2 💰, +1 👑, -1 👑) */}
+      {/* Floating Resource Badges (+1 ⚜️, +3 💰, +1 👑, etc.) */}
       {playerFloats.map(ev => (
         <div 
           key={ev.id} 
@@ -79,14 +82,14 @@ export function PlayerAvatar({
       ))}
 
       {/* Dynamic Speech / Reaction Bubble */}
-      {speechText && !isEliminated && (
+      {speechText && (
         <div className="bot-speech-bubble cinzel-font">
           {speechText}
         </div>
       )}
 
-      {/* Round Avatar with Gold Ring, Damage Flash & Number Badge */}
-      <div className={`bot-avatar-frame ${isActive ? 'active-turn' : ''} ${isTargetable ? 'is-targetable' : ''} ${isTakingDamage ? 'damage-blood-flash' : ''}`}>
+      {/* Round Avatar with Gold Ring & Number Badge */}
+      <div className={`bot-avatar-frame ${isActive ? 'active-turn' : ''} ${isTargetable ? 'is-targetable' : ''}`}>
         {isTargetable && (
           <div className="avatar-target-reticle cinzel-font">
             🎯
@@ -100,14 +103,29 @@ export function PlayerAvatar({
             (e.target as HTMLImageElement).src = '/avatars/sasha.jpg';
           }}
         />
-        {/* Red damage vignette overlay */}
-        {isTakingDamage && <div className="avatar-damage-overlay" />}
         <div className="bot-seat-badge">{player.seatNumber}</div>
       </div>
 
       {/* Info Plate below avatar */}
       <div className="bot-info-plate">
-        <span className="bot-name-text">{player.name}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+          <span className="bot-name-text">{player.name}</span>
+          {/* Action Tokens Badge */}
+          <span 
+            style={{ 
+              fontSize: '0.65rem', 
+              color: player.actionTokens > 0 ? '#38bdf8' : '#64748b', 
+              fontWeight: 800,
+              background: player.actionTokens > 0 ? 'rgba(2, 132, 199, 0.2)' : 'rgba(30, 41, 59, 0.4)',
+              padding: '0 4px',
+              borderRadius: '4px',
+              border: `1px solid ${player.actionTokens > 0 ? '#0284c7' : '#334155'}`
+            }}
+            title={`Жетоны действия: ${player.actionTokens}/2`}
+          >
+            ⚡ {player.actionTokens}
+          </span>
+        </div>
         
         {player.archetype && (
           <span 
@@ -118,49 +136,61 @@ export function PlayerAvatar({
           </span>
         )}
 
-        {/* Stats: Crowns & Gold */}
-        <div className="bot-stats-strip">
-          <span style={{ color: 'var(--gold-light)' }}>👑 {player.favor}</span>
-          <span style={{ color: '#fbbf24' }}>💰 {player.gold}</span>
-        </div>
-
-        {/* 3 Reputation Hearts with Drop Animation on Damage */}
-        <div className="bot-hearts-strip">
-          {Array.from({ length: 3 }).map((_, i) => {
-            const isAliveHeart = i < player.reputation;
-            const isFallingHeart = isTakingDamage && i === player.reputation;
-
-            if (isFallingHeart) {
-              return (
-                <span key={i} className="heart-dropping-anim" title="Потеря репутации!">
-                  💔
-                </span>
-              );
-            }
-
-            return (
-              <span key={i} style={{ opacity: isAliveHeart ? 1 : 0.2 }}>
-                {isAliveHeart ? '❤️' : '🖤'}
-              </span>
-            );
-          })}
-        </div>
-
-        {/* In-Hand Cards Indicator: Shows 1 in hand + 1 on stake if acting */}
-        {!isEliminated && (
-          <div className="bot-cards-fan" title={`У игрока ${player.hand.length} карт(ы)`}>
-            {hasCardStakedOnTable ? (
-              <>
-                <div className="mini-card-back" title="1 карта в руке" />
-                <div className="mini-card-staked-slot" title="1 карта на столе" />
-              </>
-            ) : (
-              player.hand.map((_, i) => (
-                <div key={i} className="mini-card-back" />
-              ))
-            )}
+        {/* Active Plot Badge if bot has one on the table */}
+        {player.activePlot && (
+          <div 
+            style={{
+              fontSize: '0.6rem',
+              fontWeight: 800,
+              background: 'linear-gradient(90deg, #ca8a04, #eab308)',
+              color: '#000',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              marginTop: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              boxShadow: '0 0 6px rgba(234, 179, 8, 0.4)'
+            }}
+            title={`Активная Интрига: ${player.activePlot.type}`}
+          >
+            <span>🎴</span>
+            <span>{player.activePlot.type}</span>
+            {player.activePlot.charges !== undefined && <span>({player.activePlot.charges})</span>}
+            {targetPlayer && <span>→ {targetPlayer.name}</span>}
           </div>
         )}
+
+        {/* Stats: Crowns & Gold */}
+        <div className="bot-stats-strip">
+          <span style={{ color: 'var(--gold-light)' }} title="Короны влияния (цель: 6)">👑 {player.favor}</span>
+          <span style={{ color: '#fbbf24' }} title="Золотые монеты">💰 {player.gold}</span>
+        </div>
+
+        {/* Royal Seals (⚜️ 0/2) */}
+        <div className="bot-seals-strip" title="Королевские печати (2 ⚜️ = 1 👑)">
+          <span style={{ fontSize: '0.66rem', color: '#c084fc', fontWeight: 800 }}>⚜️ {player.seals}/2</span>
+          <div className="seal-indicators" style={{ display: 'inline-flex', gap: '2px', marginLeft: '4px' }}>
+            <span style={{ opacity: player.seals >= 1 ? 1 : 0.25, fontSize: '0.7rem' }}>⚜️</span>
+            <span style={{ opacity: player.seals >= 2 ? 1 : 0.25, fontSize: '0.7rem' }}>⚜️</span>
+          </div>
+        </div>
+
+        {/* In-Hand Cards Indicator */}
+        <div className="bot-cards-in-hand-strip">
+          {hasCardStakedOnTable ? (
+            <>
+              <span className="bot-inhand-card-icon held" title="1 карта в руке">🂠</span>
+              <span className="bot-inhand-card-icon on-stake" title="1 карта выставлена на стол">⚡</span>
+            </>
+          ) : (
+            <>
+              <span className="bot-inhand-card-icon held" title="Карта в руке">🂠</span>
+              <span className="bot-inhand-card-icon held" title="Карта в руке">🂠</span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

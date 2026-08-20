@@ -1,16 +1,24 @@
-import type { Role } from '../engine/types';
-import { ROLE_INFO } from '../engine/roles';
+import type { GameCard } from '../engine/types';
+import { CARD_INFO, isPlot, isInstant } from '../engine/cards';
 
 interface CardProps {
-  role: Role;
+  role: GameCard; // Accepts any GameCard (Role, Plot, Instant)
   onClick?: () => void;
   isPlayable?: boolean;
   isSelected?: boolean;
   hintText?: string;
 }
 
-export function Card({ role, onClick, isPlayable, isSelected, hintText }: CardProps) {
-  const info = ROLE_INFO[role];
+export function Card({ 
+  role, 
+  onClick, 
+  isPlayable, 
+  isSelected
+}: CardProps) {
+  const info = CARD_INFO[role] || CARD_INFO['Наследник'];
+  const isPlotCard = isPlot(role);
+  const isInstantCard = isInstant(role);
+  const isLongTitle = info.name.length > 10;
 
   return (
     <div 
@@ -21,17 +29,31 @@ export function Card({ role, onClick, isPlayable, isSelected, hintText }: CardPr
         borderColor: isSelected ? 'var(--gold-light)' : info.borderColor,
         boxShadow: isSelected ? '0 0 30px rgba(253, 224, 71, 0.85)' : undefined
       }}
-      title={`Нажмите, чтобы сыграть карту «${role}» на стол`}
+      title={`«${role}» — ${info.shortDescription}`}
     >
-      {/* Playable badge indicator when it's player's turn */}
-      {isPlayable && (
-        <div className="card-stake-hint cinzel-font">
-          {hintText || 'СЫГРАТЬ'}
-        </div>
-      )}
+      {/* Single Category Badge in Top-Left Corner */}
+      <div 
+        className="card-top-category-badge"
+        style={{
+          borderColor: info.borderColor,
+          background: isPlotCard 
+            ? 'rgba(202, 138, 4, 0.7)' 
+            : isInstantCard 
+              ? 'rgba(147, 51, 234, 0.7)' 
+              : 'rgba(225, 29, 72, 0.7)'
+        }}
+      >
+        {isPlotCard ? '🎴 ИНТРИГА' : isInstantCard ? '⚡ ИНСТАНТ' : '👑 РОЛЬ'}
+      </div>
 
-      {/* Card Title */}
-      <div className="card-title-head cinzel-font">
+      {/* Card Title - Scaled to prevent text overflow */}
+      <div 
+        className="card-title-head cinzel-font"
+        style={{ 
+          fontSize: isLongTitle ? '0.70rem' : '0.82rem',
+          letterSpacing: isLongTitle ? '0px' : '0.5px'
+        }}
+      >
         {info.name}
       </div>
 
@@ -50,15 +72,21 @@ export function Card({ role, onClick, isPlayable, isSelected, hintText }: CardPr
         </div>
       </div>
 
-      {/* Short Role Rule */}
+      {/* Short Rule Description */}
       <div className="card-short-desc">
         {info.shortDescription}
       </div>
 
-      {/* Bottom Counter Icon / Cost */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
-        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.7)' }}>
-          {info.blocksRole ? `🛡️ vs ${info.blocksRole}` : info.cost > 0 ? `${info.cost} 💰` : '👑 Роль'}
+      {/* Bottom Footer Info */}
+      <div className="card-bottom-bar">
+        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.75)' }}>
+          {info.blocksRole 
+            ? `🛡️ vs ${info.blocksRole}` 
+            : isPlotCard 
+              ? '🎴 1 ⚡ интрига' 
+              : isInstantCard 
+                ? '⚡ 1 ⚡ инстант' 
+                : '👑 1 ⚡ заявить'}
         </span>
         <span style={{ fontSize: '0.8rem' }}>{info.bottomIcon}</span>
       </div>

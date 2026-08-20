@@ -27,7 +27,7 @@ export function Chronicle({ onOpenRules }: ChronicleProps) {
           <span>ЛЕТОПИСЬ ДВОРА</span>
         </div>
         {candidate && (
-          <div style={{ fontSize: '0.68rem', color: '#fef08a', background: 'rgba(245, 158, 11, 0.2)', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+          <div className="chronicle-final-badge cinzel-font">
             👑 Фаворит: {candidate.name}
           </div>
         )}
@@ -37,57 +37,57 @@ export function Chronicle({ onOpenRules }: ChronicleProps) {
       <div className="chronicle-feed" ref={feedRef}>
         {history.map((entry, idx) => {
           const isLatest = idx === 0;
-          const isDanger = entry.includes('поймал') || entry.includes('потеря') || entry.includes('теряет') || entry.includes('ПОЗОР') || entry.includes('изгнан') || entry.includes('атакует') || entry.includes('отнимает') || entry.includes('крадёт');
-          const isTruth = entry.includes('ПРАВДА') || entry.includes('действительно') || entry.includes('сохранил') || entry.includes('получает +1 👑') || entry.includes('КОРОНАЦИЯ');
-          const isDuel = entry.includes('ДУЭЛЬ') || entry.includes('вызов на дуэль') || entry.includes('ОТРАЖЕН');
+          const isDanger = entry.includes('поймал') || entry.includes('ПОЗОР') || entry.includes('ОБА ПОПАЛИСЬ') || entry.includes('отменяется') || entry.includes('отступает');
+          const isTruth = entry.includes('ПРАВДА') || entry.includes('действительно') || entry.includes('+1 👑') || entry.includes('+1 ⚜️') || entry.includes('КОРОНАЦИЯ') || entry.includes('трансформировались');
+          const isFinal = entry.includes('ПОСЛЕДНЯЯ АУДИЕНЦИЯ') || entry.includes('ПОБЕДИТЕЛЬ') || entry.includes('НИЧЬЯ');
+          const isDuel = entry.includes('ДУЭЛЬ') || entry.includes('вызов на дуэль') || entry.includes('ПРОБИТИЕ') || entry.includes('КОНТРАТАКА');
+          const isAttack = entry.includes('атакует') || entry.includes('крадет') || entry.includes('Шантажирует') || entry.includes('забирает');
 
-          let customClass = '';
-          if (isLatest) customClass += ' highlight-latest';
-          if (isDanger) customClass += ' danger-event';
-          else if (isTruth) customClass += ' truth-event';
-          else if (isDuel) customClass += ' duel-event';
+          let itemClass = 'chronicle-item';
+          if (isLatest) itemClass += ' highlight-latest';
+          if (isFinal) itemClass += ' final-event';
+          else if (isDanger) itemClass += ' danger-event';
+          else if (isTruth) itemClass += ' truth-event';
+          else if (isDuel) itemClass += ' duel-event';
+          else if (isAttack) itemClass += ' attack-event';
 
           // Extract icon or decorative flair
-          let icon = '•';
-          if (entry.includes('👑')) icon = '👑';
-          else if (entry.includes('⚔️') || entry.includes('ДУЭЛЬ')) icon = '⚔️';
+          let icon = '📜';
+          if (entry.includes('👑') || entry.includes('КОРОНАЦИЯ') || entry.includes('АУДИЕНЦИЯ')) icon = '👑';
+          else if (entry.includes('⚜️')) icon = '⚜️';
+          else if (entry.includes('⚔️') || entry.includes('ДУЭЛЬ') || entry.includes('🤺')) icon = '⚔️';
           else if (entry.includes('💰')) icon = '💰';
           else if (entry.includes('🎭')) icon = '🎭';
           else if (entry.includes('👁️')) icon = '👁️';
           else if (entry.includes('🛡️')) icon = '🛡️';
           else if (entry.includes('🔄')) icon = '🔄';
           else if (entry.includes('🍷')) icon = '🍷';
-          else if (entry.includes('📜')) icon = '📜';
+          else if (entry.includes('🤡')) icon = '🤡';
+          else if (entry.includes('🏳️')) icon = '🏳️';
 
           return (
-            <div key={idx} className={`chronicle-item ${customClass}`}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>{icon}</span>
-                <span style={{ flex: 1 }}>{entry}</span>
+            <div key={idx} className={itemClass}>
+              <div className="chronicle-item-icon">{icon}</div>
+              <div className="chronicle-item-content">
+                <span className="chronicle-text">{entry}</span>
               </div>
             </div>
           );
         })}
-
-        {history.length === 0 && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', marginTop: '20px' }}>
-            Летопись пуста. Партия начинается...
-          </div>
-        )}
       </div>
 
-      {/* Footer quick action */}
-      <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(245, 158, 11, 0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Записей: {history.length}</span>
-        {onOpenRules && (
+      {/* Footer Info */}
+      <div className="chronicle-footer">
+        <div className="chronicle-footer-content">
+          <span className="chronicle-ratio-pill cinzel-font">2 ⚜️ = 1 👑</span>
           <button 
-            type="button"
+            type="button" 
+            className="chronicle-help-btn"
             onClick={onOpenRules}
-            style={{ background: 'transparent', border: 'none', color: 'var(--gold-light)', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
           >
-            Справка по терминам
+            <span>📖 Свод законов</span>
           </button>
-        )}
+        </div>
       </div>
     </aside>
   );
