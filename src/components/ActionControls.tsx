@@ -50,7 +50,9 @@ export function ActionControls({
 
     if (isTarget) {
       if (selectingRedirectTarget) {
-        const redirectTargets = players.filter(p => p.id !== human.id && p.id !== actor?.id);
+        const redirectTargets = players.filter(
+          p => p.id !== human.id && p.id !== actor?.id && (pendingAction?.roleClaim !== 'Шантажист' || p.favor > 0)
+        );
         return (
           <div className="player-actions-toolbar" style={{ gap: '6px' }}>
             <div style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
@@ -185,13 +187,13 @@ export function ActionControls({
             {/* Option 4: Redirection Instant if held in hand */}
             {redirectIndex !== -1 && (
               <button 
-                type="button"
+                type="button" 
                 className="action-deck-btn btn-gold"
                 onClick={() => setSelectingRedirectTarget(true)}
                 style={{ padding: '6px 4px', border: '1px solid #fbbf24' }}
               >
                 <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>🔀 Инстант</span>
-                <span className="action-deck-btn-sub">Перенаправить</span>
+                <span className="action-deck-btn-sub">Перенаправить (0 ⚡)</span>
               </button>
             )}
           </div>
@@ -270,7 +272,7 @@ export function ActionControls({
   // 4. VETO_WINDOW (Dedicated window before applying effect)
   if (turnPhase === 'VETO_WINDOW') {
     const vetoIdx = human.hand.indexOf('Право вето');
-    const canVeto = vetoIdx !== -1 && !useGameStore.getState().isVetoed && hasTokens;
+    const canVeto = vetoIdx !== -1 && !useGameStore.getState().isVetoed;
     const { proceedAfterVetoWindow } = useGameStore.getState();
 
     return (
@@ -287,7 +289,7 @@ export function ActionControls({
               style={{ padding: '8px 16px', border: '2px solid #f87171', background: 'linear-gradient(135deg, #991b1b, #dc2626)' }}
             >
               <span className="action-deck-btn-title" style={{ color: '#fff', fontSize: '0.85rem' }}>
-                🚫 НАЛОЖИТЬ ВЕТО! (1 ⚡)
+                🚫 НАЛОЖИТЬ ВЕТО! (0 ⚡)
               </span>
               <span className="action-deck-btn-sub" style={{ color: '#fee2e2' }}>
                 Отменить действие и отправить в сброс
@@ -347,6 +349,28 @@ export function ActionControls({
           </span>
           <span className="action-deck-btn-sub">
             Фаза 3: Роли / Интриги
+          </span>
+        </button>
+      )}
+
+      {/* Secret Conspiracy Activation Button in own turn (2, 3 or 4 charges) */}
+      {isMyTurn && human.activePlot?.type === 'Тайный заговор' && (human.activePlot.charges ?? 0) >= 2 && (
+        <button 
+          type="button"
+          className="action-deck-btn btn-gold"
+          style={{ padding: '8px 12px', border: '2px solid #c084fc', background: 'linear-gradient(135deg, #581c87, #7e22ce)' }}
+          onClick={() => useGameStore.getState().openConspiracyDialog(false)}
+          title="Свершить Заговор (стоит 1 ⚡)"
+        >
+          <span className="action-deck-btn-title" style={{ color: '#f3e8ff', fontSize: '0.78rem' }}>
+            ⚔️ Свершить Заговор ({human.activePlot.charges}/4)
+          </span>
+          <span className="action-deck-btn-sub" style={{ color: '#e9d5ff' }}>
+            {human.activePlot.charges === 2 
+              ? 'Сброс до 3 💰 (1 ⚡)' 
+              : human.activePlot.charges === 3 
+                ? 'Лишить 1 👑 или 3 💰 (1 ⚡)' 
+                : '🛡️ Сброс или Корона без Вето! (1 ⚡)'}
           </span>
         </button>
       )}

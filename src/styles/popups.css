@@ -1,0 +1,259 @@
+/* ==========================================================================
+   POPUPS, MODALS & FLOATING TOASTS
+   ========================================================================== */
+
+.popup-click-outside-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  backdrop-filter: none;
+  z-index: var(--z-backdrop);
+}
+
+/* ==========================================================================
+   ROLE CLAIM POPUP (ANCHORED FLOATING POPUP OVER HAND CARDS)
+   ========================================================================== */
+.role-claim-popup-desktop {
+  position: absolute;
+  bottom: calc(100% + 28px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 580px;
+  max-width: 95vw;
+  background: radial-gradient(circle at 50% 10%, #1e293b 0%, #0f172a 80%, #020617 100%);
+  border: 2px solid var(--gold-primary);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-popup);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: var(--z-popup);
+  animation: popup-anchor-in 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Downward Golden Pointer Arrow targeting the exact staked card */
+.role-claim-popup-desktop::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: var(--arrow-left, 50%);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 14px solid var(--gold-primary);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.9));
+}
+
+.role-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+  padding-bottom: 6px;
+}
+
+.role-popup-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--gold-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.role-popup-subtitle {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  margin-top: 1px;
+}
+
+.role-popup-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.role-popup-close-btn:hover {
+  background: rgba(239, 68, 68, 0.8);
+  border-color: #f87171;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.role-truth-badge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.22);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+}
+
+.role-bluff-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   NORMAL ACTIONS POPUP
+   ========================================================================== */
+.normal-actions-popup-desktop {
+  position: absolute;
+  bottom: calc(100% + 28px);
+  right: 0;
+  width: 440px;
+  max-width: 95vw;
+  background: radial-gradient(circle at 50% 10%, #1e293b 0%, #0f172a 80%, #020617 100%);
+  border: 2px solid var(--gold-primary);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-popup);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: var(--z-popup);
+  transform-origin: bottom right;
+  animation: popup-anchor-in-right 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Downward Golden Pointer Arrow targeting the normal action button */
+.normal-actions-popup-desktop::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  right: 50px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 14px solid var(--gold-primary);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.9));
+}
+
+/* Roles Grid (4x2 Desktop Layout) */
+.roles-grid-desktop {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.role-select-card-desktop {
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1.5px solid rgba(245, 158, 11, 0.3);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(15, 23, 42, 0.75);
+  text-align: left;
+}
+
+.role-select-card-desktop:hover:not(:disabled) {
+  border-color: var(--gold-light);
+  transform: translateY(-2px);
+  background: rgba(30, 41, 59, 0.95);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+}
+
+.role-select-card-desktop:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   MODALS & OVERLAYS
+   ========================================================================== */
+.game-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fade-in 0.25s ease;
+}
+
+.game-modal-content {
+  width: 100%;
+  max-width: 620px;
+  background: radial-gradient(circle at 50% 15%, #1e293b 0%, #0f172a 75%, #020617 100%);
+  border: 2px solid var(--gold-primary);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--gold-light);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.close-modal-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  padding: 10px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.close-modal-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* ==========================================================================
+   TOAST NOTICE
+   ========================================================================== */
+.game-toast-notice {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.96);
+  border: 1.5px solid var(--gold-primary);
+  color: #fef08a;
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(245, 158, 11, 0.4);
+  z-index: 99;
+  animation: pop-toast 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-align: center;
+}

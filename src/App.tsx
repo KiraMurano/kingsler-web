@@ -34,7 +34,6 @@ export default function App() {
     targetDeclareDuel,
     attackerRetreatDuel,
     attackerAcceptDuel,
-    hasPlayedRoleThisTurn,
     endTurn
   } = useGameStore();
 
@@ -58,6 +57,7 @@ export default function App() {
   } | null>(null);
 
   const [selectedStakedCardIndex, setSelectedStakedCardIndex] = useState<number>(0);
+  const [redirectModalCardIndex, setRedirectModalCardIndex] = useState<number | null>(null);
 
   useEffect(() => {
     startGame();
@@ -110,7 +110,7 @@ export default function App() {
 
     // 1. If clicking card in VETO_WINDOW:
     if (turnPhase === 'VETO_WINDOW') {
-      if (card === 'Право вето' && human.actionTokens >= 1) {
+      if (card === 'Право вето') {
         playInstant(human.id, 'Право вето', cardIndex);
         return;
       }
@@ -118,86 +118,29 @@ export default function App() {
 
     // 2. If in TARGET_REACTION_WINDOW:
     if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
-      if (card === 'Перенаправление' && human.actionTokens >= 1) {
-        setPendingTargetAction({
-          type: 'instant',
-          name: 'Перенаправление',
-          instantType: 'Перенаправление',
-          isInstantDirect: true,
-          stakedCardIndex: cardIndex,
-          cost: 0
-        });
+      if (card === 'Перенаправление') {
+        setRedirectModalCardIndex(cardIndex);
         return;
       }
       targetDeclareDuel(human.id, cardIndex);
       return;
     }
 
-    // 3. If playing Instant or Va-banque combo during own turn:
+    // 3. If in own turn (IDLE):
     if (isMyTurn) {
-      if (card === 'Ва-банк') {
-        if (human.actionTokens < 1) {
-          showToast('Недостаточно жетонов действия (нужен 1 ⚡)');
-          return;
-        }
-        if (hasPlayedRoleThisTurn) {
-          showToast('Лимит: 1 действие Роли за ход уже сыграно');
-          return;
-        }
-        const otherIdx = cardIndex === 0 ? 1 : 0;
-        const validOtherIdx = human.hand[otherIdx] ? otherIdx : 0;
-        setSelectedStakedCardIndex(validOtherIdx);
-        setIsVaBanqueComboLaunch(true);
-        setShowRoleModal(true);
-        return;
-      }
-
-      if (card === 'Шпион') {
-        if (human.actionTokens < 1) {
-          showToast('Недостаточно жетонов действия (нужен 1 ⚡)');
-          return;
-        }
-        setPendingTargetAction({
-          type: 'instant',
-          name: 'Шпион',
-          instantType: 'Шпион',
-          isInstantDirect: true,
-          stakedCardIndex: cardIndex,
-          cost: 0
-        });
-        return;
-      }
-
-      if (card === 'Дворцовый переполох') {
-        if (human.actionTokens < 1) {
-          showToast('Недостаточно жетонов действия (нужен 1 ⚡)');
-          return;
-        }
-        setPendingTargetAction({
-          type: 'instant',
-          name: 'Дворцовый переполох',
-          instantType: 'Дворцовый переполох',
-          isInstantDirect: true,
-          stakedCardIndex: cardIndex,
-          cost: 0
-        });
-        return;
-      }
-    }
-
-    if (!isMyTurn) {
-      if (card === 'Право вето' && human.actionTokens >= 1) {
-        playInstant(human.id, 'Право вето', cardIndex);
-        return;
-      }
-      const active = players.find(p => p.id === activePlayerId);
-      showToast(`Сейчас ход придворного: ${active?.name || 'другого игрока'}`);
+      setIsVaBanqueComboLaunch(false);
+      setSelectedStakedCardIndex(cardIndex);
+      setShowRoleModal(true);
       return;
     }
 
-    setIsVaBanqueComboLaunch(false);
-    setSelectedStakedCardIndex(cardIndex);
-    setShowRoleModal(true);
+    // 4. If not my turn:
+    if (card === 'Право вето') {
+      playInstant(human.id, 'Право вето', cardIndex);
+      return;
+    }
+    const active = players.find(p => p.id === activePlayerId);
+    showToast(`Сейчас ход придворного: ${active?.name || 'другого игрока'}`);
   };
 
   // Keyboard Shortcuts Listener for Desktop Experience
@@ -210,6 +153,7 @@ export default function App() {
         setShowRoleModal(false);
         setShowRulesModal(false);
         setPendingTargetAction(null);
+        setRedirectModalCardIndex(null);
         return;
       }
 
@@ -306,7 +250,7 @@ export default function App() {
     turnBannerDesc = `Заявлена роль «${pendingAction?.roleClaim}». Кто усомнится?`;
   } else if (turnPhase === 'VETO_WINDOW') {
     turnBannerTitle = '🚫 ОКНО ВЕТО!';
-    turnBannerDesc = `Применяется «${pendingAction?.roleClaim || pendingAction?.name}»! Любой игрок может сыграть Право вето (1 ⚡).`;
+    turnBannerDesc = `Применяется «${pendingAction?.roleClaim || pendingAction?.name}»! Любой игрок может сыграть Право вето (0 ⚡).`;
   }
 
   return (
@@ -328,29 +272,40 @@ export default function App() {
           <span className="brand-crest">👑</span>
           <div>
             <div className="brand-title cinzel-font gold-gradient-text">KINGLIER</div>
-            <div className="brand-subtitle">39 Карт • 6 Ролей • Интриги • Инстанты • 2 ⚡ Жетона</div>
+            <div className="brand-subtitle">39 Карт • 6 Ролей • Интриги • 2 ⚡ Жетона</div>
           </div>
         </div>
 
-        {/* Center Coronation Goal Progress Banner */}
-        <div className="coronation-status-banner cinzel-font">
-          <div className="coronation-goal-text">
-            <span>👑 ЦЕЛЬ: 6 КОРОН (2 ⚜️ = 1 👑)</span>
-          </div>
-          <div className="crown-segments-track" title="Для победы удержите 6 корон круг">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div 
-                key={i} 
-                className={`crown-segment ${(human?.favor ?? 0) > i ? 'filled' : ''}`}
-              >
-                {(human?.favor ?? 0) > i ? '👑' : ''}
-              </div>
-            ))}
-          </div>
+        {/* Center: Dynamic Turn Stage & Action Status Pill */}
+        <div className={`top-turn-stage-pill ${coronationCandidateId ? 'final-round-active-banner' : ''}`}>
+          <span className="turn-pill-icon">{isMyTurn ? '⚔️' : (coronationCandidateId ? '👑' : '⏳')}</span>
+          <span className="turn-banner-title cinzel-font">
+            {turnBannerTitle}
+          </span>
+          <span className="turn-pill-divider">•</span>
+          <span className="turn-banner-desc">
+            {turnBannerDesc}
+          </span>
         </div>
 
-        {/* Top Actions */}
+        {/* Right Actions & Coronation Goal Tracker */}
         <div className="nav-actions">
+          <div className="coronation-status-banner cinzel-font">
+            <div className="coronation-goal-text">
+              <span>ЦЕЛЬ: 6 👑</span>
+            </div>
+            <div className="crown-segments-track" title="Для победы удержите 6 корон круг">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className={`crown-segment ${(human?.favor ?? 0) > i ? 'filled' : ''}`}
+                >
+                  {(human?.favor ?? 0) > i ? '👑' : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <button 
             className="nav-pill-btn"
             onClick={() => setShowRulesModal(true)}
@@ -375,17 +330,6 @@ export default function App() {
 
         {/* Center Column: Grand Oval Table & Player Command Deck */}
         <main className="arena-center">
-          {/* Top Turn Stage Banner */}
-          <div className={`current-turn-stage-banner ${coronationCandidateId ? 'final-round-active-banner' : ''}`}>
-            <span className="turn-banner-title cinzel-font">
-              {turnBannerTitle}
-            </span>
-            <span style={{ color: 'var(--gold-border)' }}>•</span>
-            <span className="turn-banner-desc">
-              {turnBannerDesc}
-            </span>
-          </div>
-
           {/* Grand Oval Royal Table */}
           <Table 
             pendingTargetAction={pendingTargetAction}
@@ -474,6 +418,25 @@ export default function App() {
       <Modals 
         showRulesModal={showRulesModal}
         onCloseRulesModal={() => setShowRulesModal(false)}
+        redirectModalCardIndex={redirectModalCardIndex}
+        onCloseRedirectModal={() => setRedirectModalCardIndex(null)}
+        onConfirmRedirectInstant={(cardIdx) => {
+          setRedirectModalCardIndex(null);
+          setPendingTargetAction({
+            type: 'instant',
+            name: 'Перенаправление',
+            instantType: 'Перенаправление',
+            isInstantDirect: true,
+            stakedCardIndex: cardIdx,
+            cost: 0
+          });
+        }}
+        onConfirmRedirectDuelBluff={(cardIdx) => {
+          setRedirectModalCardIndex(null);
+          if (human) {
+            targetDeclareDuel(human.id, cardIdx);
+          }
+        }}
       />
     </div>
   );

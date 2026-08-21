@@ -24,7 +24,7 @@ export function Table({
   onSelectTarget,
   onCancelTarget
 }: TableProps) {
-  const { players, activePlayerId } = useGameStore();
+  const { players, activePlayerId, pendingAction } = useGameStore();
   const human = players.find(p => !p.isBot);
 
   // Desktop Arc Seat Positioning for the 3 opponent bots (Left, Top Center, Right)
@@ -37,6 +37,10 @@ export function Table({
   const isValidTarget = (player: Player): boolean => {
     if (!pendingTargetAction) return false;
     if (player.id === human?.id) return false;
+    if (pendingTargetAction.instantType === 'Перенаправление') {
+      if (pendingAction?.actorId && player.id === pendingAction.actorId) return false;
+      if (pendingAction?.roleClaim === 'Шантажист' && player.favor === 0) return false;
+    }
     if (pendingTargetAction.roleClaim === 'Шантажист' && player.favor === 0) return false;
     return true;
   };

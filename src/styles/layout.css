@@ -1,0 +1,219 @@
+/* ==========================================================================
+   DESKTOP MASTER LAYOUT & TOP NAVIGATION
+   ========================================================================== */
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background-image: 
+    radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.6) 0%, rgba(2, 6, 23, 0.95) 100%),
+    url('/bg/palace.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.desktop-viewport {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Ambient Dust / Particle Overlay */
+.ambient-glow-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, rgba(59, 130, 246, 0.08) 0%, rgba(245, 158, 11, 0.04) 45%, transparent 70%);
+  z-index: var(--z-base);
+}
+
+/* ==========================================================================
+   TOP BAR (HERALDIC HEADER)
+   ========================================================================== */
+.top-nav-desktop {
+  height: 54px;
+  background: linear-gradient(180deg, rgba(10, 15, 29, 0.95) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border-bottom: 1.5px solid var(--bg-panel-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: var(--z-header);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-crest {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+}
+
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.brand-subtitle {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Center Dynamic Turn Stage Pill */
+.top-turn-stage-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.45);
+  padding: 6px 18px;
+  border-radius: 24px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(245, 158, 11, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 540px;
+}
+
+.top-turn-stage-pill.final-round-active-banner {
+  background: radial-gradient(circle at 50% 50%, rgba(225, 29, 72, 0.85) 0%, rgba(136, 19, 55, 0.98) 100%);
+  border-color: #fb7185;
+  box-shadow: 0 0 20px rgba(225, 29, 72, 0.6);
+  animation: final-round-pulse 2s infinite ease-in-out;
+}
+
+.turn-pill-icon {
+  font-size: 1rem;
+}
+
+.turn-pill-divider {
+  color: rgba(245, 158, 11, 0.6);
+  font-size: 0.85rem;
+}
+
+.turn-banner-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--gold-light);
+  white-space: nowrap;
+}
+
+.turn-banner-desc {
+  font-size: 0.76rem;
+  color: #bfdbfe;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Coronation Goal Tracker Badge */
+.coronation-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.5) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 5px 14px;
+  border-radius: 20px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4), inset 0 0 8px rgba(245, 158, 11, 0.12);
+}
+
+.coronation-goal-text {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--gold-light);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.crown-segments-track {
+  display: flex;
+  gap: 4px;
+}
+
+.crown-segment {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.crown-segment.filled {
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  border-color: #fef08a;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.7);
+  color: #000;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-pill-btn:hover {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: var(--gold-light);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.25);
+}
+
+/* ==========================================================================
+   DESKTOP 3-COLUMN MAIN ARENA
+   ========================================================================== */
+.main-desktop-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 310px 1fr 310px;
+  gap: 16px;
+  padding: 14px 18px;
+  height: calc(100vh - 54px);
+  overflow: hidden;
+  z-index: var(--z-grid);
+}
+
+@media (max-width: 1360px) {
+  .main-desktop-grid {
+    grid-template-columns: 270px 1fr 270px;
+    gap: 12px;
+    padding: 10px 14px;
+  }
+}

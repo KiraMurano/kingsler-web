@@ -30,7 +30,7 @@ export interface Player {
   isBot: boolean;
   archetype?: BotArchetype;
   gold: number;
-  favor: number;       // Crowns 👑 (0 to 5, 5 = win condition)
+  favor: number;       // Crowns 👑 (0 to 6, 6 = win condition)
   seals: number;       // Royal Seals ⚜️ (0 or 1, 2 seals = 1 crown)
   actionTokens: number;// Action tokens (0 to 2, refilled to 2 at turn start)
   hand: GameCard[];
@@ -140,42 +140,45 @@ export interface CardFlightEvent {
   defenderWasTruth?: boolean;
 }
 
+export interface ConspiracyPromptData {
+  playerId: string;
+  charges: number;
+  isImmediateReaction: boolean;
+}
+
 export type TurnSubPhase = 'NORMAL_ACTION_PHASE' | 'CARD_PLAY_PHASE';
 
 export interface GameState {
   players: Player[];
+  activePlayerId: string;
   deck: GameCard[];
   discardPile: GameCard[];
-  activePlayerId: string;
   turnPhase: TurnPhase;
   turnSubPhase: TurnSubPhase;
+  timerSeconds: number;
+  timerMaxSeconds: number;
+  isTimerPaused: boolean;
+  coronationCandidateId: string | null;
   
-  // Track actions executed within current turn
+  // Pending Action state
+  pendingAction: Action | null;
+  pendingDoubtDoubterId: string | null;
   hasUsedNormalActionThisTurn: boolean;
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;
-  
-  // Coronation Circle State
-  coronationCandidateId: string | null;
-  
-  pendingAction: Action | null;
-  pendingDoubtDoubterId: string | null;
-  
-  // Instant modifiers
   isVaBanqueActive: boolean;
   isVetoed: boolean;
   
-  // Duel state
-  pendingDuelDefenderCardIndex: number | null;
-  pendingDuelDefenderRoleClaim: Role | null;
-  duelOutcome: DuelOutcome | null;
-  
-  timerSeconds: number;
-  timerMaxSeconds: number;
-  
+  // Outcome Modals
   revealOutcome: RevealOutcome | null;
   spyPeekData: SpyPeekData | null;
+  duelOutcome: DuelOutcome | null;
   informantPeekData: InformantPeekData | null;
+  conspiracyPrompt: ConspiracyPromptData | null;
+
+  // Duel Specific Pending Cards
+  pendingDuelDefenderCardIndex: number | null;
+  pendingDuelDefenderRoleClaim: Role | null;
   
   // Animation & Visual Feedback States
   activeSpeechReactions: Record<string, string>;
@@ -209,6 +212,9 @@ export interface GameState {
   completeSpyAction: (takeCardIndex?: number | null) => void;
   closeInformantPeek: () => void;
   closeRevealOutcome: () => void;
+  openConspiracyDialog: (isImmediateReaction?: boolean) => void;
+  closeConspiracyDialog: () => void;
+  activateConspiracy: (playerId: string, targetPlayerId: string, effect: 'gold' | 'crown', isFreeReaction?: boolean) => void;
   
   endTurn: () => void;
   restartGame: () => void;

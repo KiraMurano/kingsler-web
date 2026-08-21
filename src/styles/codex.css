@@ -1,0 +1,119 @@
+/* ==========================================================================
+   ROYAL CODEX SIDEBAR (СВОД ЗАКОНОВ И РОЛЕЙ)
+   ========================================================================== */
+
+.codex-sidebar {
+  background: var(--bg-panel);
+  border: 1.5px solid var(--bg-panel-border);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.codex-deck-tracker {
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deck-info-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--gold-light);
+  font-weight: 700;
+}
+
+.codex-filter-tab {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.codex-filter-tab:hover {
+  filter: brightness(1.2);
+}
+
+.codex-roles-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.3) rgba(15, 23, 42, 0.5);
+}
+
+.codex-role-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.codex-role-card:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: var(--gold-primary);
+  transform: translateX(-2px);
+}
+
+.codex-role-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.codex-role-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--gold-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.held-badge {
+  font-size: 0.58rem;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 800;
+}
+
+.codex-role-desc {
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  line-height: 1.25;
+}
+
+.codex-role-details {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+  animation: fade-in 0.2s ease;
+}
+
+.codex-role-counter {
+  font-size: 0.64rem;
+  color: #93c5fd;
+  margin-top: 2px;
+  font-style: italic;
+}

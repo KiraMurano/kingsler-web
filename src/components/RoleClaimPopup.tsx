@@ -13,12 +13,12 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
   const { players, performAction, playPlotAction, playInstant, hasPlayedPlotThisTurn, hasPlayedRoleThisTurn } = useGameStore();
   const human = players.find(p => !p.isBot);
 
-  if (!human) return null;
-
-  const hasVaBanqueInHand = human.hand.includes('Ва-банк');
-  const canUseVaBanque = hasVaBanqueInHand && human.actionTokens >= 1 && !hasPlayedRoleThisTurn;
+  const hasVaBanqueInHand = !!human?.hand.includes('Ва-банк');
+  const canUseVaBanque = hasVaBanqueInHand && (human?.actionTokens ?? 0) >= 1 && !hasPlayedRoleThisTurn;
 
   const [withVaBanque, setWithVaBanque] = useState(initialWithVaBanque && canUseVaBanque);
+
+  if (!human) return null;
 
   const activeStakedCard = human.hand[stakedCardIndex] || human.hand[0];
   const activeCardInfo = CARD_INFO[activeStakedCard];
@@ -160,21 +160,25 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: 800, color: '#e9d5ff', fontSize: '0.82rem' }}>
-                  ⚡ Сыграть открыто как Инстант (1 ⚡)
+                  {activeStakedCard === 'Шпион' || activeStakedCard === 'Дворцовый переполох'
+                    ? '⚡ Сыграть открыто как Инстант (1 ⚡)'
+                    : '⚡ Реактивный инстант (для защиты в чужой ход)'}
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#d8b4fe' }}>
                   {activeCardInfo?.shortDescription}
                 </div>
               </div>
-              <button
-                type="button"
-                className="action-deck-btn btn-blue"
-                style={{ padding: '4px 10px', fontSize: '0.74rem' }}
-                disabled={human.actionTokens < 1}
-                onClick={handlePlayDirectInstant}
-              >
-                Сыграть
-              </button>
+              {(activeStakedCard === 'Шпион' || activeStakedCard === 'Дворцовый переполох') && (
+                <button
+                  type="button"
+                  className="action-deck-btn btn-blue"
+                  style={{ padding: '4px 10px', fontSize: '0.74rem' }}
+                  disabled={human.actionTokens < 1}
+                  onClick={handlePlayDirectInstant}
+                >
+                  Сыграть
+                </button>
+              )}
             </div>
           </div>
         )}

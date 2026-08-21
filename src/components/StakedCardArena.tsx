@@ -10,8 +10,6 @@ export function StakedCardArena() {
     revealOutcome, 
     duelOutcome, 
     pendingDuelDefenderRoleClaim, 
-    timerSeconds, 
-    timerMaxSeconds,
     cardFlightEvent,
     hasCardDeparted
   } = useGameStore();
@@ -95,7 +93,6 @@ export function StakedCardArena() {
     return null;
   }
 
-  const timerPercent = timerMaxSeconds > 0 ? (timerSeconds / timerMaxSeconds) * 100 : 0;
   const claimedRole = pendingAction?.roleClaim || pendingAction?.name || '';
   const roleInfo = pendingAction?.roleClaim ? CARD_INFO[pendingAction.roleClaim] : null;
 
@@ -234,12 +231,6 @@ export function StakedCardArena() {
               ? duelOutcome.message
               : `${defender?.name} выставил щит «${defenderRole}» против ${actor?.name}!`}
           </div>
-          <div className={`action-timer-strip ${!isDuelAttackerWindow ? 'timer-fading' : ''}`}>
-            <span>⏱ {timerSeconds} сек.</span>
-            <div className="action-timer-track">
-              <div className="action-timer-progress" style={{ width: `${timerPercent}%` }} />
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -352,14 +343,6 @@ export function StakedCardArena() {
           </div>
           
           <div className="action-effect-desc">{phaseDesc}</div>
-
-          {/* Countdown Timer Bar */}
-          <div className={`action-timer-strip ${(!isDoubtWindow && !isTargetReaction) ? 'timer-fading' : ''}`}>
-            <span>⏱ {timerSeconds} сек.</span>
-            <div className="action-timer-track">
-              <div className="action-timer-progress" style={{ width: `${timerPercent}%` }} />
-            </div>
-          </div>
         </div>
       )}
     </div>

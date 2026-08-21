@@ -1,0 +1,420 @@
+/* ==========================================================================
+   ANIMATIONS, KEYFRAMES & VISUAL FX
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   CHRONICLE & HEADER KEYFRAMES
+   -------------------------------------------------------------------------- */
+@keyframes slide-in-chronicle {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes final-round-pulse {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(225, 29, 72, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(251, 113, 133, 0.85);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   TURN & TARGETING KEYFRAMES
+   -------------------------------------------------------------------------- */
+@keyframes pulse-turn-glow {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 18px rgba(253, 224, 71, 0.6);
+  }
+  100% {
+    transform: scale(1.08);
+    box-shadow: 0 0 32px rgba(253, 224, 71, 1);
+  }
+}
+
+@keyframes pulse-target {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+  }
+  100% {
+    transform: scale(1.12);
+    box-shadow: 0 0 32px rgba(239, 68, 68, 1), 0 0 15px rgba(245, 158, 11, 0.9);
+  }
+}
+
+@keyframes bounce-reticle {
+  0% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    transform: translate(-50%, -6px) scale(1.25);
+  }
+}
+
+@keyframes slide-up-banner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes pulse-reticle-icon {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.3);
+  }
+}
+
+@keyframes pop-speech {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   STAKED CARD ARENA & DUEL KEYFRAMES
+   -------------------------------------------------------------------------- */
+@keyframes card-fly-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.6) rotateX(30deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0);
+  }
+}
+
+@keyframes plaque-fade-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    opacity: 0.85;
+    transform: translateY(4px) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+    pointer-events: none;
+  }
+}
+
+@keyframes pop-in-plaque {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes clash-swords {
+  0% {
+    transform: scale(1) rotate(-8deg);
+  }
+  100% {
+    transform: scale(1.15) rotate(8deg);
+    filter: drop-shadow(0 0 12px #fbbf24);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   CARD FLIGHT TRAJECTORIES
+   -------------------------------------------------------------------------- */
+@keyframes fly-out-to-discard {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+  }
+  40% {
+    transform: translate(160px, -50px) scale(0.85) rotate(6deg);
+    opacity: 0.95;
+    box-shadow: 0 0 35px rgba(168, 85, 247, 0.85);
+  }
+  100% {
+    transform: translate(480px, -90px) scale(0.35) rotate(12deg);
+    opacity: 0;
+    box-shadow: 0 0 50px rgba(168, 85, 247, 1);
+  }
+}
+
+@keyframes fly-out-to-hand-human {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    transform: translate(0, 60px) scale(0.9) rotate(-4deg);
+    opacity: 0.95;
+    box-shadow: 0 0 35px rgba(34, 197, 94, 0.85);
+  }
+  100% {
+    transform: translate(0, 220px) scale(0.6) rotate(0deg);
+    opacity: 0;
+    box-shadow: 0 0 45px rgba(34, 197, 94, 1);
+  }
+}
+
+@keyframes fly-to-bot-left {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-340px, -40px) scale(0.3) rotate(-35deg);
+    opacity: 0;
+  }
+}
+
+@keyframes fly-to-bot-top {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, -200px) scale(0.3) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+@keyframes fly-to-bot-right {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(340px, -40px) scale(0.3) rotate(35deg);
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   DAMAGE, BLOOD FLASH & SCREEN SHAKE ANIMATIONS
+   -------------------------------------------------------------------------- */
+.screen-damage-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-damage-fx);
+  background: radial-gradient(circle at 50% 50%, transparent 35%, rgba(220, 38, 38, 0.5) 75%, rgba(153, 27, 27, 0.9) 100%);
+  box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.9);
+  animation: blood-vignette-pulse 1.3s ease-out forwards;
+}
+
+@keyframes blood-vignette-pulse {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.screen-shake-anim {
+  animation: screen-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes screen-shake {
+  10%, 90% { transform: translate3d(-3px, -2px, 0); }
+  20%, 80% { transform: translate3d(4px, 3px, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, -4px, 0); }
+  40%, 60% { transform: translate3d(5px, 4px, 0); }
+}
+
+.node-taking-damage {
+  animation: damage-shake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+}
+
+@keyframes damage-shake {
+  0%, 100% { transform: scale(1); }
+  15%, 45%, 75% { transform: scale(0.94) translate(-5px, 3px); }
+  30%, 60%, 90% { transform: scale(1.06) translate(5px, -3px); }
+}
+
+.damage-blood-flash {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 35px rgba(239, 68, 68, 1), 0 0 15px rgba(185, 28, 28, 0.9) !important;
+}
+
+.avatar-damage-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.7) 0%, rgba(153, 27, 27, 0.9) 100%);
+  animation: blood-flash-fade 1.3s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes blood-flash-fade {
+  0% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* Heart Falling Animation */
+.heart-dropping-anim {
+  display: inline-block;
+  animation: heart-drop-fade 1.4s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+  filter: drop-shadow(0 0 8px #ef4444);
+}
+
+@keyframes heart-drop-fade {
+  0% {
+    transform: translateY(0) scale(1.5);
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(-10px) scale(1.8);
+    opacity: 1;
+  }
+  65% {
+    transform: translateY(28px) scale(0.9) rotate(30deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(55px) scale(0.2) rotate(75deg);
+    opacity: 0;
+  }
+}
+
+/* Floating Resource Badges (+3 💰, -2 💰, +1 👑) */
+.resource-float-pill {
+  position: absolute;
+  top: -30px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: var(--z-float-badge);
+  animation: float-up-fade 2.2s ease-out forwards;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8);
+}
+
+.resource-float-pill.float-gain {
+  background: linear-gradient(135deg, #15803d, #22c55e);
+  border: 1.5px solid #86efac;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+}
+
+.resource-float-pill.float-loss {
+  background: linear-gradient(135deg, #991b1b, #ef4444);
+  border: 1.5px solid #fca5a5;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+}
+
+@keyframes float-up-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.7);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.2);
+  }
+  70% {
+    opacity: 0.95;
+    transform: translateY(-28px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-55px) scale(0.8);
+  }
+}
+
+@keyframes pulse-staked-slot {
+  0% {
+    border-color: rgba(245, 158, 11, 0.35);
+    box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.1);
+  }
+  100% {
+    border-color: rgba(245, 158, 11, 0.9);
+    box-shadow: inset 0 0 25px rgba(245, 158, 11, 0.35);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   MODAL & POPUP ANIMATIONS
+   -------------------------------------------------------------------------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes popup-anchor-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes popup-anchor-in-right {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pop-toast {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -15px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ACCESSIBILITY: REDUCED MOTION
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

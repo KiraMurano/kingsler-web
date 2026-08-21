@@ -70,7 +70,9 @@ export function PlayerStatusBar({ player, isActive }: PlayerStatusBarProps) {
             >
               <span>🎴</span>
               <span>{player.activePlot.type}</span>
-              {player.activePlot.charges !== undefined && <span>({player.activePlot.charges})</span>}
+              {player.activePlot.charges !== undefined && (
+                <span>({player.activePlot.charges}{player.activePlot.type === 'Тайный заговор' ? '/4' : ''})</span>
+              )}
               {targetPlayer && <span>→ {targetPlayer.name}</span>}
             </span>
           )}
