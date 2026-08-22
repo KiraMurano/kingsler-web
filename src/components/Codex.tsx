@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
-import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_INFO } from '../engine/cards';
+import { 
+  ALL_ROLES, 
+  ALL_PLOTS, 
+  ALL_INSTANTS, 
+  CARD_INFO, 
+  getCardMaxCopies,
+  TOTAL_ROLES_COUNT,
+  TOTAL_PLOTS_COUNT,
+  TOTAL_INSTANTS_COUNT,
+  TOTAL_DECK_SIZE 
+} from '../engine/cards';
 import type { GameCard } from '../engine/types';
 
 interface CodexProps {
@@ -31,21 +41,12 @@ export function Codex({ onOpenRules }: CodexProps) {
     return true;
   });
 
-  const getMaxCopies = (card: GameCard): number => {
-    if (ALL_ROLES.includes(card as any)) return 3;
-    if (card === 'Право вето') return 5;
-    if (card === 'Тайный заговор') return 3;
-    return 2;
-  };
-
   const getTypeDescription = (card: GameCard): string => {
     const info = CARD_INFO[card];
-    if (info.category === 'role') return '👑 Роль (3 копии)';
-    if (card === 'Тайный заговор') return '🎴 Интрига (3 копии, 1 ⚡)';
-    if (info.category === 'plot') return '🎴 Интрига (2 копии, 1 ⚡)';
-    if (card === 'Право вето') return '⚡ Инстант (5 копий, 0 ⚡)';
-    if (card === 'Перенаправление') return '⚡ Инстант (2 копии, 0 ⚡)';
-    return '⚡ Инстант (2 копии, 1 ⚡)';
+    const copies = getCardMaxCopies(card);
+    if (info.category === 'role') return `👑 Роль (${copies} копии)`;
+    if (info.category === 'plot') return `🎴 Интрига (${copies} ${copies === 5 ? 'копий' : 'копии'}, 1 ⚡)`;
+    return `⚡ Инстант (${copies} ${copies === 5 ? 'копий' : 'копии'}, ${card === 'Право вето' || card === 'Перенаправление' ? '0 ⚡' : '1 ⚡'})`;
   };
 
   return (
@@ -93,7 +94,7 @@ export function Codex({ onOpenRules }: CodexProps) {
         </div>
 
         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>В игре: 44 карты (18 ролей, 13 интриг, 13 инстантов)</span>
+          <span>В игре: {TOTAL_DECK_SIZE} карт ({TOTAL_ROLES_COUNT} ролей, {TOTAL_PLOTS_COUNT} интриг, {TOTAL_INSTANTS_COUNT} инстантов)</span>
           <span style={{ color: '#93c5fd' }}>{showDiscardView ? 'Скрыть ▲' : 'Счётчик ▼'}</span>
         </div>
       </div>
@@ -114,7 +115,7 @@ export function Codex({ onOpenRules }: CodexProps) {
           }}
           onClick={() => setActiveTab('all')}
         >
-          Все (17)
+          Все ({allCardsList.length})
         </button>
         <button
           type="button"
@@ -130,7 +131,7 @@ export function Codex({ onOpenRules }: CodexProps) {
           }}
           onClick={() => setActiveTab('roles')}
         >
-          👑 Роли (6)
+          👑 Роли ({ALL_ROLES.length})
         </button>
         <button
           type="button"
@@ -146,7 +147,7 @@ export function Codex({ onOpenRules }: CodexProps) {
           }}
           onClick={() => setActiveTab('plots')}
         >
-          🎴 Интриги (6)
+          🎴 Интриги ({ALL_PLOTS.length})
         </button>
         <button
           type="button"
@@ -162,7 +163,7 @@ export function Codex({ onOpenRules }: CodexProps) {
           }}
           onClick={() => setActiveTab('instants')}
         >
-          ⚡ Инстанты (5)
+          ⚡ Инстанты ({ALL_INSTANTS.length})
         </button>
       </div>
 
@@ -180,7 +181,7 @@ export function Codex({ onOpenRules }: CodexProps) {
         }}>
           {allCardsList.map(card => {
             const count = discardCounts[card] || 0;
-            const max = getMaxCopies(card);
+            const max = getCardMaxCopies(card);
             return (
               <div 
                 key={card}
@@ -211,7 +212,7 @@ export function Codex({ onOpenRules }: CodexProps) {
           const isHeldByHuman = human?.hand.includes(card);
           const isExpanded = selectedCard === card;
           const inDiscard = discardCounts[card] || 0;
-          const maxCopies = getMaxCopies(card);
+          const maxCopies = getCardMaxCopies(card);
 
           return (
             <div 

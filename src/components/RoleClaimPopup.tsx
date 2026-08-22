@@ -53,7 +53,7 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
   const handlePlayDirectInstant = () => {
     if (human.actionTokens < 1) return;
     onClose();
-    if (activeStakedCard === 'Дворцовый переполох' || activeStakedCard === 'Перенаправление' || activeStakedCard === 'Шпион') {
+    if (activeStakedCard === 'Дворцовый переполох' || activeStakedCard === 'Перенаправление' || activeStakedCard === 'Шпион' || activeStakedCard === 'Обвинение в измене') {
       setTimeout(() => {
         (window as any).__startTargeting({
           type: 'instant',
@@ -113,7 +113,7 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
                   {withVaBanque && <span style={{ fontSize: '0.65rem', background: '#9333ea', color: '#fff', padding: '1px 6px', borderRadius: '4px' }}>АКТИВЕН x2 (1 ⚡)</span>}
                 </div>
                 <div style={{ fontSize: '0.66rem', color: '#e9d5ff' }}>
-                  При проверке: x2 эффект роли (+2 👑/+6 💰/+4 💰/кража x2, Шут: +4 💰 и +1 👑; печати отменяются). При блефе: +2 ⚜️ ловцу. Без проверки: x1.
+                  При проверке: x2 эффект роли (+2 👑/+6 🪙/+4 🪙/кража x2, Шут: +4 🪙 и +1 👑; печати отменяются). При блефе: +2 ⚜️ ловцу. Без проверки: x1.
                 </div>
               </div>
               <button
@@ -160,7 +160,7 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: 800, color: '#e9d5ff', fontSize: '0.82rem' }}>
-                  {activeStakedCard === 'Шпион' || activeStakedCard === 'Дворцовый переполох'
+                  {activeStakedCard === 'Шпион' || activeStakedCard === 'Дворцовый переполох' || activeStakedCard === 'Обвинение в измене'
                     ? '⚡ Сыграть открыто как Инстант (1 ⚡)'
                     : '⚡ Реактивный инстант (для защиты в чужой ход)'}
                 </div>
@@ -168,7 +168,7 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
                   {activeCardInfo?.shortDescription}
                 </div>
               </div>
-              {(activeStakedCard === 'Шпион' || activeStakedCard === 'Дворцовый переполох') && (
+              {(activeStakedCard === 'Шпион' || activeStakedCard === 'Дворцовый переполох' || activeStakedCard === 'Обвинение в измене') && (
                 <button
                   type="button"
                   className="action-deck-btn btn-blue"
@@ -256,10 +256,10 @@ export function RoleClaimPopup({ stakedCardIndex, initialWithVaBanque = false, o
                 <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.7)', marginTop: '2px', lineHeight: 1.25 }}>
                   {withVaBanque 
                     ? (role === 'Наследник' ? '👑 +2 👑 при проверке (без печатей)!' :
-                       role === 'Казначей' ? '💰 +6 💰 при проверке (без печатей)!' :
-                       role === 'Рыцарь' ? '💰 +4 💰 при проверке (без печатей)!' :
-                       role === 'Шут' ? '🎭 +4 💰 и +1 👑 при проверке!' :
-                       role === 'Вор' ? '💰 Крадет до 4 💰 при проверке!' :
+                       role === 'Казначей' ? '🪙 +6 🪙 при проверке (без печатей)!' :
+                       role === 'Рыцарь' ? '🪙 +4 🪙 при проверке (без печатей)!' :
+                       role === 'Шут' ? '🎭 +4 🪙 и +1 👑 при проверке!' :
+                       role === 'Вор' ? '🪙 Крадет до 4 🪙 при проверке!' :
                        '🗡️ Крадет 2 👑 при проверке!')
                     : info.shortDescription}
                 </div>

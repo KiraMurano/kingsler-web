@@ -4,6 +4,7 @@ import { botMemory } from '../Bot';
 import { declineGen } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
+import { chargeActiveConspiracies } from './plotResolver';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -138,6 +139,45 @@ export function playInstant(
           }, 1200);
         }
       }
+    }
+  } else if (instantType === 'Обвинение в измене' && targetPlayerId) {
+    const targetIdx = updatedPlayers.findIndex(p => p.id === targetPlayerId);
+    if (targetIdx !== -1) {
+      const victim = updatedPlayers[targetIdx];
+      if (victim.favor > 0) {
+        updatedPlayers[targetIdx] = { ...victim, favor: victim.favor - 1 };
+
+        get()._disruptPlayerPlotsOnLoss(victim.id, 'обвинения в измене');
+        chargeActiveConspiracies(get, set, `лишение короны Обвинением в измене (${actor.name})`);
+
+        if (get().coronationCandidateId === victim.id && updatedPlayers[targetIdx].favor < 6) {
+          set(state => ({
+            coronationCandidateId: null,
+            history: [`⚖️ Коронация ${victim.name} сорвана Обвинением в измене! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
+          }));
+        }
+
+        set(state => ({
+          players: updatedPlayers,
+          discardPile: updatedDiscard,
+          turnSubPhase: 'CARD_PLAY_PHASE',
+          history: [`⛓️ ${actor.name} играет инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (потрачен 1 ⚡)! ${victim.name} теряет -1 👑!`, ...state.history].slice(0, 50)
+        }));
+        triggerResourceFloat(set, victim.id, '-1 👑 Измена!', false);
+        triggerResourceFloat(set, actor.id, `⛓️ Донос на ${victim.name}!`, true);
+      } else {
+        set(state => ({
+          players: updatedPlayers,
+          discardPile: updatedDiscard,
+          turnSubPhase: 'CARD_PLAY_PHASE',
+          history: [`⛓️ ${actor.name} играет инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (потрачен 1 ⚡) против ${victim.name}, но у цели 0 👑!`, ...state.history].slice(0, 50)
+        }));
+      }
+    }
+    if (isOwnTurn) {
+      timerManager.scheduleDelay(() => {
+        get()._checkEndgameAndAdvanceTurn();
+      }, 1200);
     }
   }
 }

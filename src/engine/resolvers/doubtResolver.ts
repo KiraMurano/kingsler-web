@@ -33,16 +33,16 @@ export function doubtAction(
   let newPlayers = players.map(p => p.id === doubter.id ? { ...p, actionTokens: p.actionTokens - 1 } : p);
   triggerResourceFloat(set, doubter.id, '-1 ⚡', false);
 
-  // Informant Network trigger: all OTHER holders (not the doubter) receive +1 💰 for checks by other players!
+  // Informant Network trigger: all OTHER holders (not the doubter) receive +1 🪙 for checks by other players!
   const informantHolders = newPlayers.filter(p => p.activePlot?.type === 'Сеть информаторов' && p.id !== doubter.id);
   if (informantHolders.length > 0) {
     newPlayers = newPlayers.map(p => (p.activePlot?.type === 'Сеть информаторов' && p.id !== doubter.id) ? { ...p, gold: p.gold + 1 } : p);
     informantHolders.forEach(p => {
-      triggerResourceFloat(set, p.id, '+1 💰 Информаторы', true);
+      triggerResourceFloat(set, p.id, '+1 🪙 Информаторы', true);
     });
   }
 
-  const informantLogs = informantHolders.map(p => `👁️ «Сеть информаторов» приносит +1 💰 для ${p.name} за проверку при дворе от ${doubter.name}!`);
+  const informantLogs = informantHolders.map(p => `👁️ «Сеть информаторов» приносит +1 🪙 для ${p.name} за проверку при дворе от ${doubter.name}!`);
 
   set(state => ({
     players: newPlayers,
@@ -239,7 +239,7 @@ export function executeRevealOutcome(
   if (wasTruth) {
     if (claimedRole === 'Шут') {
       if (isVaBanqueActive) {
-        message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «Шут»! Ловушка под Ва-банком: ${actor.name} получает +4 💰 и +1 👑 (печати отменены)!${vaBanqueNotice}`;
+        message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «Шут»! Ловушка под Ва-банком: ${actor.name} получает +4 🪙 и +1 👑 (печати отменены)!${vaBanqueNotice}`;
       } else {
         message = `${doubter.name} ${doubterDoubted} в ${actorAcc}, но на кону действительно «Шут»! Ловушка сработала: ${actor.name} получает +1 👑!`;
       }
@@ -365,20 +365,22 @@ export function triggerVetoWindowOrResolveEffect(
     set({
       turnPhase: 'VETO_WINDOW',
       timerSeconds: 0,
-      timerMaxSeconds: 0
+      timerMaxSeconds: 0,
+      isPendingActionAfterTruthChallenge: isAfterTruthChallenge
     });
   } else if (botHoldsVeto) {
     // Bots evaluate veto. If no bot plays veto, proceed after delay
     set({
       turnPhase: 'VETO_WINDOW',
       timerSeconds: 0,
-      timerMaxSeconds: 0
+      timerMaxSeconds: 0,
+      isPendingActionAfterTruthChallenge: isAfterTruthChallenge
     });
     timerManager.scheduleDelay(() => {
       if (get().turnPhase === 'VETO_WINDOW' && !get().isVetoed) {
         get().proceedAfterVetoWindow();
       }
-    }, 1400);
+    }, 2200);
   } else {
     timerManager.scheduleDelay(() => {
       get()._resolveRoleActionEffect(action, isAfterTruthChallenge);
@@ -391,7 +393,7 @@ export function proceedAfterVetoWindow(
   set: StateSetter
 ): void {
   timerManager.clearAll();
-  const { pendingAction, isVetoed } = get();
+  const { pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
   if (!pendingAction) {
     get()._checkEndgameAndAdvanceTurn();
     return;
@@ -405,6 +407,6 @@ export function proceedAfterVetoWindow(
       get()._checkEndgameAndAdvanceTurn();
     }, 1200);
   } else {
-    get()._resolveRoleActionEffect(pendingAction);
+    get()._resolveRoleActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
   }
 }

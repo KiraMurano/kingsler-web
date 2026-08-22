@@ -50,6 +50,7 @@ export interface Action {
   plotType?: PlotType;
   instantType?: InstantType;
   stakedCardIndex?: number; // Face-down staked card from hand (0 or 1)
+  stakedCardIndices?: number[]; // For exchanging 1 or 2 cards in normal action
   costGold: number;
   costTokens: number;
   withVaBanque?: boolean;   // Played together with Va-banque instant modifier (x2 on challenge)
@@ -168,6 +169,7 @@ export interface GameState {
   hasPlayedPlotThisTurn: boolean;
   isVaBanqueActive: boolean;
   isVetoed: boolean;
+  isPendingActionAfterTruthChallenge?: boolean;
   
   // Outcome Modals
   revealOutcome: RevealOutcome | null;

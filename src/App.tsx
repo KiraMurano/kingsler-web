@@ -10,6 +10,7 @@ import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
+import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, TOTAL_DECK_SIZE } from './engine/cards';
 import type { Role, PlotType, InstantType, GameCard } from './engine/types';
 
 // Start intelligent bot engine once
@@ -237,7 +238,7 @@ export default function App() {
   if (coronationCandidateId) {
     const candidate = players.find(p => p.id === coronationCandidateId);
     turnBannerTitle = '👑 КРУГ КОРОНАЦИИ!';
-    turnBannerDesc = `${candidate?.name || 'Лидер'} удерживает ${candidate?.favor || 5} 👑! Сбейте его влияние, пока круг не замкнулся!`;
+    turnBannerDesc = `${candidate?.name || 'Лидер'} удерживает ${candidate?.favor || 6} 👑! Сбейте его влияние, пока круг не замкнулся!`;
   } else if (turnPhase === 'TARGET_REACTION_WINDOW') {
     const target = players.find(p => p.id === pendingAction?.targetId);
     turnBannerTitle = 'ЦЕЛЕВАЯ АТАКА';
@@ -272,7 +273,7 @@ export default function App() {
           <span className="brand-crest">👑</span>
           <div>
             <div className="brand-title cinzel-font gold-gradient-text">KINGLIER</div>
-            <div className="brand-subtitle">39 Карт • 6 Ролей • Интриги • 2 ⚡ Жетона</div>
+            <div className="brand-subtitle">{TOTAL_DECK_SIZE} Карт • {ALL_ROLES.length} Ролей • {ALL_PLOTS.length} Интриг • {ALL_INSTANTS.length} Инстантов • 2 ⚡ Жетона</div>
           </div>
         </div>
 

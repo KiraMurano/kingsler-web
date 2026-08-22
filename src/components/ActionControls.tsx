@@ -367,9 +367,9 @@ export function ActionControls({
           </span>
           <span className="action-deck-btn-sub" style={{ color: '#e9d5ff' }}>
             {human.activePlot.charges === 2 
-              ? 'Сброс до 3 💰 (1 ⚡)' 
+              ? 'Сброс до 3 🪙 (1 ⚡)' 
               : human.activePlot.charges === 3 
-                ? 'Лишить 1 👑 или 3 💰 (1 ⚡)' 
+                ? 'Лишить 1 👑 или 3 🪙 (1 ⚡)' 
                 : '🛡️ Сброс или Корона без Вето! (1 ⚡)'}
           </span>
         </button>

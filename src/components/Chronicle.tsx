@@ -56,7 +56,7 @@ export function Chronicle({ onOpenRules }: ChronicleProps) {
           if (entry.includes('👑') || entry.includes('КОРОНАЦИЯ') || entry.includes('АУДИЕНЦИЯ')) icon = '👑';
           else if (entry.includes('⚜️')) icon = '⚜️';
           else if (entry.includes('⚔️') || entry.includes('ДУЭЛЬ') || entry.includes('🤺')) icon = '⚔️';
-          else if (entry.includes('💰')) icon = '💰';
+          else if (entry.includes('🪙')) icon = '🪙';
           else if (entry.includes('🎭')) icon = '🎭';
           else if (entry.includes('👁️')) icon = '👁️';
           else if (entry.includes('🛡️')) icon = '🛡️';

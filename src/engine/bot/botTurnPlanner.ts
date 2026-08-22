@@ -46,7 +46,7 @@ export function makeBotMove(botId: string): void {
           targetId: rumorTarget.id,
           costGold: 5,
           costTokens: 1,
-          description: `Заплатил 5 💰: ${rumorTarget.name} теряет 1 👑.`
+          description: `Заплатил 5 🪙: ${rumorTarget.name} теряет 1 👑.`
         });
         return;
       }
@@ -61,7 +61,7 @@ export function makeBotMove(botId: string): void {
         actorId: bot.id,
         costGold: 3,
         costTokens: 1,
-        description: 'Заплатил 3 💰 и получил +1 👑.'
+        description: 'Заплатил 3 🪙 и получил +1 👑.'
       });
       return;
     }
@@ -77,7 +77,7 @@ export function makeBotMove(botId: string): void {
           targetId: rumorTarget.id,
           costGold: 5,
           costTokens: 1,
-          description: `Заплатил 5 💰: ${rumorTarget.name} теряет 1 👑.`
+          description: `Заплатил 5 🪙: ${rumorTarget.name} теряет 1 👑.`
         });
         return;
       }
@@ -91,25 +91,30 @@ export function makeBotMove(botId: string): void {
         actorId: bot.id,
         costGold: 0,
         costTokens: 1,
-        description: 'Просит содержание и берет 1 💰.'
+        description: 'Просит содержание и берет 1 🪙.'
       });
       return;
     }
 
-    // 5. Бесплатная смена карты при наличии мертвых/неподходящих карт
-    if (bot.hand.length > 0 && Math.random() < 0.22) {
-      const badIdx = bot.hand.findIndex(
-        c => c === 'Шпион' || c === 'Дворцовый переполох' || c === 'Право вето' || c === 'Перенаправление'
-      );
-      if (badIdx !== -1) {
+    // 5. Бесплатная смена 1 или 2 карт при наличии мертвых/неподходящих карт
+    if (bot.hand.length > 0 && Math.random() < 0.25) {
+      const badIndices = bot.hand
+        .map((c, i) => ({ c, i }))
+        .filter(({ c }) => c === 'Шпион' || c === 'Дворцовый переполох' || c === 'Право вето' || c === 'Перенаправление')
+        .map(({ i }) => i);
+
+      if (badIndices.length > 0) {
         useGameStore.getState().performAction({
           type: 'normal',
-          name: '🔄 Сменить карту',
+          name: badIndices.length >= 2 ? '🔄 Сменить 2 карты' : '🔄 Сменить карту',
           actorId: bot.id,
-          stakedCardIndex: badIdx,
+          stakedCardIndex: badIndices[0],
+          stakedCardIndices: badIndices,
           costGold: 0,
           costTokens: 1,
-          description: 'Сбросил карту и бесплатно взял новую из колоды.'
+          description: badIndices.length >= 2
+            ? 'Сбросил 2 карты и бесплатно взял новые из колоды.'
+            : 'Сбросил карту и бесплатно взял новую из колоды.'
         });
         return;
       }
@@ -158,8 +163,8 @@ export function makeBotMove(botId: string): void {
       } else if (plotCard === 'Сеть информаторов') {
         useGameStore.getState().playPlotAction('Сеть информаторов', plotIdx);
         return;
-      } else if (plotCard === 'Королевская грамота') {
-        useGameStore.getState().playPlotAction('Королевская грамота', plotIdx);
+      } else if (plotCard === 'Золотая булла') {
+        useGameStore.getState().playPlotAction('Золотая булла', plotIdx);
         return;
       } else if (plotCard === 'Тайный заговор') {
         useGameStore.getState().playPlotAction('Тайный заговор', plotIdx);
@@ -168,7 +173,19 @@ export function makeBotMove(botId: string): void {
     }
   }
 
-  // Приоритет 2: Розыгрыш Инстантов ⚡ (Шпион, Дворцовый переполох)
+  // Приоритет 2: Розыгрыш Инстантов ⚡ (Обвинение в измене, Шпион, Дворцовый переполох)
+  const treasonIdx = bot.hand.indexOf('Обвинение в измене');
+  if (treasonIdx !== -1) {
+    const target = leader && leader.favor >= 1
+      ? leader
+      : opponents.filter(p => p.favor >= 1).sort((a, b) => b.favor - a.favor)[0];
+
+    if (target && (target.favor >= 2 || state.coronationCandidateId === target.id || Math.random() < 0.75)) {
+      useGameStore.getState().playInstant(bot.id, 'Обвинение в измене', treasonIdx, target.id);
+      return;
+    }
+  }
+
   const spyIdx = bot.hand.indexOf('Шпион');
   if (spyIdx !== -1 && Math.random() < 0.70) {
     const target = selectBestSpyTarget(bot, opponents);
@@ -298,7 +315,7 @@ export function makeBotMove(botId: string): void {
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
-          description: `Заявляет «Казначей»${withVB ? ' под Ва-банком' : ''} и берет +3 💰.`
+          description: `Заявляет «Казначей»${withVB ? ' под Ва-банком' : ''} и берет +3 🪙.`
         });
         return;
       }
@@ -317,7 +334,7 @@ export function makeBotMove(botId: string): void {
             withVaBanque: withVB,
             costGold: 0,
             costTokens: vbTokens,
-            description: `Заявляет «Вор»${withVB ? ' под Ва-банком' : ''} и забирает до 2 💰 у ${target.name}.`
+            description: `Заявляет «Вор»${withVB ? ' под Ва-банком' : ''} и забирает до 2 🪙 у ${target.name}.`
           });
           return;
         }
@@ -334,7 +351,7 @@ export function makeBotMove(botId: string): void {
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
-          description: `Заявляет «Шут»${withVB ? ' под Ва-банком' : ''} и получает +2 💰.`
+          description: `Заявляет «Шут»${withVB ? ' под Ва-банком' : ''} и получает +2 🪙.`
         });
         return;
       }
@@ -350,7 +367,7 @@ export function makeBotMove(botId: string): void {
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
-          description: `Заявляет «Рыцарь»${withVB ? ' под Ва-банком' : ''} и получает +2 💰.`
+          description: `Заявляет «Рыцарь»${withVB ? ' под Ва-банком' : ''} и получает +2 🪙.`
         });
         return;
       }

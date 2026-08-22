@@ -25,8 +25,8 @@ export function addSealsToPlayer(
   const newFavor = player.favor + gainedCrowns;
   const remainderSeals = newFavor >= 6 ? 0 : (totalSeals % 2);
 
-  // Royal Charter trigger: +1 💰 from treasury when gaining seals!
-  const hasRoyalCharter = player.activePlot?.type === 'Королевская грамота';
+  // Royal Bulla trigger: +1 🪙 from treasury when gaining seals!
+  const hasRoyalCharter = player.activePlot?.type === 'Золотая булла';
   const charterBonusGold = hasRoyalCharter ? 1 : 0;
 
   const updatedPlayer: Player = {
@@ -42,7 +42,7 @@ export function addSealsToPlayer(
   triggerResourceFloat(set, playerId, `+${count} ⚜️`, true);
   if (hasRoyalCharter) {
     window.setTimeout(() => {
-      triggerResourceFloat(set, playerId, '+1 💰 Грамота', true);
+      triggerResourceFloat(set, playerId, '+1 🪙 Булла', true);
     }, 250);
   }
   if (gainedCrowns > 0) {
@@ -51,7 +51,7 @@ export function addSealsToPlayer(
     }, 450);
   }
 
-  const charterNotice = hasRoyalCharter ? ' 📜 «Королевская грамота» приносит +1 💰!' : '';
+  const charterNotice = hasRoyalCharter ? ' 📜 «Золотая булла» приносит +1 🪙!' : '';
   const conversionNotice = gainedCrowns > 0
     ? ` ⚜️ 2 печати трансформировались в +${gainedCrowns} 👑 для ${player.name}!`
     : '';

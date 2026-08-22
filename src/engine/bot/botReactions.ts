@@ -188,25 +188,30 @@ export function handleVetoPhase(state: GameState, schedule: BotScheduler): void 
   for (const bot of vetoBots) {
     let shouldVeto = false;
 
-    // Защита себя от прямой атаки
+    // Защита себя от прямой атаки (Вор или Шантажист)
     if (pendingAction.targetId === bot.id) {
       shouldVeto = true;
     }
 
-    // Блокировка Наследника, берущего 6-ю победную корону
+    // Блокировка Наследника, берущего решающую корону
     const actor = players.find(p => p.id === pendingAction.actorId);
-    if (pendingAction.roleClaim === 'Наследник' && actor && actor.favor >= 5) {
+    if (pendingAction.roleClaim === 'Наследник' && actor && actor.favor >= 4) {
       shouldVeto = true;
     }
 
-    if (shouldVeto || Math.random() < 0.35) {
+    // Блокировка опасных действий под Ва-банком
+    if (state.isVaBanqueActive) {
+      shouldVeto = true;
+    }
+
+    if (shouldVeto || Math.random() < 0.40) {
       const vetoIdx = bot.hand.indexOf('Право вето');
       schedule('veto', () => {
         const cur = useGameStore.getState();
         if (cur.turnPhase === 'VETO_WINDOW' && !cur.isVetoed) {
           cur.playInstant(bot.id, 'Право вето', vetoIdx);
         }
-      }, 1200 + Math.random() * 600);
+      }, 500 + Math.random() * 400);
       break;
     }
   }

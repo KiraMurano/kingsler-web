@@ -110,7 +110,7 @@ export function PlayerStatusBar({ player, isActive }: PlayerStatusBarProps) {
           <div className="player-resource-row">
             {/* Gold */}
             <div className="res-pill gold-res" title="Золотые монеты">
-              <span>💰</span>
+              <span>🪙</span>
               <span className="res-val">{player.gold}</span>
               <span className="res-label">золота</span>
             </div>

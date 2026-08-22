@@ -7,7 +7,8 @@ import type {
 } from './types';
 import {
   createInitialDeck,
-  drawCardsFromDeck
+  drawCardsFromDeck,
+  TOTAL_DECK_SIZE
 } from './cards';
 import { botMemory } from './Bot';
 import { ALL_BOT_CANDIDATES, BOT_ARCHETYPES, getBotArchetype, type BotCandidate } from './botsConfig';
@@ -66,6 +67,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   isVaBanqueActive: false,
   isVetoed: false,
+  isPendingActionAfterTruthChallenge: false,
 
   pendingDuelDefenderCardIndex: null,
   pendingDuelDefenderRoleClaim: null,
@@ -149,6 +151,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingAction: null,
       isVaBanqueActive: false,
       isVetoed: false,
+      isPendingActionAfterTruthChallenge: false,
       pendingDuelDefenderCardIndex: null,
       pendingDuelDefenderRoleClaim: null,
       duelOutcome: null,
@@ -161,7 +164,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       floatingResourceEvents: [],
       winnerId: null,
       conspiracyPrompt: null,
-      history: ['👑 Новая партия началась! В колоде 44 карты (роли, интриги, инстанты). У каждого по 2 💰, 2 карты и 2 ⚡ жетона действия.']
+      history: [`👑 Новая партия началась! В колоде ${TOTAL_DECK_SIZE} карт (роли, интриги, инстанты). У каждого по 2 🪙, 2 карты и 2 ⚡ жетона действия.`]
     });
   },
 
@@ -272,11 +275,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasUsedNormalActionThisTurn: action.type === 'normal' ? true : state.hasUsedNormalActionThisTurn,
       hasPlayedRoleThisTurn: action.type === 'role' ? true : state.hasPlayedRoleThisTurn,
       isVaBanqueActive: withVaBanque,
-      isVetoed: false
+      isVetoed: false,
+      isPendingActionAfterTruthChallenge: false
     }));
 
     if (action.costGold > 0) {
-      triggerResourceFloat(set, actor.id, `-${action.costGold} 💰`, false);
+      triggerResourceFloat(set, actor.id, `-${action.costGold} 🪙`, false);
     }
     triggerResourceFloat(set, actor.id, `-${tokensRequired} ⚡`, false);
     if (withVaBanque) {

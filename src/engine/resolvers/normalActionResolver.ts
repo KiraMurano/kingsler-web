@@ -22,7 +22,7 @@ export function executeNormalAction(
   if (action.name.includes('Просить') || action.name.includes('содержание')) {
     actor = { ...actor, gold: actor.gold + 1 };
     newPlayers[actorIdx] = actor;
-    triggerResourceFloat(set, actor.id, '+1 💰', true);
+    triggerResourceFloat(set, actor.id, '+1 🪙', true);
   } else if (action.name.includes('Пир') || action.name.includes('пир')) {
     if (actor.favor < 5) {
       actor = { ...actor, favor: actor.favor + 1 };
@@ -47,28 +47,42 @@ export function executeNormalAction(
       }
     }
   } else if (action.name.includes('Сменить') || action.name.includes('сменить')) {
-    const cardIdx = action.stakedCardIndex ?? 0;
-    const returnedCard = actor.hand[cardIdx] || actor.hand[0];
+    const rawIndices: number[] = (action.stakedCardIndices && action.stakedCardIndices.length > 0)
+      ? action.stakedCardIndices
+      : [action.stakedCardIndex ?? 0];
 
-    const newDiscard = [...get().discardPile, returnedCard];
-    const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(1, get().deck, newDiscard);
-    const newCard = drawn[0] || 'Наследник';
+    // Filter valid indices within actor.hand and ensure uniqueness
+    const uniqueIndices = Array.from(new Set(rawIndices.filter(idx => idx >= 0 && idx < actor.hand.length)));
+    const finalIndices = uniqueIndices.length > 0 ? uniqueIndices : (actor.hand.length > 0 ? [0] : []);
 
-    const newHand = [...actor.hand];
-    newHand[cardIdx] = newCard;
-    actor = { ...actor, hand: newHand };
-    newPlayers[actorIdx] = actor;
-    botMemory.invalidatePlayerHand(actor.id);
+    if (finalIndices.length > 0) {
+      const returnedCards = finalIndices.map(idx => actor.hand[idx]);
+      const newDiscard = [...get().discardPile, ...returnedCards];
 
-    const drawNotice = actor.id === 'p1' ? ` (получена новая карта: «${newCard}»)` : '';
-    const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+      const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(finalIndices.length, get().deck, newDiscard);
 
-    set(state => ({
-      deck: newDeck,
-      discardPile: newDiscardPile,
-      players: newPlayers,
-      history: [`🔄 ${actor.name} сбросил карту и бесплатно взял новую из колоды${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
-    }));
+      const newHand = [...actor.hand];
+      finalIndices.forEach((idx, i) => {
+        newHand[idx] = drawn[i] || 'Наследник';
+      });
+
+      actor = { ...actor, hand: newHand };
+      newPlayers[actorIdx] = actor;
+      botMemory.invalidatePlayerHand(actor.id);
+
+      const count = finalIndices.length;
+      const countStr = count === 1 ? '1 карту' : '2 карты';
+      const drawnCardsStr = drawn.map(c => `«${c}»`).join(', ');
+      const drawNotice = actor.id === 'p1' ? ` (получено: ${drawnCardsStr})` : '';
+      const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+
+      set(state => ({
+        deck: newDeck,
+        discardPile: newDiscardPile,
+        players: newPlayers,
+        history: [`🔄 ${actor.name} сбросил ${countStr} и бесплатно взял ${count === 1 ? 'новую' : 'новые'} из колоды${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
+      }));
+    }
   }
 
   set({ players: newPlayers });

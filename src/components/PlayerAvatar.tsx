@@ -71,7 +71,7 @@ export function PlayerAvatar({
       }}
       onClick={isTargetable ? onTarget : undefined}
     >
-      {/* Floating Resource Badges (+1 ⚜️, +3 💰, +1 👑, etc.) */}
+      {/* Floating Resource Badges (+1 ⚜️, +3 🪙, +1 👑, etc.) */}
       {playerFloats.map(ev => (
         <div 
           key={ev.id} 
@@ -167,7 +167,7 @@ export function PlayerAvatar({
         {/* Stats: Crowns & Gold */}
         <div className="bot-stats-strip">
           <span style={{ color: 'var(--gold-light)' }} title="Короны влияния (цель: 6)">👑 {player.favor}</span>
-          <span style={{ color: '#fbbf24' }} title="Золотые монеты">💰 {player.gold}</span>
+          <span style={{ color: '#fbbf24' }} title="Золотые монеты">🪙 {player.gold}</span>
         </div>
 
         {/* Royal Seals (⚜️ 0/2) */}

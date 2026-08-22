@@ -36,7 +36,7 @@ export function resolveRoleActionEffect(
     const gold = isVB ? 6 : 3;
     actor = { ...actor, gold: actor.gold + gold };
     newPlayers[actorIdx] = actor;
-    triggerResourceFloat(set, actor.id, `+${gold} 💰${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
+    triggerResourceFloat(set, actor.id, `+${gold} 🪙${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
     set({ players: newPlayers });
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();
@@ -45,7 +45,7 @@ export function resolveRoleActionEffect(
     const gold = isVB ? 4 : 2;
     actor = { ...actor, gold: actor.gold + gold };
     newPlayers[actorIdx] = actor;
-    triggerResourceFloat(set, actor.id, `+${gold} 💰${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
+    triggerResourceFloat(set, actor.id, `+${gold} 🪙${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
     set({ players: newPlayers });
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();
@@ -58,8 +58,8 @@ export function resolveRoleActionEffect(
       newPlayers[targetIdx] = { ...newPlayers[targetIdx], gold: newPlayers[targetIdx].gold - stolen };
       actor = { ...actor, gold: actor.gold + stolen };
       newPlayers[actorIdx] = actor;
-      triggerResourceFloat(set, action.targetId, `-${stolen} 💰`, false);
-      triggerResourceFloat(set, actor.id, `+${stolen} 💰${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
+      triggerResourceFloat(set, action.targetId, `-${stolen} 🪙`, false);
+      triggerResourceFloat(set, actor.id, `+${stolen} 🪙${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
 
       if (stolen > 0) {
         get()._disruptPlayerPlotsOnLoss(action.targetId, 'кражи Вора');

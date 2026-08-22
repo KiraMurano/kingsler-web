@@ -254,16 +254,16 @@ export function activateConspiracy(
 
     if (goldLoss > 0) {
       get()._disruptPlayerPlotsOnLoss(target.id, 'удара Заговора');
-      triggerResourceFloat(set, target.id, `-${goldLoss} 💰 Заговор`, false);
+      triggerResourceFloat(set, target.id, `-${goldLoss} 🪙 Заговор`, false);
     }
-    triggerResourceFloat(set, player.id, `⚔️ Сброс ${goldLoss} 💰!`, true);
+    triggerResourceFloat(set, player.id, `⚔️ Сброс ${goldLoss} 🪙!`, true);
 
     set(state => ({
       players: newPlayers,
       discardPile: newDiscard,
       conspiracyPrompt: null,
       history: [
-        `⚔️ ${player.name} свершает «Тайный заговор» (${charges} зар.)! ${target.name} теряет ${goldLoss} 💰 в казну!${isFreeReaction ? ' (Мгновенная реакция, 0 ⚡)' : ''}${isUnvetoable ? ' [🛡️ Нельзя отменить Вето]' : ''}`,
+        `⚔️ ${player.name} свершает «Тайный заговор» (${charges} зар.)! ${target.name} теряет ${goldLoss} 🪙 в казну!${isFreeReaction ? ' (Мгновенная реакция, 0 ⚡)' : ''}${isUnvetoable ? ' [🛡️ Нельзя отменить Вето]' : ''}`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -342,7 +342,7 @@ export function resolveMorningPlots(
     if (newFavor >= 6 && !coronationCandidateId) {
       coronationTriggeredByReception = true;
     }
-  } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Королевская грамота') {
+  } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Золотая булла') {
     const totalSeals = nextPlayerUpdated.seals + 1;
     const gainedCrowns = Math.floor(totalSeals / 2);
     const newFavor = Math.min(6, nextPlayerUpdated.favor + gainedCrowns);
@@ -355,17 +355,17 @@ export function resolveMorningPlots(
       activePlot: null
     };
     updatedPlayers[nextIndex] = nextPlayerUpdated;
-    triggerResourceFloat(set, nextPlayerUpdated.id, '+1 ⚜️ Грамота!', true);
+    triggerResourceFloat(set, nextPlayerUpdated.id, '+1 ⚜️ Булла!', true);
     if (gainedCrowns > 0) {
       setTimeout(() => {
         triggerResourceFloat(set, nextPlayerUpdated.id, `+${gainedCrowns} 👑`, true);
       }, 350);
     }
 
-    newDiscard = [...newDiscard, 'Королевская грамота'];
+    newDiscard = [...newDiscard, 'Золотая булла'];
     const convNotice = gainedCrowns > 0 ? ` (2 печати дали +${gainedCrowns} 👑)` : '';
     set(state => ({
-      history: [`📜 «Королевская грамота» ${declineGen(nextPlayerUpdated.name)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
+      history: [`📜 «Золотая булла» ${declineGen(nextPlayerUpdated.name)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
     }));
 
     if (newFavor >= 6 && !coronationCandidateId) {

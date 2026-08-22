@@ -11,7 +11,7 @@ export type PlotType =
   | 'Чёрная книга' 
   | 'Сеть информаторов' 
   | 'Досье'
-  | 'Королевская грамота'
+  | 'Золотая булла'
   | 'Тайный заговор';
 
 export type InstantType = 
@@ -19,7 +19,8 @@ export type InstantType =
   | 'Перенаправление' 
   | 'Ва-банк' 
   | 'Дворцовый переполох'
-  | 'Шпион';
+  | 'Шпион'
+  | 'Обвинение в измене';
 
 export type GameCard = Role | PlotType | InstantType;
 
@@ -57,7 +58,7 @@ export const ALL_PLOTS: PlotType[] = [
   'Чёрная книга',
   'Сеть информаторов',
   'Досье',
-  'Королевская грамота',
+  'Золотая булла',
   'Тайный заговор'
 ];
 
@@ -66,7 +67,8 @@ export const ALL_INSTANTS: InstantType[] = [
   'Перенаправление',
   'Ва-банк',
   'Дворцовый переполох',
-  'Шпион'
+  'Шпион',
+  'Обвинение в измене'
 ];
 
 export const CARD_INFO: Record<GameCard, CardInfo> = {
@@ -96,8 +98,8 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     borderColor: '#4ade80',
     artImage: '/cards/treasurer.jpg',
     bottomIcon: '🛡️',
-    shortDescription: '+3 💰. Блокирует Вора.',
-    fullDescription: 'Получите +3 💰 золота из казны. Также Казначей защищает от Вора, выставляясь щитом на Дуэль.',
+    shortDescription: '+3 🪙. Блокирует Вора.',
+    fullDescription: 'Получите +3 🪙 золота из казны. Также Казначей защищает от Вора, выставляясь щитом на Дуэль.',
     cost: 0,
     targeted: false,
     blocksRole: 'Вор'
@@ -106,14 +108,14 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     name: 'Вор',
     category: 'role',
     title: 'Ловкие пальцы',
-    badge: '💰',
+    badge: '🪙',
     themeColor: '#ca8a04',
     gradient: 'linear-gradient(180deg, #854d0e 0%, #713f12 50%, #0f172a 100%)',
     borderColor: '#eab308',
     artImage: '/cards/spy.jpg',
-    bottomIcon: '💰',
-    shortDescription: 'Украсть до 2 💰 у выбранного игрока.',
-    fullDescription: 'Выберите цель: заберите до 2 💰 монет у игрока. Может быть заблокирован Казначеем на Дуэли.',
+    bottomIcon: '🪙',
+    shortDescription: 'Украсть до 2 🪙 у выбранного игрока.',
+    fullDescription: 'Выберите цель: заберите до 2 🪙 монет у игрока. Может быть заблокирован Казначеем на Дуэли.',
     cost: 0,
     targeted: true,
     blockableBy: 'Казначей'
@@ -144,8 +146,8 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     borderColor: '#fbbf24',
     artImage: '/cards/treasurer.jpg',
     bottomIcon: '🛡️',
-    shortDescription: '+2 💰. Блокирует Шантажиста.',
-    fullDescription: 'На своем ходу: получите +2 💰 жалования. На защите: Рыцарь блокирует попытку Шантажиста украсть у вас корону 👑 на Дуэли.',
+    shortDescription: '+2 🪙. Блокирует Шантажиста.',
+    fullDescription: 'На своем ходу: получите +2 🪙 жалования. На защите: Рыцарь блокирует попытку Шантажиста украсть у вас корону 👑 на Дуэли.',
     cost: 0,
     targeted: false,
     blocksRole: 'Шантажист'
@@ -160,8 +162,8 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     borderColor: '#f472b6',
     artImage: '/cards/spy.jpg',
     bottomIcon: '🃏',
-    shortDescription: '+2 💰. Если проверили: +1 👑 (ловушка)!',
-    fullDescription: 'Если не проверили: получите +2 💰 золота. ЛОВУШКА: если настоящего Шута проверили («Не верю!») — он получает +1 👑 вместо обычной печати +1 ⚜️, а его +2 💰 не срабатывают!',
+    shortDescription: '+2 🪙. Если проверили: +1 👑 (ловушка)!',
+    fullDescription: 'Если не проверили: получите +2 🪙 золота. ЛОВУШКА: если настоящего Шута проверили («Не верю!») — он получает +1 👑 вместо обычной печати +1 ⚜️, а его +2 🪙 не срабатывают!',
     cost: 0,
     targeted: false
   },
@@ -206,9 +208,9 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     gradient: 'linear-gradient(180deg, #1e3a8a 0%, #172554 50%, #0f172a 100%)',
     borderColor: '#60a5fa',
     artImage: '/cards/spy.jpg',
-    bottomIcon: '💰',
-    shortDescription: 'Получаете +1 💰, когда другой игрок объявляет проверку при дворе.',
-    fullDescription: 'Выложите перед собой (стоит 1 ⚡). В течение полного круга (до вашего следующего хода) каждый раз, когда ДРУГОЙ игрок объявляет проверку («НЕ ВЕРЮ!») — вы немедленно получаете +1 💰 из казны за перехват дворцовых сведений.',
+    bottomIcon: '🪙',
+    shortDescription: 'Получаете +1 🪙, когда другой игрок объявляет проверку при дворе.',
+    fullDescription: 'Выложите перед собой (стоит 1 ⚡). В течение полного круга (до вашего следующего хода) каждый раз, когда ДРУГОЙ игрок объявляет проверку («НЕ ВЕРЮ!») — вы немедленно получаете +1 🪙 из казны за перехват дворцовых сведений.',
     cost: 0,
     targeted: false
   },
@@ -227,8 +229,8 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     cost: 0,
     targeted: true
   },
-  'Королевская грамота': {
-    name: 'Королевская грамота',
+  'Золотая булла': {
+    name: 'Золотая булла',
     category: 'plot',
     title: 'Золотая печать',
     badge: '📜',
@@ -237,8 +239,8 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     borderColor: '#fbbf24',
     artImage: '/cards/treasurer.jpg',
     bottomIcon: '⚜️',
-    shortDescription: '+1 💰 за каждую полученную печать ⚜️, а через круг даёт +1 ⚜️.',
-    fullDescription: 'Выложите перед собой (стоит 1 ⚡). Действует 1 полный круг. Каждый раз, когда вы получаете королевскую печать (⚜️) за спор или дуэль — вы дополнительно получаете +1 💰 из казны. В начале вашего следующего хода приносит +1 ⚜️ и сбрасывается.',
+    shortDescription: '+1 🪙 за каждую полученную печать ⚜️, а через круг даёт +1 ⚜️.',
+    fullDescription: 'Выложите перед собой (стоит 1 ⚡). Действует 1 полный круг. Каждый раз, когда вы получаете королевскую печать (⚜️) за спор или дуэль — вы дополнительно получаете +1 🪙 из казны. В начале вашего следующего хода приносит +1 ⚜️ и сбрасывается.',
     cost: 0,
     targeted: false
   },
@@ -252,8 +254,8 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     borderColor: '#a855f7',
     artImage: '/cards/thief.jpg',
     bottomIcon: '💥',
-    shortDescription: 'Копит до 4 зарядов. За 2: сброс до 3 💰; за 3: -1 👑; за 4: выбор без Вето!',
-    fullDescription: 'Выложите перед собой (стоит 1 ⚡). Накапливает заряды (макс 4) при любых проверках («НЕ ВЕРЮ!»), Дуэлях и кражах Вора/Шантажиста. Можно активировать СРАЗУ при получении заряда (0 ⚡) или в свой ход (1 ⚡). При активации карта сбрасывается: за 2 заряда — сброс до 3 💰 у цели; за 3 заряда — лишить цель 1 👑; за 4 заряда — сброс 3 💰 или 1 👑 БЕЗ возможности Вето.',
+    shortDescription: 'Копит до 4 зарядов. За 2: сброс до 3 🪙; за 3: -1 👑; за 4: выбор без Вето!',
+    fullDescription: 'Выложите перед собой (стоит 1 ⚡). Накапливает заряды (макс 4) при любых проверках («НЕ ВЕРЮ!»), Дуэлях и кражах Вора/Шантажиста. Можно активировать СРАЗУ при получении заряда (0 ⚡) или в свой ход (1 ⚡). При активации карта сбрасывается: за 2 заряда — сброс до 3 🪙 у цели; за 3 заряда — лишить цель 1 👑; за 4 заряда — сброс 3 🪙 или 1 👑 БЕЗ возможности Вето.',
     cost: 0,
     targeted: false
   },
@@ -300,7 +302,7 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     artImage: '/cards/spy.jpg',
     bottomIcon: '⚜️',
     shortDescription: 'Модификатор x2 к роли при проверке.',
-    fullDescription: 'Инстант-модификатор ⚡. Играется только в свой ход вместе с картой Роли как единое действие (стоит 1 ⚡). Если вас проверят и там правда — вы получаете удвоенный эффект роли (+2 👑/+6 💰/+4 💰/кража x2, Шут: +4 💰 и +1 👑), а печати отменяются. Если блеф — сомневавшийся получает +2 ⚜️. На дуэли крадет x2, ничья дает по 1 ⚜️, а при проигрыше дуэли победитель берет +2 ⚜️. Без проверки срабатывает обычный эффект x1.',
+    fullDescription: 'Инстант-модификатор ⚡. Играется только в свой ход вместе с картой Роли как единое действие (стоит 1 ⚡). Если вас проверят и там правда — вы получаете удвоенный эффект роли (+2 👑/+6 🪙/+4 🪙/кража x2, Шут: +4 🪙 и +1 👑), а печати отменяются. Если блеф — сомневавшийся получает +2 ⚜️. На дуэли крадет x2, ничья дает по 1 ⚜️, а при проигрыше дуэли победитель берет +2 ⚜️. Без проверки срабатывает обычный эффект x1.',
     cost: 0,
     targeted: false
   },
@@ -333,8 +335,56 @@ export const CARD_INFO: Record<GameCard, CardInfo> = {
     fullDescription: 'Инстант ⚡ (1 жетон действия). Выберите игрока: вы тайно смотрите обе карты из его руки. Себе ничего не забираете. Дает стратегическую информацию для будущих споров.',
     cost: 0,
     targeted: true
+  },
+  'Обвинение в измене': {
+    name: 'Обвинение в измене',
+    category: 'instant',
+    title: 'Королевский донос',
+    badge: '⛓️',
+    themeColor: '#ef4444',
+    gradient: 'linear-gradient(180deg, #991b1b 0%, #450a0a 50%, #0f172a 100%)',
+    borderColor: '#f87171',
+    artImage: '/cards/blackmailer.jpg',
+    bottomIcon: '👑',
+    shortDescription: 'Выбранный игрок теряет -1 👑.',
+    fullDescription: 'Инстант ⚡ (1 жетон действия). Выберите соперника: он немедленно теряет -1 👑 (срывает Королевский приём и Коронацию). Нельзя играть во время активного неразрешенного спора.',
+    cost: 0,
+    targeted: true
   }
 };
+
+export const CARD_COPIES_MAP: Record<GameCard, number> = {
+  // 6 Ролей (по 3 копии = 18)
+  'Наследник': 3,
+  'Казначей': 3,
+  'Вор': 3,
+  'Шантажист': 3,
+  'Рыцарь': 3,
+  'Шут': 3,
+
+  // 6 Интриг (5 типов × 2 + Тайный заговор × 3 = 13)
+  'Королевский приём': 2,
+  'Чёрная книга': 2,
+  'Сеть информаторов': 2,
+  'Досье': 2,
+  'Золотая булла': 2,
+  'Тайный заговор': 3,
+
+  // 6 Инстантов (16 карт)
+  'Право вето': 5,
+  'Обвинение в измене': 3,
+  'Перенаправление': 2,
+  'Ва-банк': 2,
+  'Дворцовый переполох': 2,
+  'Шпион': 2
+};
+
+export const getCardMaxCopies = (card: GameCard): number => CARD_COPIES_MAP[card] ?? 2;
+
+export const TOTAL_ROLES_COUNT = ALL_ROLES.reduce((sum, r) => sum + (CARD_COPIES_MAP[r] ?? 3), 0);
+export const TOTAL_PLOTS_COUNT = ALL_PLOTS.reduce((sum, p) => sum + (CARD_COPIES_MAP[p] ?? 2), 0);
+export const TOTAL_INSTANTS_COUNT = ALL_INSTANTS.reduce((sum, i) => sum + (CARD_COPIES_MAP[i] ?? 2), 0);
+export const TOTAL_DECK_SIZE = TOTAL_ROLES_COUNT + TOTAL_PLOTS_COUNT + TOTAL_INSTANTS_COUNT;
 
 export function isRole(card: GameCard): card is Role {
   return ALL_ROLES.includes(card as Role);
@@ -349,38 +399,16 @@ export function isInstant(card: GameCard): card is InstantType {
 }
 
 /**
- * Создает полную колоду из 44 карт:
- * - 6 Ролей × 3 копии = 18 карт
- * - 6 Интриг: 5 типов × 2 + Тайный заговор × 3 = 13 карт
- * - 5 Инстантов:
- *   - Право вето × 5 копий
- *   - Перенаправление × 2 копии
- *   - Ва-банк × 2 копии
- *   - Дворцовый переполох × 2 копии
- *   - Шпион × 2 копии
- *   = 13 карт
- * Итого: 44 карты
+ * Создает полную колоду из всех карт согласно CARD_COPIES_MAP:
  */
 export function createInitialDeck(): GameCard[] {
   const deck: GameCard[] = [];
 
-  // 18 ролевых карт (6 ролей × 3)
-  for (const role of ALL_ROLES) {
-    deck.push(role, role, role);
+  for (const [card, count] of Object.entries(CARD_COPIES_MAP)) {
+    for (let i = 0; i < count; i++) {
+      deck.push(card as GameCard);
+    }
   }
-
-  // 13 карт интриг (5 типов × 2 + 1 дополнительный Тайный заговор)
-  for (const plot of ALL_PLOTS) {
-    deck.push(plot, plot);
-  }
-  deck.push('Тайный заговор'); // 3-я копия Тайного заговора
-
-  // 13 карт инстантов:
-  deck.push('Право вето', 'Право вето', 'Право вето', 'Право вето', 'Право вето');
-  deck.push('Перенаправление', 'Перенаправление');
-  deck.push('Ва-банк', 'Ва-банк');
-  deck.push('Дворцовый переполох', 'Дворцовый переполох');
-  deck.push('Шпион', 'Шпион');
 
   // Перемешивание алгоритмом Фишера-Йетса
   for (let i = deck.length - 1; i > 0; i--) {

@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
-import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_INFO } from '../engine/cards';
+import { 
+  ALL_ROLES, 
+  ALL_PLOTS, 
+  ALL_INSTANTS, 
+  CARD_INFO, 
+  TOTAL_ROLES_COUNT, 
+  TOTAL_PLOTS_COUNT, 
+  TOTAL_INSTANTS_COUNT, 
+  TOTAL_DECK_SIZE 
+} from '../engine/cards';
 import type { ConspiracyPromptData, Player, GameCard } from '../engine/types';
 
 function ConspiracyModalDialog({
@@ -77,7 +86,7 @@ function ConspiracyModalDialog({
                   {opp.name}
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                  👑 {opp.favor} | 💰 {opp.gold}
+                  👑 {opp.favor} | 🪙 {opp.gold}
                 </div>
               </div>
             );
@@ -103,10 +112,10 @@ function ConspiracyModalDialog({
             }}
           >
             <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#fef08a' }}>
-              💰 Сброс до 3 монет
+              🪙 Сброс до 3 монет
             </div>
             <div style={{ fontSize: '0.68rem', color: '#cbd5e1', marginTop: '4px' }}>
-              {selectedTarget ? `Сбросит: ${Math.min(3, selectedTarget.gold)} 💰 в казну` : 'Требует 2+ заряда'}
+              {selectedTarget ? `Сбросит: ${Math.min(3, selectedTarget.gold)} 🪙 в казну` : 'Требует 2+ заряда'}
             </div>
           </button>
 
@@ -487,7 +496,7 @@ export function Modals({
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                       <span style={{ color: 'var(--gold-light)', fontWeight: 800 }}>👑 {p.favor}</span>
                       <span style={{ color: '#c084fc', fontWeight: 700 }}>⚜️ {p.seals}</span>
-                      <span style={{ color: '#fbbf24' }}>💰 {p.gold}</span>
+                      <span style={{ color: '#fbbf24' }}>🪙 {p.gold}</span>
                     </div>
                   </div>
                 );
@@ -512,14 +521,14 @@ export function Modals({
           
           <div style={{ fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.45, display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
-              <strong style={{ color: 'var(--gold-light)' }}>👑 Единая колода из 44 карт и победа:</strong> Колода состоит из 18 карт Ролей (6 ролей × 3), 13 Интриг 🎴 (5 типов × 2 + Тайный заговор × 3) и 13 Инстантов ⚡ (Право вето × 5, остальные 4 типа × 2). Побеждает тот, кто первым удержит 6 👑 корон полный круг. За разоблачения и победы в спорах начисляются <span style={{ color: '#c084fc' }}>⚜️ печати</span> (<strong>2 ⚜️ = 1 👑</strong>).
+              <strong style={{ color: 'var(--gold-light)' }}>👑 Единая колода из {TOTAL_DECK_SIZE} карт и победа:</strong> Колода состоит из {TOTAL_ROLES_COUNT} карт Ролей ({ALL_ROLES.length} ролей × 3), {TOTAL_PLOTS_COUNT} Интриг 🎴 ({ALL_PLOTS.length} типов) и {TOTAL_INSTANTS_COUNT} Инстантов ⚡ ({ALL_INSTANTS.length} типов). Побеждает тот, кто первым удержит 6 👑 корон полный круг. За разоблачения и победы в спорах начисляются <span style={{ color: '#c084fc' }}>⚜️ печати</span> (<strong>2 ⚜️ = 1 👑</strong>).
             </div>
 
             <div>
               <strong style={{ color: '#38bdf8' }}>⚡ 3 Фазы Хода и 2 Жетона Действия:</strong>
               <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
-                <li><strong>Фаза 1 (Утро):</strong> Восполнение до 2 ⚡ + срабатывание эффектов круга («Приём», «Грамота»).</li>
-                <li><strong>Фаза 2 (Обычное действие, макс. 1):</strong> Содержание, Пир, Слух, Смена карты (1 ⚡) или пропуск фазы. Вернуться к ней после перехода к картам нельзя!</li>
+                <li><strong>Фаза 1 (Утро):</strong> Восполнение до 2 ⚡ + срабатывание эффектов круга («Приём», «Булла»).</li>
+                <li><strong>Фаза 2 (Обычное действие, макс. 1):</strong> Содержание, Пир, Слух, Смена 1-2 карт (1 ⚡) или пропуск фазы. Вернуться к ней после перехода к картам нельзя!</li>
                 <li><strong>Фаза 3 (Розыгрыш карт):</strong> Интрига 🎴 (макс. 1, 1 ⚡), Роль 👑 (макс. 1, 1 ⚡), Инстанты ⚡ (по 1 ⚡, защита 0 ⚡).</li>
                 <li><strong>Добор карт:</strong> Карты из колоды добираются в руку (до 2 штук) <strong>только в конце хода</strong>!</li>
               </ul>
@@ -530,7 +539,7 @@ export function Modals({
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', fontWeight: 'bold', color: 'var(--gold-light)' }}>
-              6 Ролей Двора (18 карт):
+              {ALL_ROLES.length} Ролей Двора ({TOTAL_ROLES_COUNT} карт):
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               {ALL_ROLES.map(r => (
@@ -541,7 +550,7 @@ export function Modals({
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', fontWeight: 'bold', color: '#facc15' }}>
-              6 Интриг 🎴 (13 карт):
+              {ALL_PLOTS.length} Интриг 🎴 ({TOTAL_PLOTS_COUNT} карт):
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               {ALL_PLOTS.map(p => (
@@ -552,7 +561,7 @@ export function Modals({
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px', fontWeight: 'bold', color: '#c084fc' }}>
-              5 Инстантов ⚡ (13 карт):
+              {ALL_INSTANTS.length} Инстантов ⚡ ({TOTAL_INSTANTS_COUNT} карт):
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               {ALL_INSTANTS.map(i => (
