@@ -1,7 +1,9 @@
+import React from 'react';
 import { useGameStore } from '../engine/GameStore';
 import { PlayerAvatar } from './PlayerAvatar';
 import { StakedCardArena } from './StakedCardArena';
-import type { Role, PlotType, InstantType, Player } from '../engine/types';
+import type { Role, PlotType, InstantType, Player, GameCard } from '../engine/types';
+import { Button } from './ui/Button';
 
 interface TableProps {
   pendingTargetAction?: { 
@@ -9,29 +11,31 @@ interface TableProps {
     name: string; 
     cost: number; 
     roleClaim?: Role; 
-    plotType?: PlotType;
-    instantType?: InstantType;
-    isPlotDirect?: boolean;
-    isInstantDirect?: boolean;
+    plotType?: PlotType; 
+    instantType?: InstantType; 
+    isPlotDirect?: boolean; 
+    isInstantDirect?: boolean; 
     stakedCardIndex?: number 
   } | null;
   onSelectTarget?: (targetId: string) => void;
   onCancelTarget?: () => void;
+  onInspectCard?: (card: GameCard) => void;
 }
 
-export function Table({ 
+export const Table: React.FC<TableProps> = ({ 
   pendingTargetAction, 
   onSelectTarget,
-  onCancelTarget
-}: TableProps) {
+  onCancelTarget,
+  onInspectCard
+}) => {
   const { players, activePlayerId, pendingAction } = useGameStore();
   const human = players.find(p => !p.isBot);
 
   // Desktop Arc Seat Positioning for the 3 opponent bots (Left, Top Center, Right)
   const botSeatPositions = [
-    { seat: 2, top: '44%', left: '-12px', transform: 'translateY(-50%)' },               // Bot 1 (Left)
-    { seat: 3, top: '-34px', left: '50%', transform: 'translateX(-50%)' },              // Bot 2 (Top Center)
-    { seat: 4, top: '44%', right: '-12px', transform: 'translateY(-50%)' }              // Bot 3 (Right)
+    { seat: 2, top: '44%', left: '-18px', transform: 'translateY(-50%)' },               // Bot 1 (Left)
+    { seat: 3, top: '-36px', left: '50%', transform: 'translateX(-50%)' },              // Bot 2 (Top Center)
+    { seat: 4, top: '44%', right: '-18px', transform: 'translateY(-50%)' }              // Bot 3 (Right)
   ];
 
   const isValidTarget = (player: Player): boolean => {
@@ -62,13 +66,14 @@ export function Table({
               <span className="targeting-text">
                 Выберите цель для <strong style={{ color: 'var(--gold-light)' }}>«{pendingTargetAction.name}»</strong>:
               </span>
-              <button 
-                type="button" 
-                className="targeting-cancel-pill"
+              <Button 
+                variant="red" 
+                size="sm"
                 onClick={onCancelTarget}
+                hotkey="Esc"
               >
-                ✕ Отмена (Esc)
-              </button>
+                Отмена
+              </Button>
             </div>
           </div>
         )}
@@ -88,6 +93,7 @@ export function Table({
                 isActive={activePlayerId === player.id}
                 isTargetable={isTargetable}
                 onTarget={isTargetable && onSelectTarget ? () => onSelectTarget(player.id) : undefined}
+                onInspectCard={onInspectCard}
                 style={{
                   position: 'absolute',
                   top: pos.top,
@@ -101,8 +107,9 @@ export function Table({
         </div>
 
         {/* Center Staked Arena for Active Cards & 3D Flips */}
-        <StakedCardArena />
+        <StakedCardArena onInspectCard={onInspectCard} />
       </div>
     </div>
   );
-}
+};
+

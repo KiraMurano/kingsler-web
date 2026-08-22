@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
-import { CARD_INFO } from '../engine/cards';
+import { CARD_DESCRIPTIONS } from '../data/cardDescriptions';
 import type { Role } from '../engine/types';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
 
 interface ActionControlsProps {
   onOpenNormalActions: () => void;
 }
 
-export function ActionControls({
+export const ActionControls: React.FC<ActionControlsProps> = ({
   onOpenNormalActions
-}: ActionControlsProps) {
+}) => {
   const { 
     players, 
     activePlayerId, 
@@ -55,32 +57,30 @@ export function ActionControls({
         );
         return (
           <div className="player-actions-toolbar" style={{ gap: '6px' }}>
-            <div style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.74rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
               🔀 Выберите новую цель для атаки:
             </div>
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
               {redirectTargets.map(t => (
-                <button
+                <Button
                   key={t.id}
-                  type="button"
-                  className="action-deck-btn btn-gold"
-                  style={{ padding: '6px 12px', fontSize: '0.74rem' }}
+                  variant="gold"
+                  size="sm"
                   onClick={() => {
                     setSelectingRedirectTarget(false);
                     playInstant(human.id, 'Перенаправление', redirectIndex, t.id);
                   }}
                 >
                   {t.name}
-                </button>
+                </Button>
               ))}
-              <button
-                type="button"
-                className="action-deck-btn btn-blue"
-                style={{ padding: '6px 10px', fontSize: '0.72rem' }}
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setSelectingRedirectTarget(false)}
               >
                 ◀ Назад
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -89,24 +89,23 @@ export function ActionControls({
       if (selectingDuelCard) {
         return (
           <div className="player-actions-toolbar" style={{ gap: '6px' }}>
-            <div style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.74rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
               🛡️ Выберите карту из руки на Дуэль (заявляется «{requiredRole}»):
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
               {human.hand.map((cardRole, idx) => {
-                const info = CARD_INFO[cardRole];
+                const info = CARD_DESCRIPTIONS[cardRole];
                 const isTruth = cardRole === requiredRole;
                 return (
-                  <button
+                  <Button
                     key={idx}
-                    type="button"
-                    className={`action-deck-btn ${isTruth ? 'btn-green' : 'btn-gold'}`}
+                    variant={isTruth ? 'green' : 'gold'}
+                    size="sm"
                     style={{
                       padding: '6px 8px',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      border: isTruth ? '2px solid #4ade80' : '1px solid #d97706'
+                      alignItems: 'center'
                     }}
                     onClick={() => {
                       setSelectingDuelCard(false);
@@ -117,21 +116,20 @@ export function ActionControls({
                       <span style={{ fontSize: '1.1rem' }}>{info?.badge}</span>
                       <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>{cardRole}</span>
                     </div>
-                    <span style={{ fontSize: '0.62rem', color: isTruth ? '#bbf7d0' : '#fde68a', fontWeight: 700 }}>
-                      {isTruth ? '✨ ПРАВДА' : '🎭 БЛЕФ'}
-                    </span>
-                  </button>
+                    <Badge variant={isTruth ? 'emerald' : 'amber'} size="sm">
+                      {isTruth ? 'ПРАВДА' : 'БЛЕФ'}
+                    </Badge>
+                  </Button>
                 );
               })}
-              <button
-                type="button"
-                className="action-deck-btn btn-blue"
-                style={{ padding: '6px 10px', fontSize: '0.72rem' }}
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setSelectingDuelCard(false)}
                 title="Вернуться к выбору действия"
               >
                 ◀ Назад
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -139,62 +137,58 @@ export function ActionControls({
 
       return (
         <div className="player-actions-toolbar">
-          <div style={{ fontSize: '0.72rem', color: '#fef08a', fontWeight: 800, textAlign: 'center', marginBottom: '2px' }}>
-            ⚔️ {actor?.name} атакует вас «{pendingAction?.roleClaim}»!
+          <div style={{ fontSize: '0.74rem', color: '#fef08a', fontWeight: 800, textAlign: 'center', marginBottom: '2px' }}>
+            ⚔️ {actor?.name} атакует вас ролью «{pendingAction?.roleClaim}»!
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: redirectIndex !== -1 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '6px' }}>
             {/* Option 1: Accept */}
-            <button 
-              type="button"
-              className="action-deck-btn btn-blue"
+            <Button 
+              variant="blue"
+              size="sm"
+              subtext="Без спора • 0 ⚡"
               onClick={() => {
                 setSelectingDuelCard(false);
                 targetAcceptAttack(human.id);
               }}
-              style={{ padding: '6px 4px' }}
             >
-              <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>🏳️ Принять</span>
-              <span className="action-deck-btn-sub">Без спора (0 ⚡)</span>
-            </button>
+              🏳️ Принять
+            </Button>
             
-            {/* Option 2: Doubt (costs 1 Token) */}
-            <button 
-              type="button"
-              className="action-deck-btn btn-red"
+            {/* Option 2: Doubt */}
+            <Button 
+              variant="red"
+              size="sm"
               disabled={!hasTokens}
+              subtext={hasTokens ? 'Стоит 1 ⚡' : '0 ⚡ (закрыто)'}
               onClick={() => {
                 setSelectingDuelCard(false);
                 targetDoubtAttack(human.id);
               }}
-              style={{ padding: '6px 4px', opacity: hasTokens ? 1 : 0.4 }}
               title={hasTokens ? 'Проверить на блеф (стоит 1 ⚡)' : 'Недостаточно жетонов действия (0 ⚡)'}
             >
-              <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>⚔️ Не верю!</span>
-              <span className="action-deck-btn-sub">{hasTokens ? 'Стоит 1 ⚡' : '0 ⚡ (закрыто)'}</span>
-            </button>
+              ⚔️ Не верю!
+            </Button>
 
             {/* Option 3: Duel */}
-            <button 
-              type="button"
-              className="action-deck-btn btn-gold"
+            <Button 
+              variant="gold"
+              size="sm"
+              subtext={`Щит ${blockingRoleDeclined} • 0 ⚡`}
               onClick={() => setSelectingDuelCard(true)}
-              style={{ padding: '6px 4px' }}
             >
-              <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>🤺 Дуэль!</span>
-              <span className="action-deck-btn-sub">Блок {blockingRoleDeclined} (0 ⚡)</span>
-            </button>
+              🤺 Дуэль!
+            </Button>
 
             {/* Option 4: Redirection Instant if held in hand */}
             {redirectIndex !== -1 && (
-              <button 
-                type="button" 
-                className="action-deck-btn btn-gold"
+              <Button 
+                variant="purple"
+                size="sm"
+                subtext="Инстант • 0 ⚡"
                 onClick={() => setSelectingRedirectTarget(true)}
-                style={{ padding: '6px 4px', border: '1px solid #fbbf24' }}
               >
-                <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>🔀 Инстант</span>
-                <span className="action-deck-btn-sub">Перенаправить (0 ⚡)</span>
-              </button>
+                🔀 Перенаправить
+              </Button>
             )}
           </div>
         </div>
@@ -207,26 +201,24 @@ export function ActionControls({
     if (isActor) {
       return (
         <div className="player-actions-toolbar">
-          <button 
-            className="action-deck-btn btn-red"
+          <Button 
+            variant="red"
+            size="md"
+            hotkey="2"
+            subtext="Одновременное вскрытие карт"
             onClick={() => attackerAcceptDuel(human.id)}
-            style={{ padding: '8px 12px' }}
           >
-            <span className="action-deck-btn-title">
-              ⚔️ Принять дуэль! <span className="hotkey-badge">[2]</span>
-            </span>
-            <span className="action-deck-btn-sub">Одновременное вскрытие карт</span>
-          </button>
-          <button 
-            className="action-deck-btn btn-blue"
+            ⚔️ Принять дуэль!
+          </Button>
+          <Button 
+            variant="blue"
+            size="md"
+            hotkey="1"
+            subtext="Сбросить карту в сброс"
             onClick={() => attackerRetreatDuel(human.id)}
-            style={{ padding: '6px 12px' }}
           >
-            <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>
-              🏳️ Отступить <span className="hotkey-badge">[1]</span>
-            </span>
-            <span className="action-deck-btn-sub">Сбросить карту в сброс</span>
-          </button>
+            🏳️ Отступить
+          </Button>
         </div>
       );
     }
@@ -237,33 +229,27 @@ export function ActionControls({
     return (
       <div className="player-actions-toolbar" style={{ gap: '6px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%' }}>
-          {/* Left Button: Doubt / Check */}
-          <button 
-            className="action-deck-btn btn-red"
+          <Button 
+            variant="red"
+            size="md"
+            hotkey="D"
             disabled={!hasTokens}
+            subtext={hasTokens ? 'Разоблачить • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
             onClick={() => doubtAction(human.id)}
-            style={{ padding: '8px 10px', opacity: hasTokens ? 1 : 0.4 }}
-            title={hasTokens ? 'Проверить заявление на блеф (тратит 1 ⚡)' : 'У вас 0 жетонов действия ⚡'}
+            title={hasTokens ? 'Проверить заявление на блеф (тратит 1 ⚡)' : 'У вас 0 жетонов действия'}
           >
-            <span className="action-deck-btn-title">
-              ⚔️ Не верю! <span className="hotkey-badge">[D]</span>
-            </span>
-            <span className="action-deck-btn-sub">
-              {hasTokens ? 'Разоблачить (1 ⚡)' : 'Нет жетонов (0 ⚡)'}
-            </span>
-          </button>
+            ⚔️ Не верю!
+          </Button>
 
-          {/* Right Button: Pass / Trust */}
-          <button 
-            className="action-deck-btn btn-green"
+          <Button 
+            variant="green"
+            size="md"
+            hotkey="V"
+            subtext="Пропустить ход"
             onClick={() => passDoubt(human.id)}
-            style={{ padding: '8px 10px' }}
           >
-            <span className="action-deck-btn-title">
-              ✋ Верю <span className="hotkey-badge">[V]</span>
-            </span>
-            <span className="action-deck-btn-sub">Пропустить ход</span>
-          </button>
+            ✋ Верю
+          </Button>
         </div>
       </div>
     );
@@ -276,121 +262,91 @@ export function ActionControls({
     const { proceedAfterVetoWindow } = useGameStore.getState();
 
     return (
-      <div className="player-actions-toolbar" style={{ gap: '6px', background: 'rgba(49, 10, 10, 0.95)', border: '1px solid #ef4444' }}>
-        <div style={{ fontSize: '0.74rem', color: '#fecaca', fontWeight: 800, textAlign: 'center', width: '100%' }}>
+      <div className="player-actions-toolbar" style={{ gap: '6px', background: 'rgba(49, 10, 10, 0.95)', border: '1px solid #ef4444', borderRadius: '12px', padding: '10px' }}>
+        <div style={{ fontSize: '0.76rem', color: '#fecaca', fontWeight: 800, textAlign: 'center', width: '100%' }}>
           🚫 ОКНО ВЕТО: Применяется эффект «{pendingAction?.roleClaim || pendingAction?.name}»!
         </div>
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', width: '100%' }}>
           {canVeto && (
-            <button
-              type="button"
-              className="action-deck-btn btn-red"
+            <Button
+              variant="red"
+              size="md"
+              subtext="Отменить действие в сброс"
               onClick={() => playInstant(human.id, 'Право вето', vetoIdx)}
-              style={{ padding: '8px 16px', border: '2px solid #f87171', background: 'linear-gradient(135deg, #991b1b, #dc2626)' }}
             >
-              <span className="action-deck-btn-title" style={{ color: '#fff', fontSize: '0.85rem' }}>
-                🚫 НАЛОЖИТЬ ВЕТО! (0 ⚡)
-              </span>
-              <span className="action-deck-btn-sub" style={{ color: '#fee2e2' }}>
-                Отменить действие и отправить в сброс
-              </span>
-            </button>
+              🚫 НАЛОЖИТЬ ВЕТО! • 0 ⚡
+            </Button>
           )}
 
-          <button
-            type="button"
-            className="action-deck-btn btn-blue"
+          <Button
+            variant="blue"
+            size="md"
+            subtext="Применить эффект"
             onClick={proceedAfterVetoWindow}
-            style={{ padding: '8px 16px' }}
           >
-            <span className="action-deck-btn-title" style={{ fontSize: '0.78rem' }}>
-              ✨ Продолжить ➔
-            </span>
-            <span className="action-deck-btn-sub">
-              Применить эффект
-            </span>
-          </button>
+            ✨ Продолжить ➔
+          </Button>
         </div>
       </div>
     );
   }
 
-  // 4. DEFAULT IDLE ACTION BAR WITH 3-PHASE CONTROLS
+  // 5. DEFAULT IDLE ACTION BAR WITH 3-PHASE CONTROLS
   const isNormalPhase = turnSubPhase === 'NORMAL_ACTION_PHASE' && !hasUsedNormalActionThisTurn;
 
   return (
     <div className="player-actions-toolbar" style={{ gap: '6px' }}>
       {/* Subphase 2: Normal Action Button */}
-      <button 
-        className="action-deck-btn btn-blue"
+      <Button 
+        variant="blue"
+        size="md"
+        hotkey="1"
         disabled={!isMyTurn || !hasTokens || !isNormalPhase}
+        subtext={isNormalPhase ? 'Пир, Слух, Смена, Золото • 1 ⚡' : '⛔ Пропущено (1 на ход)'}
         onClick={onOpenNormalActions}
-        style={{ padding: '8px 10px', opacity: (isMyTurn && hasTokens && isNormalPhase) ? 1 : 0.4 }}
-        title={isNormalPhase ? 'Открыть меню обычных действий (Пир, Содержание, Слух, Смена)' : 'Фаза обычных действий пропущена или уже использована'}
+        title={isNormalPhase ? 'Открыть меню обычных действий' : 'Фаза обычных действий пропущена или уже использована'}
       >
-        <span className="action-deck-btn-title" style={{ fontSize: '0.76rem' }}>
-          🕊️ Обычное действие <span className="hotkey-badge">[1]</span>
-        </span>
-        <span className="action-deck-btn-sub">
-          {isNormalPhase ? 'Пир, Слух, Смена, Деньги (1 ⚡)' : '⛔ Пропущено (1/ход)'}
-        </span>
-      </button>
+        🕊️ Обычное действие
+      </Button>
 
       {/* Button to skip Normal Action and go directly to Cards */}
       {isMyTurn && isNormalPhase && (
-        <button 
-          className="action-deck-btn btn-gold"
-          style={{ padding: '8px 10px' }}
+        <Button 
+          variant="gold"
+          size="sm"
+          subtext="Фаза 3: Роли и Интриги"
           onClick={skipNormalActionPhase}
           title="Пропустить обычное действие и перейти сразу к розыгрышу карт из руки"
         >
-          <span className="action-deck-btn-title" style={{ fontSize: '0.76rem' }}>
-            ⏭️ К картам ➔
-          </span>
-          <span className="action-deck-btn-sub">
-            Фаза 3: Роли / Интриги
-          </span>
-        </button>
+          ⏭️ К картам ➔
+        </Button>
       )}
 
       {/* Secret Conspiracy Activation Button in own turn (2, 3 or 4 charges) */}
       {isMyTurn && human.activePlot?.type === 'Тайный заговор' && (human.activePlot.charges ?? 0) >= 2 && (
-        <button 
-          type="button"
-          className="action-deck-btn btn-gold"
-          style={{ padding: '8px 12px', border: '2px solid #c084fc', background: 'linear-gradient(135deg, #581c87, #7e22ce)' }}
+        <Button 
+          variant="purple"
+          size="md"
+          subtext={human.activePlot.charges === 2 ? 'Сброс до 3 🪙 • 1 ⚡' : human.activePlot.charges === 3 ? 'Лишить 1 👑 • 1 ⚡' : '🛡️ Без Вето! • 1 ⚡'}
           onClick={() => useGameStore.getState().openConspiracyDialog(false)}
           title="Свершить Заговор (стоит 1 ⚡)"
         >
-          <span className="action-deck-btn-title" style={{ color: '#f3e8ff', fontSize: '0.78rem' }}>
-            ⚔️ Свершить Заговор ({human.activePlot.charges}/4)
-          </span>
-          <span className="action-deck-btn-sub" style={{ color: '#e9d5ff' }}>
-            {human.activePlot.charges === 2 
-              ? 'Сброс до 3 🪙 (1 ⚡)' 
-              : human.activePlot.charges === 3 
-                ? 'Лишить 1 👑 или 3 🪙 (1 ⚡)' 
-                : '🛡️ Сброс или Корона без Вето! (1 ⚡)'}
-          </span>
-        </button>
+          ⚔️ Свершить Заговор ({human.activePlot.charges}/4)
+        </Button>
       )}
 
-      {/* End Turn Manually Button (Preserving remaining action tokens for defense) */}
-      <button 
-        className="action-deck-btn btn-red"
-        style={{ padding: '8px 10px' }}
+      {/* End Turn Manually Button */}
+      <Button 
+        variant="red"
+        size="md"
+        hotkey="Пробел"
         disabled={!isMyTurn}
+        subtext={human.actionTokens > 0 ? 'Сохранить жетоны на защиту' : 'Добор карт и передача хода'}
         onClick={endTurnManually}
         title="Завершить ход и сохранить оставшиеся жетоны действия для проверок на чужих ходах"
       >
-        <span className="action-deck-btn-title" style={{ fontSize: '0.74rem' }}>
-          ✋ {human.actionTokens > 0 ? `Завершить ход (${human.actionTokens} ⚡ в запас)` : 'Завершить ход'} <span className="hotkey-badge">[Пробел]</span>
-        </span>
-        <span className="action-deck-btn-sub">
-          {human.actionTokens > 0 ? 'Сохранить на «НЕ ВЕРЮ!»' : 'Добор карт и передача'}
-        </span>
-      </button>
+        ✋ {human.actionTokens > 0 ? `Завершить ход • ${human.actionTokens} ⚡` : 'Завершить ход'}
+      </Button>
     </div>
   );
-}
-
+};

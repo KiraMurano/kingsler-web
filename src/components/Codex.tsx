@@ -1,268 +1,204 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
 import { 
   ALL_ROLES, 
   ALL_PLOTS, 
   ALL_INSTANTS, 
-  CARD_INFO, 
+  CARD_DESCRIPTIONS 
+} from '../data/cardDescriptions';
+
+import {
   getCardMaxCopies,
   TOTAL_ROLES_COUNT,
   TOTAL_PLOTS_COUNT,
   TOTAL_INSTANTS_COUNT,
   TOTAL_DECK_SIZE 
 } from '../engine/cards';
+
 import type { GameCard } from '../engine/types';
+import { Sheet } from './ui/Sheet';
+import { Tabs } from './ui/Tabs';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
 
 interface CodexProps {
-  onOpenRules: () => void;
-  onRestart?: () => void;
+  open: boolean;
+  onClose: () => void;
+  onOpenRules?: () => void;
+  onSelectCardToInspect: (card: GameCard) => void;
 }
 
-export function Codex({ onOpenRules }: CodexProps) {
+export const Codex: React.FC<CodexProps> = ({ 
+  open, 
+  onClose,
+  onOpenRules,
+  onSelectCardToInspect
+}) => {
   const { deck, discardPile, players } = useGameStore();
-  const [selectedCard, setSelectedCard] = useState<GameCard | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'roles' | 'plots' | 'instants'>('all');
-  const [showDiscardView, setShowDiscardView] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const human = players.find(p => !p.isBot);
 
   const allCardsList: GameCard[] = [...ALL_ROLES, ...ALL_PLOTS, ...ALL_INSTANTS];
 
-  // Count occurrences in discard pile
-  const discardCounts = allCardsList.reduce((acc, card) => {
-    acc[card] = discardPile.filter(r => r === card).length;
-    return acc;
-  }, {} as Record<GameCard, number>);
-
   const displayedCards = allCardsList.filter(c => {
-    if (activeTab === 'roles') return ALL_ROLES.includes(c as any);
-    if (activeTab === 'plots') return ALL_PLOTS.includes(c as any);
-    if (activeTab === 'instants') return ALL_INSTANTS.includes(c as any);
+    if (activeTab === 'roles' && !ALL_ROLES.includes(c as any)) return false;
+    if (activeTab === 'plots' && !ALL_PLOTS.includes(c as any)) return false;
+    if (activeTab === 'instants' && !ALL_INSTANTS.includes(c as any)) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const info = CARD_DESCRIPTIONS[c];
+      return c.toLowerCase().includes(q) || info.shortDescription.toLowerCase().includes(q) || info.title.toLowerCase().includes(q);
+    }
     return true;
   });
 
-  const getTypeDescription = (card: GameCard): string => {
-    const info = CARD_INFO[card];
-    const copies = getCardMaxCopies(card);
-    if (info.category === 'role') return `👑 Роль (${copies} копии)`;
-    if (info.category === 'plot') return `🎴 Интрига (${copies} ${copies === 5 ? 'копий' : 'копии'}, 1 ⚡)`;
-    return `⚡ Инстант (${copies} ${copies === 5 ? 'копий' : 'копии'}, ${card === 'Право вето' || card === 'Перенаправление' ? '0 ⚡' : '1 ⚡'})`;
-  };
-
   return (
-    <aside className="codex-sidebar">
-      {/* Header */}
-      <div className="sidebar-header">
-        <div className="sidebar-title cinzel-font">
-          <span>📖</span>
-          <span>КОДЕКС КАРТ</span>
-        </div>
-        <button 
-          className="nav-pill-btn" 
-          onClick={onOpenRules}
-          style={{ padding: '3px 8px', fontSize: '0.7rem' }}
-          title="Открыть полные правила"
+    <Sheet
+      open={open}
+      onClose={onClose}
+      side="right"
+      width="440px"
+      title="📖 КОДЕКС КАРТ И КОЛОДА"
+      description={`В игре ${TOTAL_DECK_SIZE} карт • ${TOTAL_ROLES_COUNT} ролей • ${TOTAL_PLOTS_COUNT} интриг • ${TOTAL_INSTANTS_COUNT} инстантов`}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '10px' }}>
+        {/* Deck & Discard Tracker Strip */}
+        <div 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(15, 23, 42, 0.7)',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255, 255, 255, 0.08)'
+          }}
         >
-          Правила
-        </button>
-      </div>
-
-      {/* Deck & Discard Tracker Strip */}
-      <div className="codex-deck-tracker" style={{ flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div className="deck-info-pill">
-            <span>🂠 Колода:</span>
-            <span style={{ color: '#fff', fontSize: '0.88rem' }}>{deck.length}</span>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <Badge variant="sapphire" icon="🂠" size="md">
+              Колода: {deck.length}
+            </Badge>
+            <Badge variant={discardPile.length > 0 ? 'ruby' : 'secondary'} icon="🗑️" size="md">
+              Сброс: {discardPile.length}
+            </Badge>
           </div>
 
-          <button
-            type="button"
-            className="deck-info-pill"
-            style={{ 
-              background: showDiscardView ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: '6px',
-              padding: '2px 8px',
-              cursor: 'pointer'
-            }}
-            onClick={() => setShowDiscardView(!showDiscardView)}
-            title="Нажмите, чтобы просмотреть карты в сбросе"
-          >
-            <span>🗑️ Сброс:</span>
-            <span style={{ color: '#fca5a5', fontSize: '0.88rem' }}>{discardPile.length}</span>
-          </button>
+          <div style={{ fontSize: '0.84rem', color: '#94a3b8', fontWeight: 600 }}>
+            Всего: {TOTAL_DECK_SIZE}
+          </div>
         </div>
 
-        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>В игре: {TOTAL_DECK_SIZE} карт ({TOTAL_ROLES_COUNT} ролей, {TOTAL_PLOTS_COUNT} интриг, {TOTAL_INSTANTS_COUNT} инстантов)</span>
-          <span style={{ color: '#93c5fd' }}>{showDiscardView ? 'Скрыть ▲' : 'Счётчик ▼'}</span>
-        </div>
-      </div>
+        {/* Search Bar */}
+        <input
+          type="text"
+          placeholder="🔍 Поиск карты по названию или свойству..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            background: 'rgba(10, 15, 29, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '0.9rem',
+            outline: 'none'
+          }}
+        />
 
-      {/* Tabs for Category filtering */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '2px', padding: '4px 8px', background: 'rgba(0,0,0,0.2)' }}>
-        <button
-          type="button"
-          className="codex-filter-tab"
-          style={{
-            padding: '4px 2px',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            background: activeTab === 'all' ? 'rgba(245, 158, 11, 0.25)' : 'transparent',
-            border: activeTab === 'all' ? '1px solid #f59e0b' : '1px solid transparent',
-            color: activeTab === 'all' ? '#fbbf24' : '#94a3b8',
-            borderRadius: '4px'
-          }}
-          onClick={() => setActiveTab('all')}
-        >
-          Все ({allCardsList.length})
-        </button>
-        <button
-          type="button"
-          className="codex-filter-tab"
-          style={{
-            padding: '4px 2px',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            background: activeTab === 'roles' ? 'rgba(225, 29, 72, 0.25)' : 'transparent',
-            border: activeTab === 'roles' ? '1px solid #fb7185' : '1px solid transparent',
-            color: activeTab === 'roles' ? '#fda4af' : '#94a3b8',
-            borderRadius: '4px'
-          }}
-          onClick={() => setActiveTab('roles')}
-        >
-          👑 Роли ({ALL_ROLES.length})
-        </button>
-        <button
-          type="button"
-          className="codex-filter-tab"
-          style={{
-            padding: '4px 2px',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            background: activeTab === 'plots' ? 'rgba(202, 138, 4, 0.25)' : 'transparent',
-            border: activeTab === 'plots' ? '1px solid #facc15' : '1px solid transparent',
-            color: activeTab === 'plots' ? '#fde047' : '#94a3b8',
-            borderRadius: '4px'
-          }}
-          onClick={() => setActiveTab('plots')}
-        >
-          🎴 Интриги ({ALL_PLOTS.length})
-        </button>
-        <button
-          type="button"
-          className="codex-filter-tab"
-          style={{
-            padding: '4px 2px',
-            fontSize: '0.65rem',
-            fontWeight: 800,
-            background: activeTab === 'instants' ? 'rgba(147, 51, 234, 0.25)' : 'transparent',
-            border: activeTab === 'instants' ? '1px solid #c084fc' : '1px solid transparent',
-            color: activeTab === 'instants' ? '#e9d5ff' : '#94a3b8',
-            borderRadius: '4px'
-          }}
-          onClick={() => setActiveTab('instants')}
-        >
-          ⚡ Инстанты ({ALL_INSTANTS.length})
-        </button>
-      </div>
+        {/* Category Tabs */}
+        <Tabs
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          size="sm"
+          items={[
+            { id: 'all', label: 'Все', count: allCardsList.length },
+            { id: 'roles', label: '👑 Роли', count: ALL_ROLES.length },
+            { id: 'plots', label: '🎴 Интриги', count: ALL_PLOTS.length },
+            { id: 'instants', label: '⚡ Инстанты', count: ALL_INSTANTS.length }
+          ]}
+        />
 
-      {/* Discard Pile Detailed Counter */}
-      {showDiscardView && (
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.95)',
-          borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
-          padding: '8px 10px',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '4px',
-          maxHeight: '140px',
-          overflowY: 'auto'
-        }}>
-          {allCardsList.map(card => {
-            const count = discardCounts[card] || 0;
-            const max = getCardMaxCopies(card);
+        {/* Cards Grid / List */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '2px' }}>
+          {displayedCards.map(card => {
+            const info = CARD_DESCRIPTIONS[card];
+            const isHeldByHuman = human?.hand.includes(card);
+            const maxCopies = getCardMaxCopies(card);
+
             return (
               <div 
-                key={card}
+                key={card} 
+                className="codex-role-card"
                 style={{
-                  fontSize: '0.68rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '2px 4px',
-                  background: count > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                  borderRadius: '4px'
+                  borderColor: isHeldByHuman ? 'rgba(74, 222, 128, 0.5)' : undefined,
+                  background: isHeldByHuman 
+                    ? 'linear-gradient(180deg, rgba(34, 197, 94, 0.12) 0%, rgba(15, 23, 42, 0.85) 100%)' 
+                    : undefined,
+                  cursor: 'pointer'
                 }}
+                onClick={() => onSelectCardToInspect(card)}
               >
-                <span>{CARD_INFO[card].badge} {card}:</span>
-                <span style={{ fontWeight: 800, color: count === max ? '#ef4444' : count > 0 ? '#fbbf24' : '#94a3b8' }}>
-                  {count}/{max}
-                </span>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  {/* Miniature 2:3 card art */}
+                  <div 
+                    style={{
+                      width: '46px',
+                      aspectRatio: '2 / 3',
+                      borderRadius: '6px',
+                      border: `1.5px solid ${info.borderColor}`,
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.6)'
+                    }}
+                  >
+                    <img 
+                      src={info.artImage} 
+                      alt={info.name} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>{info.badge}</span>
+                        <span style={{ fontWeight: 800, color: 'var(--gold-light)', fontSize: '0.98rem' }}>
+                          {info.name}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {isHeldByHuman && (
+                          <Badge variant="emerald" size="sm">В руке</Badge>
+                        )}
+                        <Badge variant="secondary" size="sm">В колоде: {maxCopies}</Badge>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.84rem', color: '#cbd5e1', lineHeight: 1.35 }}>
+                      {info.shortDescription}
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
-      )}
 
-      {/* List of Cards */}
-      <div className="codex-roles-list">
-        {displayedCards.map(card => {
-          const info = CARD_INFO[card];
-          const isHeldByHuman = human?.hand.includes(card);
-          const isExpanded = selectedCard === card;
-          const inDiscard = discardCounts[card] || 0;
-          const maxCopies = getCardMaxCopies(card);
 
-          return (
-            <div 
-              key={card} 
-              className="codex-role-card"
-              style={{
-                borderColor: isHeldByHuman ? 'rgba(74, 222, 128, 0.45)' : undefined,
-                background: isHeldByHuman 
-                  ? 'linear-gradient(180deg, rgba(34, 197, 94, 0.1) 0%, rgba(15, 23, 42, 0.7) 100%)' 
-                  : undefined
-              }}
-              onClick={() => setSelectedCard(isExpanded ? null : card)}
-            >
-              <div className="codex-role-header">
-                <div className="codex-role-name">
-                  <span>{info.badge}</span>
-                  <span>{info.name}</span>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {inDiscard > 0 && (
-                    <span style={{ fontSize: '0.6rem', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.15)', padding: '1px 4px', borderRadius: '4px' }}>
-                      🗑️ {inDiscard}/{maxCopies}
-                    </span>
-                  )}
-                  {isHeldByHuman && (
-                    <span className="held-badge">У вас</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="codex-role-desc">
-                {info.shortDescription}
-              </div>
-
-              {isExpanded && (
-                <div className="codex-role-details">
-                  <div style={{ color: 'var(--gold-light)', fontWeight: 800, marginBottom: '2px' }}>
-                    {info.title}
-                  </div>
-                  <div>{info.fullDescription}</div>
-                  <div style={{ marginTop: '4px', color: 'rgba(255,255,255,0.6)', fontSize: '0.66rem' }}>
-                    Тип: {getTypeDescription(card)}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {/* Footer */}
+        {onOpenRules && (
+          <div style={{ paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <Button variant="ghost" size="sm" style={{ width: '100%' }} onClick={onOpenRules}>
+              📖 Открыть полный свод правил игры
+            </Button>
+          </div>
+        )}
       </div>
-    </aside>
+    </Sheet>
   );
-}
+};

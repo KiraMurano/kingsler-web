@@ -2,45 +2,33 @@
    CENTER ARENA: THE GRAND ROYAL OVAL TABLE & BOT SEATS
    ========================================================================== */
 
-.arena-center {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  position: relative;
-  height: 100%;
-  overflow: visible;
-}
-
-/* ==========================================================================
-   THE GRAND OVAL ROYAL TABLE
-   ========================================================================== */
 .desktop-table-container {
   flex: 1;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 34px 0 8px 0;
+  margin: 20px 0 10px 0;
 }
 
 .grand-oval-table {
   width: 96%;
   height: 94%;
-  max-width: 900px;
-  max-height: 440px;
-  border-radius: 200px;
+  max-width: 1040px;
+  max-height: 480px;
+  border-radius: 240px;
   background-image: 
-    radial-gradient(ellipse at 50% 45%, rgba(20, 83, 45, 0.4) 0%, rgba(5, 46, 22, 0.75) 55%, rgba(2, 24, 12, 0.95) 100%),
+    radial-gradient(ellipse at 50% 45%, rgba(20, 83, 45, 0.45) 0%, rgba(5, 46, 22, 0.8) 55%, rgba(2, 24, 12, 0.96) 100%),
     url('/assets/green_fabric.jpg');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  border: 6px solid #b45309;
+  border: 5px solid #b45309;
   box-shadow: 
-    inset 0 0 75px rgba(0, 0, 0, 0.95),
-    inset 0 0 30px rgba(34, 197, 94, 0.25),
-    0 0 0 3px rgba(245, 158, 11, 0.6),
-    0 16px 50px rgba(0, 0, 0, 0.9);
+    inset 0 0 80px rgba(0, 0, 0, 0.95),
+    inset 0 0 35px rgba(34, 197, 94, 0.25),
+    0 0 0 2px rgba(245, 158, 11, 0.6),
+    0 20px 60px rgba(0, 0, 0, 0.9);
   position: relative;
   display: flex;
   align-items: center;
@@ -50,14 +38,14 @@
 .table-felt-pattern {
   position: absolute;
   inset: 12px;
-  border-radius: 190px;
+  border-radius: 230px;
   border: 1px dashed rgba(245, 158, 11, 0.25);
   pointer-events: none;
 }
 
 .table-center-crest {
   position: absolute;
-  font-size: 5rem;
+  font-size: 5.5rem;
   opacity: 0.08;
   color: var(--gold-light);
   pointer-events: none;
@@ -83,8 +71,8 @@
 }
 
 .bot-avatar-frame {
-  width: 58px;
-  height: 58px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 2.5px solid var(--gold-border);
   position: relative;
@@ -113,7 +101,7 @@
 }
 
 .bot-avatar-frame.is-targetable:hover {
-  transform: scale(1.18);
+  transform: scale(1.16);
   box-shadow: 0 0 35px rgba(239, 68, 68, 1), 0 0 20px rgba(253, 224, 71, 1);
   border-color: #fef08a;
 }
@@ -157,68 +145,43 @@
 /* Bot Info Plate */
 .bot-info-plate {
   background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(245, 158, 11, 0.35);
   padding: 4px 8px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
   align-items: center;
   margin-top: 4px;
-  min-width: 90px;
+  min-width: 96px;
 }
 
 .bot-name-text {
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   font-weight: 800;
   color: var(--text-main);
   white-space: nowrap;
 }
 
-.bot-archetype-tag {
-  font-size: 0.58rem;
-  color: #93c5fd;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 1px 4px;
-  border-radius: 4px;
-  margin-top: 1px;
-}
-
 .bot-stats-strip {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  margin-top: 2px;
+  gap: 4px;
+  margin-top: 3px;
 }
 
-.bot-seals-strip {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 0.65rem;
-  margin-top: 1px;
-}
-
-.seal-indicators {
-  display: inline-flex;
-  gap: 2px;
-}
-
-/* In-Hand Cards Indicator on Bot Plates */
 .bot-cards-in-hand-strip {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .bot-inhand-card-icon {
-  font-size: 0.75rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
@@ -232,43 +195,78 @@
   animation: pulse-target 1s infinite alternate;
 }
 
-.bot-cards-fan {
-  display: flex;
-  gap: 3px;
-  margin-top: 3px;
+/* ==========================================================================
+   ACTIVE INTRIGUE CARDS PLAYED ON TABLE IN 2:3 ASPECT RATIO
+   ========================================================================== */
+.table-active-plot-card {
+  margin-top: 6px;
+  width: 66px;
+  aspect-ratio: 2 / 3;
+  border-radius: 8px;
+  border: 1.5px solid #eab308;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.8), 0 0 12px rgba(234, 179, 8, 0.4);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
+  background: #090d16;
+  animation: pop-in-plaque 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.mini-card-back {
-  width: 14px;
-  height: 20px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, #1e1b4b, #312e81);
-  border: 1px solid var(--gold-border);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+.table-active-plot-card:hover {
+  transform: translateY(-4px) scale(1.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.9), 0 0 20px rgba(250, 204, 21, 0.8);
+  border-color: #fef08a;
+  z-index: 50;
+}
+
+.table-plot-card-inner {
+  width: 100%;
+  height: 100%;
   position: relative;
 }
 
-.mini-card-back::after {
-  content: '👑';
-  font-size: 0.45rem;
+.table-plot-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.table-plot-card-overlay {
   position: absolute;
   inset: 0;
+  background: linear-gradient(180deg, transparent 35%, rgba(2, 6, 23, 0.96) 100%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  opacity: 0.7;
+  justify-content: flex-end;
+  padding: 4px 3px;
+  text-align: center;
+}
+
+.table-plot-card-title {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.15;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
 }
 
 /* Bot Speech / Reaction Bubble */
 .bot-speech-bubble {
   position: absolute;
-  top: -42px;
+  top: -46px;
   background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 100%);
   border: 1.5px solid var(--gold-light);
   color: #fef08a;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 12px;
-  font-size: 0.74rem;
+  font-size: 0.92rem;
   font-weight: 700;
   white-space: nowrap;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.9), 0 0 15px rgba(245, 158, 11, 0.4);
@@ -292,7 +290,7 @@
 /* Floating Targeting Banner on the Grand Oval Table */
 .table-targeting-banner {
   position: absolute;
-  bottom: 18px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-header);
@@ -303,40 +301,23 @@
 .targeting-banner-content {
   background: radial-gradient(circle at 50% 30%, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
   border: 1.5px solid #ef4444;
-  border-radius: 24px;
-  padding: 6px 16px;
+  border-radius: 999px;
+  padding: 8px 22px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.9), 0 0 20px rgba(239, 68, 68, 0.4);
 }
 
 .targeting-icon-pulse {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   animation: pulse-reticle-icon 0.8s infinite alternate;
 }
 
 .targeting-text {
-  font-size: 0.82rem;
+  font-size: 1.02rem;
   font-weight: 800;
   color: #fff;
   white-space: nowrap;
 }
 
-.targeting-cancel-pill {
-  background: rgba(239, 68, 68, 0.25);
-  border: 1px solid #f87171;
-  color: #fca5a5;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.targeting-cancel-pill:hover {
-  background: rgba(239, 68, 68, 0.85);
-  color: #fff;
-  transform: scale(1.05);
-}

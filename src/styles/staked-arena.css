@@ -4,7 +4,7 @@
 
 .staked-arena-center {
   position: absolute;
-  top: 60%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   display: flex;
@@ -26,11 +26,11 @@
   overflow: visible;
 }
 
-/* Staked Card (3D Perspective Container) */
+/* Staked Card (3D Perspective Container in Strict 2:3 Aspect Ratio) */
 .staked-card-3d-wrap {
   perspective: 1000px;
-  width: 106px;
-  height: 154px;
+  width: 110px;
+  aspect-ratio: 2 / 3;
   position: relative;
   z-index: 5;
   animation: card-fly-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -60,7 +60,7 @@
   border: 2px solid var(--gold-border);
 }
 
-/* Face Down Side: Luxury Royal Tarot Card Back (No Text!) */
+/* Face Down Side: Luxury Royal Tarot Card Back */
 .staked-card-clean-back {
   background-size: cover;
   background-position: center;
@@ -88,12 +88,12 @@
   background: radial-gradient(circle at 50% 30%, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
   border: 1.5px solid rgba(245, 158, 11, 0.5);
   border-radius: 12px;
-  padding: 6px 14px;
+  padding: 6px 16px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.95), 0 0 15px rgba(245, 158, 11, 0.2);
   margin-top: 8px;
-  min-width: 220px;
-  max-width: 300px;
+  min-width: 230px;
+  max-width: 320px;
   pointer-events: auto;
   transition: opacity 0.5s ease-out, transform 0.5s ease-out;
 }
@@ -103,7 +103,7 @@
 }
 
 .action-phase-tag {
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   font-weight: 800;
   color: var(--gold-light);
   text-transform: uppercase;
@@ -111,63 +111,29 @@
 }
 
 .action-actor-claim {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
   color: #fff;
   margin: 2px 0;
 }
 
 .action-effect-desc {
-  font-size: 0.68rem;
-  color: #cbd5e1;
-  line-height: 1.25;
-}
-
-/* Live Action Timer Bar with Smooth Fade */
-.action-timer-strip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 4px;
   font-size: 0.7rem;
-  font-weight: 800;
-  color: var(--gold-light);
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
-}
-
-.action-timer-strip.timer-fading {
-  opacity: 0;
-  transform: scale(0.95);
-  pointer-events: none;
-}
-
-.action-timer-track {
-  width: 100px;
-  height: 5px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.action-timer-progress {
-  height: 100%;
-  background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e);
-  transition: width 1s linear;
+  color: #cbd5e1;
+  line-height: 1.3;
 }
 
 /* ==========================================================================
-   DUEL CLASH ARENA IN CENTER
+   DUEL CLASH ARENA IN CENTER (STRICT 2:3 ASPECT RATIO)
    ========================================================================== */
 .duel-clash-arena {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   background: radial-gradient(circle at 50% 50%, rgba(76, 5, 25, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
   border: 2px solid #ef4444;
   border-radius: 16px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   box-shadow: 0 0 35px rgba(239, 68, 68, 0.5), 0 15px 40px rgba(0, 0, 0, 0.95);
   animation: pulse-target 1.5s infinite alternate;
   pointer-events: auto;
@@ -181,18 +147,18 @@
 }
 
 .combatant-tag {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 800;
   color: #cbd5e1;
 }
 
 .duel-card-3d {
-  width: 85px;
-  height: 125px;
+  width: 90px;
+  aspect-ratio: 2 / 3;
 }
 
 .duel-swords-icon {
-  font-size: 2rem;
+  font-size: 2.2rem;
   color: var(--gold-light);
   animation: clash-swords 0.6s infinite alternate;
 }

@@ -3,17 +3,17 @@
    ========================================================================== */
 
 .player-command-station {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(7, 11, 20, 0.98) 100%);
-  border: 1.5px solid var(--bg-panel-border);
-  border-radius: 16px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 10px 16px 12px 16px;
-  box-shadow: var(--shadow-panel);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(7, 11, 20, 0.98) 100%);
+  border: 1.5px solid var(--bg-glass-border);
+  border-radius: 18px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 10px 20px 12px 20px;
+  box-shadow: var(--shadow-glass);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
   z-index: var(--z-station);
   position: relative;
 }
@@ -24,17 +24,16 @@
 .player-dashboard-plate {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 380px;
-  min-width: 320px;
-  max-width: 380px;
+  gap: 14px;
+  width: 420px;
+  min-width: 340px;
   flex-shrink: 0;
   position: relative;
 }
 
 .player-dashboard-avatar {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   border: 2.5px solid var(--gold-border);
   position: relative;
@@ -52,7 +51,7 @@
 .player-meta-info {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 }
@@ -64,29 +63,17 @@
 }
 
 .player-title-name {
-  font-size: 0.92rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: #fff;
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
 
-.my-turn-badge {
-  font-size: 0.65rem;
-  font-weight: 900;
-  background: linear-gradient(90deg, #d97706, #f59e0b);
-  color: #000;
-  padding: 2px 8px;
-  border-radius: 6px;
-  letter-spacing: 0.5px;
-  animation: pulse-turn-glow 1.5s infinite alternate;
-  white-space: nowrap;
-}
-
 .player-resource-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   width: 100%;
 }
 
@@ -97,72 +84,47 @@
   width: 100%;
 }
 
-.player-resource-row .res-pill {
-  flex: 1;
-  min-width: 0;
-  justify-content: flex-start;
-}
-
-.res-pill {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.65);
-  padding: 3px 6px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: 0.74rem;
-  white-space: nowrap;
+/* Human Active Intrigue Card on Table */
+.human-active-plot-card {
+  width: 72px;
+  aspect-ratio: 2 / 3;
+  border-radius: 8px;
+  border: 2px solid #eab308;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(234, 179, 8, 0.4);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
+  background: #090d16;
   flex-shrink: 0;
+  margin-left: 6px;
 }
 
-.res-pill.token-res {
-  border-color: rgba(56, 189, 248, 0.5);
-}
-
-.res-pill.crown-res {
-  border-color: rgba(245, 158, 11, 0.5);
-  color: var(--gold-light);
-}
-
-.res-pill.gold-res {
-  border-color: rgba(251, 191, 36, 0.5);
-  color: #fbbf24;
-}
-
-.res-pill.seal-res {
-  border-color: rgba(192, 132, 252, 0.5);
-  color: #e9d5ff;
-}
-
-.res-val {
-  font-weight: 800;
-}
-
-.res-label {
-  font-size: 0.62rem;
-  color: var(--text-muted);
+.human-active-plot-card:hover {
+  transform: translateY(-4px) scale(1.1);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.95), 0 0 22px rgba(250, 204, 21, 0.85);
+  border-color: #fef08a;
 }
 
 /* ==========================================================================
-   CENTER: LARGE INTERACTIVE DESKTOP TAROT CARDS
+   CENTER: TWO CENTRAL HERO HAND CARDS (2:3 STRICT ASPECT RATIO)
    ========================================================================== */
 .player-hand-desktop {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  width: 330px;
-  min-width: 330px;
-  max-width: 340px;
+  gap: 18px;
+  width: 360px;
+  min-width: 340px;
+  max-width: 380px;
   flex-shrink: 0;
   position: relative;
 }
 
 .desktop-tarot-card {
-  width: 148px;
-  height: 222px;
-  border-radius: 12px;
+  width: 154px;
+  aspect-ratio: 2 / 3;
+  border-radius: 14px;
   border: 2px solid var(--gold-border);
   box-shadow: var(--shadow-card);
   position: relative;
@@ -195,7 +157,7 @@
 .desktop-tarot-card.is-selected {
   border-color: var(--gold-light);
   box-shadow: 0 0 35px rgba(253, 224, 71, 0.9);
-  transform: translateY(-12px) scale(1.04);
+  transform: translateY(-14px) scale(1.04);
 }
 
 .card-full-art-img {
@@ -204,14 +166,27 @@
   object-fit: cover;
   display: block;
   pointer-events: none;
-  border-radius: 10px;
+}
+
+.card-hint-badge {
+  position: absolute;
+  bottom: 8px;
+  background: rgba(239, 68, 68, 0.92);
+  color: #fff;
+  border: 1px solid #f87171;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+  letter-spacing: 0.5px;
 }
 
 /* Staked Hand Card Placeholder in Player Deck */
 .staked-hand-placeholder {
-  width: 105px;
-  height: 145px;
-  border-radius: 12px;
+  width: 154px;
+  aspect-ratio: 2 / 3;
+  border-radius: 14px;
   border: 2px dashed rgba(245, 158, 11, 0.6);
   background: rgba(245, 158, 11, 0.08);
   display: flex;
@@ -225,18 +200,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   text-align: center;
+  padding: 8px;
 }
 
-.mini-card-staked-slot {
-  width: 14px;
-  height: 20px;
-  border-radius: 3px;
-  border: 1px dashed rgba(245, 158, 11, 0.7);
-  background: rgba(245, 158, 11, 0.15);
-  position: relative;
-}
 
 /* ==========================================================================
    RIGHT: ACTION BUTTONS TOOLBAR
@@ -246,94 +214,8 @@
   flex-direction: column;
   justify-content: center;
   gap: 8px;
-  width: 250px;
-  min-width: 250px;
-  max-width: 250px;
+  width: 270px;
+  min-width: 260px;
+  max-width: 280px;
   flex-shrink: 0;
-}
-
-.action-deck-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.action-deck-btn {
-  border-radius: 10px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
-  border: 1.5px solid transparent;
-  user-select: none;
-}
-
-.action-deck-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
-}
-
-.action-deck-btn:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
-.action-deck-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  filter: grayscale(0.4);
-  transform: none !important;
-}
-
-.btn-blue {
-  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 60%, #0f172a 100%);
-  border-color: #3b82f6;
-  color: #fff;
-}
-
-.btn-gold {
-  background: linear-gradient(180deg, #d97706 0%, #b45309 60%, #451a03 100%);
-  border-color: #fbbf24;
-  color: #fff;
-}
-
-.btn-red {
-  background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 60%, #450a0a 100%);
-  border-color: #f87171;
-  color: #fff;
-}
-
-.btn-green {
-  background: linear-gradient(180deg, #15803d 0%, #166534 60%, #052e16 100%);
-  border-color: #22c55e;
-  color: #fff;
-}
-
-.action-deck-btn-title {
-  font-size: 0.82rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-deck-btn-sub {
-  font-size: 0.58rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 1px;
-}
-
-.hotkey-badge {
-  display: inline-block;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 0 4px;
-  font-size: 0.55rem;
-  color: var(--gold-light);
-  margin-left: 4px;
 }

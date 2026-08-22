@@ -21,6 +21,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+
 html,
 body {
   background-color: var(--bg-dark);

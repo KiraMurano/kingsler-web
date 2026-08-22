@@ -1,7 +1,13 @@
+import React from 'react';
 import { useGameStore } from '../engine/GameStore';
 import { CARD_INFO } from '../engine/cards';
+import { CARD_DESCRIPTIONS, type GameCard } from '../data/cardDescriptions';
 
-export function StakedCardArena() {
+interface StakedCardArenaProps {
+  onInspectCard?: (card: GameCard) => void;
+}
+
+export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard }) => {
   const { 
     players, 
     activePlayerId,
@@ -93,21 +99,28 @@ export function StakedCardArena() {
     return null;
   }
 
-  const claimedRole = pendingAction?.roleClaim || pendingAction?.name || '';
+  const claimedRole = (pendingAction?.roleClaim || pendingAction?.name || '') as GameCard;
   const roleInfo = pendingAction?.roleClaim ? CARD_INFO[pendingAction.roleClaim] : null;
+
+  const handleInspectCard = (cardName?: string) => {
+    if (!cardName || !onInspectCard) return;
+    if (CARD_DESCRIPTIONS[cardName as GameCard]) {
+      onInspectCard(cardName as GameCard);
+    }
+  };
 
   // 1. DUEL CLASH ARENA VIEW (Attacker vs Defender cards side-by-side in center)
   if (isDuelAttackerWindow || isDuelOutcome || isDuelFlight) {
     const defender = target;
-    const defenderRole = pendingDuelDefenderRoleClaim || duelOutcome?.defenderClaim || 'Казначей';
+    const defenderRole = (pendingDuelDefenderRoleClaim || duelOutcome?.defenderClaim || 'Казначей') as GameCard;
     const defenderInfo = CARD_INFO[defenderRole];
     const isFlippedDuel = !!isDuelOutcome || (isDuelFlight && (cardFlightEvent?.attackerFlight === 'to_discard' || cardFlightEvent?.defenderFlight === 'to_discard'));
 
-    const attackerTrueRole = duelOutcome?.attackerRevealedRole || cardFlightEvent?.attackerRevealedRole || pendingAction?.roleClaim;
+    const attackerTrueRole = (duelOutcome?.attackerRevealedRole || cardFlightEvent?.attackerRevealedRole || pendingAction?.roleClaim) as GameCard;
     const attackerTrueInfo = attackerTrueRole ? CARD_INFO[attackerTrueRole] : roleInfo;
     const attackerWasTruth = duelOutcome ? duelOutcome.attackerWasTruth : (cardFlightEvent?.attackerWasTruth ?? false);
 
-    const defenderTrueRole = duelOutcome?.defenderRevealedRole || cardFlightEvent?.defenderRevealedRole || defenderRole;
+    const defenderTrueRole = (duelOutcome?.defenderRevealedRole || cardFlightEvent?.defenderRevealedRole || defenderRole) as GameCard;
     const defenderTrueInfo = defenderTrueRole ? CARD_INFO[defenderTrueRole] : defenderInfo;
     const defenderWasTruth = duelOutcome ? duelOutcome.defenderWasTruth : (cardFlightEvent?.defenderWasTruth ?? false);
 
@@ -116,7 +129,12 @@ export function StakedCardArena() {
         {(!hasCardDeparted || isDuelFlight) && (
           <div className="duel-clash-arena">
             {/* Attacker Card 3D Flip */}
-            <div className={`duel-combatant-wrapper ${attackerDuelFlightClass}`}>
+            <div 
+              className={`duel-combatant-wrapper ${attackerDuelFlightClass}`}
+              style={{ cursor: onInspectCard ? 'pointer' : 'default' }}
+              onClick={() => handleInspectCard(attackerTrueRole || pendingAction?.roleClaim)}
+              title="Нажмите, чтобы открыть описание карты атаки"
+            >
               <span className="combatant-tag cinzel-font">
                 {actor?.name} (Атака)
               </span>
@@ -167,7 +185,12 @@ export function StakedCardArena() {
             <div className="duel-swords-icon">⚔️</div>
 
             {/* Defender Card 3D Flip */}
-            <div className={`duel-combatant-wrapper ${defenderDuelFlightClass}`}>
+            <div 
+              className={`duel-combatant-wrapper ${defenderDuelFlightClass}`}
+              style={{ cursor: onInspectCard ? 'pointer' : 'default' }}
+              onClick={() => handleInspectCard(defenderTrueRole || defenderRole)}
+              title="Нажмите, чтобы открыть описание карты защиты"
+            >
               <span className="combatant-tag cinzel-font">
                 {defender?.name} (Защита)
               </span>
@@ -236,13 +259,15 @@ export function StakedCardArena() {
 
   // 2. STANDARD STAKED CARD ARENA (Single Card in Center)
   const isFlipped = !!revealOutcome || (isSingleFlight && cardFlightEvent?.flightType === 'to_discard');
-  const revealedRole = revealOutcome 
+  const revealedRole = (revealOutcome 
     ? revealOutcome.revealedRole 
-    : (cardFlightEvent?.revealedRole || cardFlightEvent?.roleClaim || pendingAction?.roleClaim);
+    : (cardFlightEvent?.revealedRole || cardFlightEvent?.roleClaim || pendingAction?.roleClaim)) as GameCard;
   const wasTruth = revealOutcome 
     ? revealOutcome.wasTruth 
     : (cardFlightEvent?.wasTruth ?? false);
   const revealedInfo = revealedRole ? CARD_INFO[revealedRole] : roleInfo;
+
+  const inspectableCard = (revealedRole || claimedRole) as GameCard;
 
   let phaseTitle = 'КАРТА НА КОНУ';
   let phaseDesc = pendingAction?.description || 'Двор обдумывает сомнения...';
@@ -262,7 +287,12 @@ export function StakedCardArena() {
   return (
     <div className="staked-arena-center">
       {(!hasCardDeparted || isSingleFlight) && (
-        <div className={`staked-card-pedestal ${singleFlightClass}`}>
+        <div 
+          className={`staked-card-pedestal ${singleFlightClass}`}
+          style={{ cursor: onInspectCard && CARD_DESCRIPTIONS[inspectableCard] ? 'pointer' : 'default' }}
+          onClick={() => handleInspectCard(inspectableCard)}
+          title="Нажмите, чтобы открыть подробное описание карты"
+        >
           {/* 3D Flipping Card */}
           <div className={`staked-card-3d-wrap ${isFlipped ? 'flipped' : ''}`}>
             <div className="staked-card-inner">
@@ -318,8 +348,11 @@ export function StakedCardArena() {
           style={{
             borderColor: isRevealOutcome 
               ? (revealOutcome?.wasTruth ? '#22c55e' : '#ef4444')
-              : 'rgba(245, 158, 11, 0.4)'
+              : 'rgba(245, 158, 11, 0.4)',
+            cursor: onInspectCard && CARD_DESCRIPTIONS[inspectableCard] ? 'pointer' : 'default'
           }}
+          onClick={() => handleInspectCard(inspectableCard)}
+          title="Нажмите, чтобы открыть подробное описание карты"
         >
           <div 
             className="action-phase-tag"
@@ -342,4 +375,4 @@ export function StakedCardArena() {
       )}
     </div>
   );
-}
+};

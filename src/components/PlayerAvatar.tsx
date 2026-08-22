@@ -1,21 +1,26 @@
-import type { Player } from '../engine/types';
+import React from 'react';
+import type { Player, GameCard } from '../engine/types';
 import { useGameStore } from '../engine/GameStore';
+import { CARD_DESCRIPTIONS } from '../data/cardDescriptions';
+import { Badge } from './ui/Badge';
 
 interface PlayerAvatarProps {
   player: Player;
   isActive: boolean;
   isTargetable?: boolean;
   onTarget?: () => void;
+  onInspectCard?: (card: GameCard) => void;
   style?: React.CSSProperties;
 }
 
-export function PlayerAvatar({ 
+export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({ 
   player, 
   isActive, 
   isTargetable, 
-  onTarget, 
+  onTarget,
+  onInspectCard,
   style 
-}: PlayerAvatarProps) {
+}) => {
   const { 
     pendingAction, 
     turnPhase, 
@@ -44,9 +49,9 @@ export function PlayerAvatar({
           speechText = `«Заявляю: ${pendingAction.roleClaim}!»`;
         }
       } else if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === player.id) {
-        speechText = `«Меня атакуют! Что делать?..»`;
+        speechText = `«Меня атакуют! Защищаюсь!»`;
       } else if (turnPhase === 'DUEL_ATTACKER_WINDOW' && pendingAction?.actorId === player.id) {
-        speechText = `«Мне бросили вызов на Дуэль!»`;
+        speechText = `«Вызов на Дуэль принят!»`;
       } else if (turnPhase === 'REVEAL_OUTCOME' && revealOutcome?.accuserId === player.id) {
         speechText = `«Не верю! Проверяю!»`;
       } else if (turnPhase === 'DUEL_OUTCOME' && duelOutcome && (duelOutcome.attackerId === player.id || duelOutcome.defenderId === player.id)) {
@@ -55,12 +60,13 @@ export function PlayerAvatar({
     }
   }
 
-  // Check if this player currently has a card staked on the table
   const hasCardStakedOnTable = pendingAction && pendingAction.type === 'role' && pendingAction.actorId === player.id && turnPhase !== 'IDLE';
 
   const targetPlayer = player.activePlot?.targetPlayerId 
     ? players.find(p => p.id === player.activePlot?.targetPlayerId) 
     : null;
+
+  const activePlotInfo = player.activePlot ? CARD_DESCRIPTIONS[player.activePlot.type] : null;
 
   return (
     <div 
@@ -108,75 +114,25 @@ export function PlayerAvatar({
 
       {/* Info Plate below avatar */}
       <div className="bot-info-plate">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           <span className="bot-name-text">{player.name}</span>
+          
           {/* Action Tokens Badge */}
-          <span 
-            style={{ 
-              fontSize: '0.65rem', 
-              color: player.actionTokens > 0 ? '#38bdf8' : '#64748b', 
-              fontWeight: 800,
-              background: player.actionTokens > 0 ? 'rgba(2, 132, 199, 0.2)' : 'rgba(30, 41, 59, 0.4)',
-              padding: '0 4px',
-              borderRadius: '4px',
-              border: `1px solid ${player.actionTokens > 0 ? '#0284c7' : '#334155'}`
-            }}
+          <Badge 
+            variant={player.actionTokens > 0 ? 'sapphire' : 'ghost'} 
+            size="sm"
+            icon="⚡"
             title={`Жетоны действия: ${player.actionTokens}/2`}
           >
-            ⚡ {player.actionTokens}
-          </span>
+            {player.actionTokens}
+          </Badge>
         </div>
         
-        {player.archetype && (
-          <span 
-            className="bot-archetype-tag" 
-            title={`${player.archetype.title}: ${player.archetype.description}`}
-          >
-            {player.archetype.badge} {player.archetype.title}
-          </span>
-        )}
-
-        {/* Active Plot Badge if bot has one on the table */}
-        {player.activePlot && (
-          <div 
-            style={{
-              fontSize: '0.6rem',
-              fontWeight: 800,
-              background: 'linear-gradient(90deg, #ca8a04, #eab308)',
-              color: '#000',
-              padding: '1px 6px',
-              borderRadius: '4px',
-              marginTop: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '3px',
-              boxShadow: '0 0 6px rgba(234, 179, 8, 0.4)'
-            }}
-            title={`Активная Интрига: ${player.activePlot.type}`}
-          >
-            <span>🎴</span>
-            <span>{player.activePlot.type}</span>
-            {player.activePlot.charges !== undefined && (
-              <span>({player.activePlot.charges}{player.activePlot.type === 'Тайный заговор' ? '/4' : ''})</span>
-            )}
-            {targetPlayer && <span>→ {targetPlayer.name}</span>}
-          </div>
-        )}
-
-        {/* Stats: Crowns & Gold */}
+        {/* Stats Strip: Crowns & Gold & Seals */}
         <div className="bot-stats-strip">
-          <span style={{ color: 'var(--gold-light)' }} title="Короны влияния (цель: 6)">👑 {player.favor}</span>
-          <span style={{ color: '#fbbf24' }} title="Золотые монеты">🪙 {player.gold}</span>
-        </div>
-
-        {/* Royal Seals (⚜️ 0/2) */}
-        <div className="bot-seals-strip" title="Королевские печати (2 ⚜️ = 1 👑)">
-          <span style={{ fontSize: '0.66rem', color: '#c084fc', fontWeight: 800 }}>⚜️ {player.seals}/2</span>
-          <div className="seal-indicators" style={{ display: 'inline-flex', gap: '2px', marginLeft: '4px' }}>
-            <span style={{ opacity: player.seals >= 1 ? 1 : 0.25, fontSize: '0.7rem' }}>⚜️</span>
-            <span style={{ opacity: player.seals >= 2 ? 1 : 0.25, fontSize: '0.7rem' }}>⚜️</span>
-          </div>
+          <Badge variant="gold" size="sm" icon="👑" title="Короны влияния">{player.favor}</Badge>
+          <Badge variant="amber" size="sm" icon="🪙" title="Золотые монеты">{player.gold}</Badge>
+          <Badge variant="purple" size="sm" icon="⚜️" title="Королевские печати">{player.seals}</Badge>
         </div>
 
         {/* In-Hand Cards Indicator */}
@@ -194,6 +150,47 @@ export function PlayerAvatar({
           )}
         </div>
       </div>
+
+      {/* ACTIVE INTRIGUE CARD ON TABLE (Played physically on table in front of bot) */}
+      {player.activePlot && activePlotInfo && (
+        <div 
+          className="table-active-plot-card"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onInspectCard) onInspectCard(player.activePlot!.type);
+          }}
+          title={`Активная интрига: ${player.activePlot.type}. Нажмите для описания.`}
+        >
+          <div className="table-plot-card-inner">
+            <img 
+              src={activePlotInfo.artImage} 
+              alt={activePlotInfo.name} 
+              className="table-plot-card-img" 
+            />
+            
+            {/* Status / Charge Overlays */}
+            <div className="table-plot-card-overlay">
+              <span className="table-plot-card-title">{activePlotInfo.name}</span>
+              
+              {player.activePlot.charges !== undefined && (
+                <div style={{ marginTop: '2px' }}>
+                  <Badge variant="purple" size="sm" icon="⚡">
+                    {player.activePlot.charges} {player.activePlot.type === 'Тайный заговор' ? '/ 4' : ''}
+                  </Badge>
+                </div>
+              )}
+
+              {targetPlayer && (
+                <div style={{ marginTop: '2px' }}>
+                  <Badge variant="destructive" size="sm" icon="🎯">
+                    {targetPlayer.name}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};

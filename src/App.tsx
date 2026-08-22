@@ -8,9 +8,18 @@ import { ActionControls } from './components/ActionControls';
 import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
+import { CardDetailModal } from './components/CardDetailModal';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
-import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, TOTAL_DECK_SIZE } from './engine/cards';
+import { Button } from './components/ui/Button';
+import { Badge } from './components/ui/Badge';
+import { 
+  ALL_ROLES, 
+  ALL_PLOTS, 
+  ALL_INSTANTS 
+} from './data/cardDescriptions';
+import { TOTAL_DECK_SIZE } from './engine/cards';
+
 import type { Role, PlotType, InstantType, GameCard } from './engine/types';
 
 // Start intelligent bot engine once
@@ -23,6 +32,8 @@ export default function App() {
     turnPhase,
     pendingAction,
     coronationCandidateId,
+    deck,
+    history,
     startGame, 
     restartGame,
     performAction,
@@ -41,6 +52,9 @@ export default function App() {
   const [showNormalModal, setShowNormalModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showChronicleSheet, setShowChronicleSheet] = useState(false);
+  const [showCodexSheet, setShowCodexSheet] = useState(false);
+  const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isVaBanqueComboLaunch, setIsVaBanqueComboLaunch] = useState(false);
   
@@ -105,7 +119,7 @@ export default function App() {
     setPendingTargetAction(null);
   };
 
-  // Click on a Card in player's hand to stake it or trigger direct instant
+  // Click on a Card in player's hand
   const handleCardClick = (card: GameCard, cardIndex: number) => {
     if (!human) return;
 
@@ -144,7 +158,7 @@ export default function App() {
     showToast(`Сейчас ход придворного: ${active?.name || 'другого игрока'}`);
   };
 
-  // Keyboard Shortcuts Listener for Desktop Experience
+  // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -153,13 +167,16 @@ export default function App() {
         setShowNormalModal(false);
         setShowRoleModal(false);
         setShowRulesModal(false);
+        setShowChronicleSheet(false);
+        setShowCodexSheet(false);
+        setInspectedCard(null);
         setPendingTargetAction(null);
         setRedirectModalCardIndex(null);
         return;
       }
 
       // 1. Idle turn hotkeys
-      if (isMyTurn && !showNormalModal && !showRoleModal && !pendingTargetAction) {
+      if (isMyTurn && !showNormalModal && !showRoleModal && !pendingTargetAction && !showChronicleSheet && !showCodexSheet) {
         if (e.key === '1') {
           setShowNormalModal(true);
         } else if (e.key === '2') {
@@ -210,6 +227,8 @@ export default function App() {
     showNormalModal, 
     showRoleModal, 
     pendingTargetAction, 
+    showChronicleSheet,
+    showCodexSheet,
     turnPhase, 
     pendingAction, 
     human,
@@ -273,7 +292,9 @@ export default function App() {
           <span className="brand-crest">👑</span>
           <div>
             <div className="brand-title cinzel-font gold-gradient-text">KINGLIER</div>
-            <div className="brand-subtitle">{TOTAL_DECK_SIZE} Карт • {ALL_ROLES.length} Ролей • {ALL_PLOTS.length} Интриг • {ALL_INSTANTS.length} Инстантов • 2 ⚡ Жетона</div>
+            <div className="brand-subtitle">
+              {TOTAL_DECK_SIZE} Карт • {ALL_ROLES.length} Ролей • {ALL_PLOTS.length} Интриг • {ALL_INSTANTS.length} Инстантов
+            </div>
           </div>
         </div>
 
@@ -289,8 +310,9 @@ export default function App() {
           </span>
         </div>
 
-        {/* Right Actions & Coronation Goal Tracker */}
+        {/* Right Actions & Navigation Buttons */}
         <div className="nav-actions">
+          {/* Coronation Goal Tracker */}
           <div className="coronation-status-banner cinzel-font">
             <div className="coronation-goal-text">
               <span>ЦЕЛЬ: 6 👑</span>
@@ -307,115 +329,167 @@ export default function App() {
             </div>
           </div>
 
-          <button 
-            className="nav-pill-btn"
+          {/* Button: Chronicle (Летопись) */}
+          <Button
+            variant={showChronicleSheet ? 'gold' : 'secondary'}
+            size="sm"
+            onClick={() => setShowChronicleSheet(true)}
+            title="Открыть летопись дворцовых событий"
+          >
+            <span>📜 Летопись</span>
+            <Badge variant="gold" size="sm">{history.length}</Badge>
+          </Button>
+
+          {/* Button: Codex (Кодекс) */}
+          <Button
+            variant={showCodexSheet ? 'gold' : 'secondary'}
+            size="sm"
+            onClick={() => setShowCodexSheet(true)}
+            title="Открыть кодекс всех карт и колоду"
+          >
+            <span>📖 Кодекс</span>
+            <Badge variant="sapphire" size="sm">🂠 {deck.length}</Badge>
+          </Button>
+
+          {/* Button: Rules */}
+          <Button 
+            variant="ghost"
+            size="sm"
             onClick={() => setShowRulesModal(true)}
+            title="Открыть свод правил игры"
           >
-            <span>📖</span>
-            <span>Правила</span>
-          </button>
-          <button 
-            className="nav-pill-btn"
+            ⚖️ Правила
+          </Button>
+
+          {/* Button: New Game */}
+          <Button 
+            variant="ghost"
+            size="sm"
             onClick={restartGame}
+            title="Начать новую партию"
           >
-            <span>🔄</span>
-            <span>Новая партия</span>
-          </button>
+            🔄 Новая игра
+          </Button>
         </div>
       </header>
 
-      {/* 2. MASTER 3-COLUMN DESKTOP GRID */}
-      <div className="main-desktop-grid">
-        {/* Left Column: Royal Chronicle (Live Feed) */}
-        <Chronicle onOpenRules={() => setShowRulesModal(true)} />
+      {/* 2. FULL-STAGE ARENA (Center Focus on Royal Table & Player Heroes) */}
+      <main className="main-full-stage">
+        {/* Grand Oval Royal Table */}
+        <Table 
+          pendingTargetAction={pendingTargetAction}
+          onSelectTarget={handleConfirmTarget}
+          onCancelTarget={() => setPendingTargetAction(null)}
+          onInspectCard={(card) => setInspectedCard(card)}
+        />
 
-        {/* Center Column: Grand Oval Table & Player Command Deck */}
-        <main className="arena-center">
-          {/* Grand Oval Royal Table */}
-          <Table 
-            pendingTargetAction={pendingTargetAction}
-            onSelectTarget={handleConfirmTarget}
-            onCancelTarget={() => setPendingTargetAction(null)}
-          />
+        {/* Bottom Player Command Station */}
+        <footer className="player-command-station">
+          {/* Player Dashboard (Name, Crowns, Gold, Seals, Tokens, Active Plot) */}
+          {human && (
+            <PlayerStatusBar 
+              player={human}
+              isActive={activePlayerId === human.id}
+              onInspectCard={(card) => setInspectedCard(card)}
+            />
+          )}
 
-          {/* Bottom Player Command Station */}
-          <footer className="player-command-station">
-            {/* Player Dashboard (Name, Crowns, Gold, Seals, Tokens) */}
-            {human && (
-              <PlayerStatusBar 
-                player={human}
-                isActive={activePlayerId === human.id}
-              />
-            )}
-
-            {/* Large Interactive Desktop Hand Cards */}
-            {human && (
-              <div className="player-hand-desktop">
-                {/* Floating Role Claim Popup directly above hand cards */}
-                {showRoleModal && (
-                  <RoleClaimPopup 
-                    stakedCardIndex={selectedStakedCardIndex}
-                    initialWithVaBanque={isVaBanqueComboLaunch}
-                    onClose={() => {
-                      setShowRoleModal(false);
-                      setIsVaBanqueComboLaunch(false);
-                    }}
-                  />
-                )}
-
-                {human.hand.map((card, idx) => {
-                  const isStakedOnTable = pendingAction && pendingAction.type === 'role' && pendingAction.actorId === human.id && turnPhase !== 'IDLE' && (pendingAction.stakedCardIndex === idx);
-                  if (isStakedOnTable) {
-                    return (
-                      <div key={idx} className="staked-hand-placeholder" title="Эта карта сейчас находится на кону в центре стола">
-                        <div className="staked-placeholder-inner">
-                          <span style={{ fontSize: '1.4rem' }}>🂠</span>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fbbf24' }}>НА КОНУ</span>
-                          <span style={{ fontSize: '0.58rem', color: '#94a3b8' }}>«{pendingAction.roleClaim || card}»</span>
-                        </div>
-                      </div>
-                    );
-                  }
-                  const isTargetReaction = turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
-                  const isPlayable = isMyTurn || isTargetReaction;
-                  const hintText = isTargetReaction ? 'НА ДУЭЛЬ' : undefined;
-
-                  return (
-                    <Card 
-                      key={idx} 
-                      role={card} 
-                      isPlayable={isPlayable}
-                      hintText={hintText}
-                      isSelected={showRoleModal && selectedStakedCardIndex === idx}
-                      onClick={() => handleCardClick(card, idx)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Action Buttons Toolbar with Direct Floating Normal Actions Popup */}
-            <div style={{ position: 'relative' }}>
-              {showNormalModal && (
-                <NormalActionsPopup 
-                  onClose={() => setShowNormalModal(false)}
+          {/* Central Hero: Two Interactive Desktop Hand Cards */}
+          {human && (
+            <div className="player-hand-desktop">
+              {/* Floating Role Claim Popup directly above hand cards */}
+              {showRoleModal && (
+                <RoleClaimPopup 
+                  stakedCardIndex={selectedStakedCardIndex}
+                  initialWithVaBanque={isVaBanqueComboLaunch}
+                  onClose={() => {
+                    setShowRoleModal(false);
+                    setIsVaBanqueComboLaunch(false);
+                  }}
                 />
               )}
-              <ActionControls 
-                onOpenNormalActions={() => setShowNormalModal(true)}
-              />
+
+              {human.hand.map((card, idx) => {
+                const isStakedOnTable = pendingAction && pendingAction.type === 'role' && pendingAction.actorId === human.id && turnPhase !== 'IDLE' && (pendingAction.stakedCardIndex === idx);
+                if (isStakedOnTable) {
+                  return (
+                    <div 
+                      key={idx} 
+                      className="staked-hand-placeholder" 
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setInspectedCard((pendingAction.roleClaim || card) as GameCard)}
+                      title="Нажмите, чтобы открыть подробное описание заявленной карты"
+                    >
+                      <div className="staked-placeholder-inner">
+                        <span style={{ fontSize: '1.4rem' }}>🂠</span>
+                        <Badge variant="gold" size="sm">НА КОНУ</Badge>
+                        <span style={{ fontSize: '0.82rem', color: '#fef08a', marginTop: '2px', fontWeight: 800 }}>«{pendingAction.roleClaim || card}»</span>
+                      </div>
+                    </div>
+
+                  );
+                }
+                const isTargetReaction = turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
+                const isPlayable = isMyTurn || isTargetReaction;
+                const hintText = isTargetReaction ? 'НА ДУЭЛЬ' : undefined;
+
+                return (
+                  <Card 
+                    key={idx} 
+                    role={card} 
+                    isPlayable={isPlayable}
+                    hintText={hintText}
+                    isSelected={showRoleModal && selectedStakedCardIndex === idx}
+                    onClick={() => handleCardClick(card, idx)}
+                  />
+                );
+              })}
             </div>
-          </footer>
-        </main>
+          )}
 
-        {/* Right Column: Royal Codex (Roles Quick Guide & Rules) */}
-        <Codex 
-          onOpenRules={() => setShowRulesModal(true)} 
-          onRestart={restartGame} 
-        />
-      </div>
+          {/* Action Buttons Toolbar with Direct Floating Normal Actions Popup */}
+          <div style={{ position: 'relative' }}>
+            {showNormalModal && (
+              <NormalActionsPopup 
+                onClose={() => setShowNormalModal(false)}
+              />
+            )}
+            <ActionControls 
+              onOpenNormalActions={() => setShowNormalModal(true)}
+            />
+          </div>
+        </footer>
+      </main>
 
-      {/* 3. MODALS */}
+      {/* 3. SLIDE-OUT SHEETS (Chronicle and Codex) */}
+      <Chronicle 
+        open={showChronicleSheet}
+        onClose={() => setShowChronicleSheet(false)}
+        onOpenRules={() => {
+          setShowChronicleSheet(false);
+          setShowRulesModal(true);
+        }}
+      />
+
+      <Codex 
+        open={showCodexSheet}
+        onClose={() => setShowCodexSheet(false)}
+        onOpenRules={() => {
+          setShowCodexSheet(false);
+          setShowRulesModal(true);
+        }}
+        onSelectCardToInspect={(card) => {
+          setInspectedCard(card);
+        }}
+      />
+
+      {/* 4. CARD DETAIL INSPECTION MODAL */}
+      <CardDetailModal
+        card={inspectedCard}
+        onClose={() => setInspectedCard(null)}
+      />
+
+      {/* 5. GAME OUTCOME & ACTION MODALS */}
       <Modals 
         showRulesModal={showRulesModal}
         onCloseRulesModal={() => setShowRulesModal(false)}

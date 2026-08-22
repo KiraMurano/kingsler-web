@@ -10,7 +10,7 @@
   position: relative;
   overflow: hidden;
   background-image: 
-    radial-gradient(circle at 50% 35%, rgba(15, 23, 42, 0.65) 0%, rgba(2, 6, 23, 0.94) 100%),
+    radial-gradient(circle at 50% 35%, rgba(15, 23, 42, 0.65) 0%, rgba(2, 6, 23, 0.95) 100%),
     url('/assets/dark_rock.jpg');
   background-size: cover;
   background-position: center center;
@@ -25,12 +25,12 @@
   position: relative;
 }
 
-/* Ambient Dust / Particle Overlay */
+/* Ambient Particle / Glow Overlay */
 .ambient-glow-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 45%, rgba(59, 130, 246, 0.08) 0%, rgba(245, 158, 11, 0.04) 45%, transparent 70%);
+  background: radial-gradient(ellipse at 50% 45%, rgba(56, 189, 248, 0.05) 0%, rgba(245, 158, 11, 0.04) 45%, transparent 70%);
   z-index: var(--z-base);
 }
 
@@ -38,17 +38,17 @@
    TOP BAR (HERALDIC HEADER)
    ========================================================================== */
 .top-nav-desktop {
-  height: 54px;
+  height: 56px;
   background: linear-gradient(180deg, rgba(10, 15, 29, 0.95) 0%, rgba(15, 23, 42, 0.85) 100%);
-  border-bottom: 1.5px solid var(--bg-panel-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--bg-glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 20px;
   z-index: var(--z-header);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
 }
 
 .nav-brand {
@@ -58,21 +58,20 @@
 }
 
 .brand-crest {
-  font-size: 1.6rem;
+  font-size: 1.8rem;
   filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
 }
 
 .brand-title {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   font-weight: 900;
   letter-spacing: 2px;
 }
 
 .brand-subtitle {
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Center Dynamic Turn Stage Pill */
@@ -80,13 +79,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%);
+  background: radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.6) 0%, rgba(15, 23, 42, 0.9) 100%);
   border: 1.5px solid rgba(245, 158, 11, 0.45);
   padding: 6px 18px;
-  border-radius: 24px;
+  border-radius: 999px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(245, 158, 11, 0.15);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  max-width: 540px;
+  max-width: 580px;
 }
 
 .top-turn-stage-pill.final-round-active-banner {
@@ -97,16 +96,16 @@
 }
 
 .turn-pill-icon {
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 
 .turn-pill-divider {
   color: rgba(245, 158, 11, 0.6);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 
 .turn-banner-title {
-  font-size: 0.86rem;
+  font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.6px;
   color: var(--gold-light);
@@ -114,33 +113,30 @@
 }
 
 .turn-banner-desc {
-  font-size: 0.76rem;
+  font-size: 0.92rem;
   color: #bfdbfe;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Coronation Goal Tracker Badge */
+/* Coronation Goal Tracker */
 .coronation-status-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.5) 0%, rgba(15, 23, 42, 0.75) 100%);
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  padding: 5px 14px;
-  border-radius: 20px;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4), inset 0 0 8px rgba(245, 158, 11, 0.12);
+  padding: 4px 12px;
+  border-radius: 999px;
 }
 
 .coronation-goal-text {
-  font-size: 0.76rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: var(--gold-light);
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
+
 
 .crown-segments-track {
   display: flex;
@@ -148,16 +144,16 @@
 }
 
 .crown-segment {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.68rem;
+  transition: all 0.25s ease;
 }
 
 .crown-segment.filled {
@@ -170,50 +166,20 @@
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.nav-pill-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: var(--text-main);
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.nav-pill-btn:hover {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: var(--gold-light);
-  color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.25);
+  gap: 8px;
 }
 
 /* ==========================================================================
-   DESKTOP 3-COLUMN MAIN ARENA
+   FULL STAGE CENTER VIEW (TABLE + COMMAND DECK)
    ========================================================================== */
-.main-desktop-grid {
+.main-full-stage {
   flex: 1;
-  display: grid;
-  grid-template-columns: 310px 1fr 310px;
-  gap: 16px;
-  padding: 14px 18px;
-  height: calc(100vh - 54px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 20px 14px 20px;
+  height: calc(100vh - 56px);
   overflow: hidden;
-  z-index: var(--z-grid);
-}
-
-@media (max-width: 1360px) {
-  .main-desktop-grid {
-    grid-template-columns: 270px 1fr 270px;
-    gap: 12px;
-    padding: 10px 14px;
-  }
+  position: relative;
+  z-index: var(--z-table);
 }
