@@ -334,42 +334,44 @@ export function Modals({
 
     return (
       <div className="game-modal-overlay">
-        <div className="game-modal-content" style={{ maxWidth: '540px' }}>
+        <div className="game-modal-content" style={{ maxWidth: '500px' }}>
           <div className="modal-header-title cinzel-font">👁️ Тайный надзор Шпиона</div>
           <div style={{ fontSize: '0.84rem', color: '#cbd5e1', textAlign: 'center', marginBottom: '14px' }}>
             Вы тайно взглянули на обе карты игрока <strong style={{ color: 'var(--gold-light)' }}>{target?.name}</strong>. Вы получили стратегическую информацию для будущих проверок и споров:
           </div>
 
           {/* Target's 2 Cards View */}
-          <div style={{ display: 'grid', gridTemplateColumns: targetCards.length > 1 ? '1fr 1fr' : '1fr', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
             {targetCards.map((cardRole: GameCard, idx: number) => {
-              const info = CARD_INFO[cardRole] || { badge: '🂠', name: cardRole, shortDescription: '', gradient: '', borderColor: '#d97706' };
+              const info = CARD_INFO[cardRole] || CARD_INFO['Наследник'];
               return (
                 <div 
                   key={idx}
                   style={{
-                    background: info.gradient || 'linear-gradient(180deg, #1e293b, #0f172a)',
-                    border: `2px solid ${info.borderColor || '#fbbf24'}`,
-                    borderRadius: '14px',
-                    padding: '14px 10px',
-                    textAlign: 'center',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    alignItems: 'center',
+                    gap: '6px'
                   }}
                 >
-                  <div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--gold-light)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>
-                      Карта #{idx + 1} у {target?.name}
-                    </div>
-                    <div style={{ fontSize: '2.4rem', marginBottom: '4px' }}>{info.badge}</div>
-                    <div className="cinzel-font" style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--gold-light)' }}>
-                      {info.name}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#e2e8f0', marginTop: '6px', lineHeight: 1.25 }}>
-                      {info.shortDescription}
-                    </div>
+                  <div style={{ fontSize: '0.70rem', color: 'var(--gold-light)', fontWeight: 800, textTransform: 'uppercase' }}>
+                    Карта #{idx + 1}
+                  </div>
+                  <div 
+                    style={{
+                      width: '130px',
+                      height: '195px',
+                      borderRadius: '12px',
+                      border: `2px solid ${info.borderColor || '#fbbf24'}`,
+                      overflow: 'hidden',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.8)'
+                    }}
+                  >
+                    <img 
+                      src={info.artImage} 
+                      alt={info.name} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                    />
                   </div>
                 </div>
               );
@@ -398,7 +400,7 @@ export function Modals({
 
     return (
       <div className="game-modal-overlay">
-        <div className="game-modal-content" style={{ maxWidth: '440px', textAlign: 'center' }}>
+        <div className="game-modal-content" style={{ maxWidth: '420px', textAlign: 'center' }}>
           <div className="modal-header-title cinzel-font">👁️ Сеть информаторов перехватила карту!</div>
           <div style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '14px' }}>
             Ваши шпионы донесли: соперник <strong style={{ color: 'var(--gold-light)' }}>{target?.name}</strong> получил новую карту из колоды:
@@ -406,22 +408,20 @@ export function Modals({
 
           <div 
             style={{
-              background: info.gradient,
+              width: '140px',
+              height: '210px',
+              borderRadius: '12px',
               border: `2px solid ${info.borderColor}`,
-              borderRadius: '14px',
-              padding: '16px',
-              maxWidth: '220px',
+              overflow: 'hidden',
               margin: '0 auto 16px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
+              boxShadow: '0 8px 24px rgba(0,0,0,0.8)'
             }}
           >
-            <div style={{ fontSize: '2.5rem', marginBottom: '4px' }}>{info.badge}</div>
-            <div className="cinzel-font" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--gold-light)' }}>
-              {info.name}
-            </div>
-            <div style={{ fontSize: '0.74rem', color: '#e2e8f0', marginTop: '6px' }}>
-              {info.shortDescription}
-            </div>
+            <img 
+              src={info.artImage} 
+              alt={info.name} 
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+            />
           </div>
 
           <button

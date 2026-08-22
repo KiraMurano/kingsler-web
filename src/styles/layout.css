@@ -10,8 +10,8 @@
   position: relative;
   overflow: hidden;
   background-image: 
-    radial-gradient(circle at 50% 30%, rgba(15, 23, 42, 0.6) 0%, rgba(2, 6, 23, 0.95) 100%),
-    url('/bg/palace.jpg');
+    radial-gradient(circle at 50% 35%, rgba(15, 23, 42, 0.65) 0%, rgba(2, 6, 23, 0.94) 100%),
+    url('/assets/dark_rock.jpg');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;

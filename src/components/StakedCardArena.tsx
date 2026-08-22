@@ -125,32 +125,31 @@ export function StakedCardArena() {
                   {/* Face-down Tarot Card Back (No Text) */}
                   <div 
                     className="staked-card-face staked-card-clean-back"
-                    style={{ backgroundImage: 'url(/cards/card_back.jpg)' }}
+                    style={{ backgroundImage: 'url(/assets/cards/back-dual-face.png)' }}
                   />
 
                   {/* Face-up True Role Artwork */}
                   <div 
                     className="staked-card-face staked-card-front"
                     style={{
-                      background: attackerTrueInfo?.gradient || '#1e3a8a',
+                      backgroundImage: `url(${attackerTrueInfo?.artImage})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
                       borderColor: attackerWasTruth ? '#22c55e' : '#ef4444',
                       boxShadow: attackerWasTruth ? '0 0 35px #22c55e' : '0 0 35px #ef4444'
                     }}
                   >
-                    <div className="card-title-head cinzel-font" style={{ marginTop: '2px', fontSize: '0.72rem', lineHeight: '1.1' }}>
-                      {attackerTrueRole}
-                    </div>
-                    <div style={{ fontSize: '2.2rem', margin: '2px 0', lineHeight: 1 }}>
-                      {attackerTrueInfo?.badge}
-                    </div>
                     <div style={{
+                      position: 'absolute',
+                      bottom: '6px',
                       fontSize: '0.64rem',
                       fontWeight: 900,
                       padding: '2px 8px',
                       borderRadius: '4px',
                       background: attackerWasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
                       color: '#fff',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.8)'
                     }}>
                       {attackerWasTruth ? '✓ ПРАВДА' : '✗ БЛЕФ'}
                     </div>
@@ -177,32 +176,31 @@ export function StakedCardArena() {
                   {/* Face-down Tarot Card Back (No Text) */}
                   <div 
                     className="staked-card-face staked-card-clean-back"
-                    style={{ backgroundImage: 'url(/cards/card_back.jpg)' }}
+                    style={{ backgroundImage: 'url(/assets/cards/back-dual-face.png)' }}
                   />
 
                   {/* Face-up True Role Artwork */}
                   <div 
                     className="staked-card-face staked-card-front"
                     style={{
-                      background: defenderTrueInfo?.gradient || '#78350f',
+                      backgroundImage: `url(${defenderTrueInfo?.artImage})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
                       borderColor: defenderWasTruth ? '#22c55e' : '#ef4444',
                       boxShadow: defenderWasTruth ? '0 0 35px #22c55e' : '0 0 35px #ef4444'
                     }}
                   >
-                    <div className="card-title-head cinzel-font" style={{ marginTop: '2px', fontSize: '0.72rem', lineHeight: '1.1' }}>
-                      {defenderTrueRole}
-                    </div>
-                    <div style={{ fontSize: '2.2rem', margin: '2px 0', lineHeight: 1 }}>
-                      {defenderTrueInfo?.badge}
-                    </div>
                     <div style={{
+                      position: 'absolute',
+                      bottom: '6px',
                       fontSize: '0.64rem',
                       fontWeight: 900,
                       padding: '2px 8px',
                       borderRadius: '4px',
                       background: defenderWasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
                       color: '#fff',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.8)'
                     }}>
                       {defenderWasTruth ? '✓ ПРАВДА' : '✗ БЛЕФ'}
                     </div>
@@ -271,35 +269,32 @@ export function StakedCardArena() {
               {/* Front of Staked Card: Clean Luxury Card Back (NO text on face-down card) */}
               <div 
                 className="staked-card-face staked-card-clean-back"
-                style={{ backgroundImage: 'url(/cards/card_back.jpg)' }}
+                style={{ backgroundImage: 'url(/assets/cards/back-dual-face.png)' }}
               />
 
               {/* Back of Staked Card: Revealed True Card when flipped with glowing aura */}
               <div 
                 className="staked-card-face staked-card-front"
                 style={{
-                  background: revealedInfo?.gradient || '#1e3a8a',
+                  backgroundImage: `url(${revealedInfo?.artImage})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                   borderColor: wasTruth ? '#22c55e' : '#ef4444',
                   boxShadow: wasTruth ? '0 0 45px rgba(34, 197, 94, 0.9)' : '0 0 45px rgba(239, 68, 68, 0.9)'
                 }}
               >
-                <div className="card-title-head cinzel-font" style={{ marginTop: '2px', fontSize: '0.74rem', lineHeight: '1.1' }}>
-                  {revealedInfo?.name || revealedRole}
-                </div>
-
-                <div style={{ fontSize: '2.2rem', margin: '2px 0', lineHeight: 1 }}>
-                  {revealedInfo?.badge}
-                </div>
-
                 <div style={{
+                  position: 'absolute',
+                  bottom: '8px',
                   fontSize: '0.66rem',
                   fontWeight: 900,
-                  padding: '2px 8px',
+                  padding: '3px 10px',
                   borderRadius: '4px',
                   background: wasTruth ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)',
                   color: '#fff',
                   letterSpacing: '0.5px',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.8)'
                 }}>
                   {wasTruth ? '✨ ПРАВДА' : '🎭 БЛЕФ'}
                 </div>
