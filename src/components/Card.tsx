@@ -3,56 +3,31 @@ import type { GameCard } from '../engine/types';
 import { CARD_DESCRIPTIONS } from '../data/cardDescriptions';
 
 export interface CardProps {
-  role: GameCard;
+  card: GameCard;
   onClick?: () => void;
   isPlayable?: boolean;
   isSelected?: boolean;
-  hintText?: string;
-  className?: string;
-  style?: React.CSSProperties;
+  hint?: string;
 }
 
-export const Card: React.FC<CardProps> = ({ 
-  role, 
-  onClick, 
-  isPlayable, 
-  isSelected,
-  hintText,
-  className = '',
-  style
-}) => {
-  const info = CARD_DESCRIPTIONS[role] || CARD_DESCRIPTIONS['Наследник'];
+export const Card: React.FC<CardProps> = ({ card, onClick, isPlayable, isSelected, hint }) => {
+  const info = CARD_DESCRIPTIONS[card] ?? CARD_DESCRIPTIONS['Наследник'];
 
   return (
-    <div 
-      className={`desktop-tarot-card ${isPlayable ? 'is-playable' : ''} ${isSelected ? 'is-selected' : ''} ${className}`}
+    <div
+      className={[
+        'handcard',
+        `cardframe cardframe--${info.category}`,
+        isPlayable ? 'handcard--playable' : 'handcard--idle',
+        isSelected ? 'handcard--selected' : ''
+      ]
+        .filter(Boolean)
+        .join(' ')}
       onClick={onClick}
-      style={{
-        aspectRatio: '2 / 3',
-        borderColor: isSelected 
-          ? 'var(--gold-light)' 
-          : isPlayable 
-            ? info.borderColor 
-            : 'rgba(217, 119, 6, 0.4)',
-        boxShadow: isSelected 
-          ? '0 0 35px rgba(253, 224, 71, 0.9), 0 12px 30px rgba(0,0,0,0.9)' 
-          : undefined,
-        ...style
-      }}
-      title={`«${role}» — ${info.shortDescription}`}
+      title={`«${info.name}» — ${info.shortDescription}`}
     >
-      <img 
-        src={info.artImage} 
-        alt={info.name} 
-        className="card-full-art-img"
-        loading="eager"
-      />
-
-      {hintText && (
-        <div className="card-hint-badge cinzel-font">
-          {hintText}
-        </div>
-      )}
+      <img className="handcard__art" src={info.artImage} alt={info.name} loading="eager" />
+      {hint && <span className="handcard__hint">{hint}</span>}
     </div>
   );
 };

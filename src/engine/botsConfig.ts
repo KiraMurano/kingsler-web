@@ -9,11 +9,10 @@ export interface BotCandidate {
 export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   {
     name: 'Барон Дима',
-    avatar: '🧔',
+    avatar: '/avatars/sasha.jpg',
     archetype: {
       type: 'gambler',
       title: 'Азартный игрок',
-      badge: '🎲',
       description: 'Часто рискует и блефует. Удваивает ставки.',
       bluffRate: 0.52,
       doubtAggression: 1.15,
@@ -24,11 +23,10 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Графиня Елена',
-    avatar: '👩‍🦰',
+    avatar: '/avatars/bot2.jpg',
     archetype: {
       type: 'cautious',
       title: 'Осторожный стратег',
-      badge: '🛡️',
       description: 'Редко блефует. Проверяет только при высокой уверенности.',
       bluffRate: 0.15,
       doubtAggression: 0.70,
@@ -39,11 +37,10 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Герцог Виктор',
-    avatar: '👨‍🦳',
+    avatar: '/avatars/bot1.jpg',
     archetype: {
       type: 'pragmatic',
       title: 'Прагматик',
-      badge: '⚖️',
       description: 'Атакует только лидеров. Оценивает шансы математически.',
       bluffRate: 0.30,
       doubtAggression: 1.00,
@@ -54,11 +51,10 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Маркиз Вадим',
-    avatar: '👱‍♂️',
+    avatar: '/avatars/bot3.jpg',
     archetype: {
       type: 'provocateur',
       title: 'Провокатор',
-      badge: '🎭',
       description: 'Ставит ловушки Шутом, плетет Интриги и провоцирует соперников.',
       bluffRate: 0.48,
       doubtAggression: 1.20,
@@ -69,11 +65,10 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Княгиня Анна',
-    avatar: '👸',
+    avatar: '/avatars/masha.jpg',
     archetype: {
       type: 'opportunist',
       title: 'Оппортунист',
-      badge: '🗡️',
       description: 'Крадет ресурсы в самый уязвимый момент.',
       bluffRate: 0.38,
       doubtAggression: 1.05,
@@ -100,7 +95,6 @@ export function getBotArchetype(botOrId: Player | string): BotArchetype {
   return BOT_ARCHETYPES[id] || {
     type: 'pragmatic',
     title: 'Придворный',
-    badge: '👑',
     description: 'Обычный придворный.',
     bluffRate: 0.35,
     doubtAggression: 1.0,

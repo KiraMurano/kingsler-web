@@ -41,7 +41,7 @@ export function makeBotMove(botId: string): void {
       if (rumorTarget) {
         useGameStore.getState().performAction({
           type: 'normal',
-          name: '📜 Распустить слух',
+          name: 'Распустить слух',
           actorId: bot.id,
           targetId: rumorTarget.id,
           costGold: 5,
@@ -57,7 +57,7 @@ export function makeBotMove(botId: string): void {
     if (bot.favor < 5 && bot.gold >= 3 && Math.random() < feastChance) {
       useGameStore.getState().performAction({
         type: 'normal',
-        name: '🍷 Устроить пир',
+        name: 'Устроить пир',
         actorId: bot.id,
         costGold: 3,
         costTokens: 1,
@@ -72,7 +72,7 @@ export function makeBotMove(botId: string): void {
       if (rumorTarget) {
         useGameStore.getState().performAction({
           type: 'normal',
-          name: '📜 Распустить слух',
+          name: 'Распустить слух',
           actorId: bot.id,
           targetId: rumorTarget.id,
           costGold: 5,
@@ -87,7 +87,7 @@ export function makeBotMove(botId: string): void {
     if (bot.gold < 1 && Math.random() < 0.35) {
       useGameStore.getState().performAction({
         type: 'normal',
-        name: '🪙 Просить содержание',
+        name: 'Просить содержание',
         actorId: bot.id,
         costGold: 0,
         costTokens: 1,
@@ -106,7 +106,7 @@ export function makeBotMove(botId: string): void {
       if (badIndices.length > 0) {
         useGameStore.getState().performAction({
           type: 'normal',
-          name: badIndices.length >= 2 ? '🔄 Сменить 2 карты' : '🔄 Сменить карту',
+          name: badIndices.length >= 2 ? 'Сменить 2 карты' : 'Сменить карту',
           actorId: bot.id,
           stakedCardIndex: badIndices[0],
           stakedCardIndices: badIndices,

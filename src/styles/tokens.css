@@ -1,0 +1,227 @@
+/* ==========================================================================
+   КИНГСЛЕР — design tokens, reset, typography
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Vinque Rg';
+  src: url('/assets/Vinque Rg.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Ink surfaces */
+  --ink-abyss: #05070c;
+  --ink-900: #080b12;
+  --ink-800: #0c1019;
+  --ink-700: #121824;
+  --ink-600: #1a2130;
+  --ink-500: #232c3e;
+
+  --surface: rgba(12, 16, 25, 0.88);
+  --surface-raised: rgba(20, 26, 38, 0.92);
+  --surface-sunken: rgba(5, 7, 12, 0.55);
+
+  /* Hairlines & gilding */
+  --line: rgba(200, 160, 74, 0.14);
+  --line-mid: rgba(200, 160, 74, 0.28);
+  --line-strong: rgba(200, 160, 74, 0.55);
+  --line-cold: rgba(255, 255, 255, 0.07);
+
+  --gold: #c8a04a;
+  --gold-bright: #e8c877;
+  --gold-pale: #f4e8c8;
+  --gold-deep: #6d5217;
+
+  /* Accents (used sparingly) */
+  --crimson: #b4405a;
+  --crimson-soft: #e08a9c;
+  --sage: #5b9a86;
+  --sage-soft: #9ad3c1;
+  --steel: #5f83ae;
+  --steel-soft: #a9c6e6;
+  --violet: #8b72c4;
+  --violet-soft: #c7b6ef;
+
+  /* Type */
+  --text: #e9e5db;
+  --text-soft: #b6b3ab;
+  --text-muted: #8b8f9c;
+  --text-dim: #626878;
+
+  --font-display: 'Vinque Rg', Georgia, serif;
+  --font-ui: 'Vinque Rg', Georgia, serif;
+
+  /* Elevation */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.75);
+  --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.7);
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  /* Layers */
+  --z-stage: 10;
+  --z-float: 40;
+  --z-header: 60;
+  --z-backdrop: 800;
+  --z-sheet: 900;
+  --z-dialog: 1000;
+  --z-toast: 1200;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--ink-abyss);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  user-select: none;
+  -webkit-user-select: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+img {
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Typography helpers
+   -------------------------------------------------------------------------- */
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.eyebrow {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.gilded {
+  background: linear-gradient(180deg, #f6ecd0 0%, #e2c37c 45%, #c8a04a 72%, #8a6a24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbars
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(200, 160, 74, 0.22);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 160, 74, 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   Resource chips — the ONLY place emoji is allowed
+   -------------------------------------------------------------------------- */
+.res {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 0 7px 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-cold);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.res__i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1em;
+  font-size: 0.9em;
+  line-height: 1;
+  filter: saturate(0.85);
+}
+
+.res--crown {
+  color: var(--gold-pale);
+  border-color: rgba(200, 160, 74, 0.3);
+  background: rgba(200, 160, 74, 0.1);
+}
+
+.res--gold {
+  color: #ecd9a8;
+  border-color: rgba(200, 160, 74, 0.2);
+}
+
+.res--seal {
+  color: var(--violet-soft);
+  border-color: rgba(139, 114, 196, 0.28);
+  gap: 1px;
+}
+
+.res--act {
+  color: var(--steel-soft);
+  border-color: rgba(95, 131, 174, 0.32);
+}
+
+.res--empty {
+  color: var(--text-dim);
+  border-color: var(--line-cold);
+  background: transparent;
+}
+
+.res__i--off {
+  opacity: 0.28;
+  filter: grayscale(0.65);
+}
+
+.res--lg {
+  height: 26px;
+  font-size: 0.92rem;
+  padding: 0 11px 0 8px;
+}

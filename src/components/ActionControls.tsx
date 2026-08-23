@@ -1,38 +1,51 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
-import { CARD_DESCRIPTIONS } from '../data/cardDescriptions';
 import type { Role } from '../engine/types';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 
 interface ActionControlsProps {
   onOpenNormalActions: () => void;
 }
 
-export const ActionControls: React.FC<ActionControlsProps> = ({
-  onOpenNormalActions
-}) => {
-  const { 
-    players, 
-    activePlayerId, 
-    turnPhase, 
+const Panel: React.FC<{
+  title: string;
+  note?: React.ReactNode;
+  alert?: boolean;
+  children: React.ReactNode;
+}> = ({ title, note, alert, children }) => (
+  <div className={`actions ${alert ? 'actions--alert' : ''}`}>
+    <div className="actions__head">
+      <span className="actions__title">{title}</span>
+    </div>
+    {note && <div className="actions__note">{note}</div>}
+    <div className="actions__grid">{children}</div>
+  </div>
+);
+
+export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActions }) => {
+  const {
+    players,
+    activePlayerId,
+    turnPhase,
     turnSubPhase,
     hasUsedNormalActionThisTurn,
-    pendingAction, 
-    doubtAction, 
-    passDoubt, 
-    targetAcceptAttack, 
-    targetDoubtAttack, 
-    targetDeclareDuel, 
-    attackerRetreatDuel, 
-    attackerAcceptDuel, 
+    isVetoed,
+    pendingAction,
+    doubtAction,
+    passDoubt,
+    targetAcceptAttack,
+    targetDoubtAttack,
+    targetDeclareDuel,
+    attackerRetreatDuel,
+    attackerAcceptDuel,
     playInstant,
-    skipNormalActionPhase,
-    endTurnManually 
+    proceedAfterVetoWindow,
+    openConspiracyDialog,
+    endTurnManually
   } = useGameStore();
 
-  const [selectingDuelCard, setSelectingDuelCard] = useState(false);
-  const [selectingRedirectTarget, setSelectingRedirectTarget] = useState(false);
+  const [duelPicker, setDuelPicker] = useState(false);
+  const [redirectPicker, setRedirectPicker] = useState(false);
 
   const human = players.find(p => !p.isBot);
   if (!human) return null;
@@ -40,313 +53,256 @@ export const ActionControls: React.FC<ActionControlsProps> = ({
   const isMyTurn = activePlayerId === human.id && turnPhase === 'IDLE';
   const isActor = pendingAction?.actorId === human.id;
   const isTarget = pendingAction?.targetId === human.id;
-
   const hasTokens = human.actionTokens >= 1;
   const redirectIndex = human.hand.indexOf('Перенаправление');
 
-  // 1. TARGET REACTION WINDOW (Victim's exclusive decision)
-  if (turnPhase === 'TARGET_REACTION_WINDOW') {
-    const actor = players.find(p => p.id === pendingAction?.actorId);
-    const requiredRole: Role = pendingAction?.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-    const blockingRoleDeclined = pendingAction?.roleClaim === 'Вор' ? 'Казначеем' : 'Рыцарем';
+  /* 1. The victim of a targeted attack decides how to answer. */
+  if (turnPhase === 'TARGET_REACTION_WINDOW' && isTarget) {
+    const attacker = players.find(p => p.id === pendingAction?.actorId);
+    const shieldRole: Role = pendingAction?.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
 
-    if (isTarget) {
-      if (selectingRedirectTarget) {
-        const redirectTargets = players.filter(
-          p => p.id !== human.id && p.id !== actor?.id && (pendingAction?.roleClaim !== 'Шантажист' || p.favor > 0)
-        );
-        return (
-          <div className="player-actions-toolbar" style={{ gap: '6px' }}>
-            <div style={{ fontSize: '0.74rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
-              🔀 Выберите новую цель для атаки:
-            </div>
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {redirectTargets.map(t => (
-                <Button
-                  key={t.id}
-                  variant="gold"
-                  size="sm"
-                  onClick={() => {
-                    setSelectingRedirectTarget(false);
-                    playInstant(human.id, 'Перенаправление', redirectIndex, t.id);
-                  }}
-                >
-                  {t.name}
-                </Button>
-              ))}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectingRedirectTarget(false)}
-              >
-                ◀ Назад
-              </Button>
-            </div>
-          </div>
-        );
-      }
-
-      if (selectingDuelCard) {
-        return (
-          <div className="player-actions-toolbar" style={{ gap: '6px' }}>
-            <div style={{ fontSize: '0.74rem', color: '#fbbf24', fontWeight: 800, textAlign: 'center' }}>
-              🛡️ Выберите карту из руки на Дуэль (заявляется «{requiredRole}»):
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '6px' }}>
-              {human.hand.map((cardRole, idx) => {
-                const info = CARD_DESCRIPTIONS[cardRole];
-                const isTruth = cardRole === requiredRole;
-                return (
-                  <Button
-                    key={idx}
-                    variant={isTruth ? 'green' : 'gold'}
-                    size="sm"
-                    style={{
-                      padding: '6px 8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center'
-                    }}
-                    onClick={() => {
-                      setSelectingDuelCard(false);
-                      targetDeclareDuel(human.id, idx);
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '1.1rem' }}>{info?.badge}</span>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>{cardRole}</span>
-                    </div>
-                    <Badge variant={isTruth ? 'emerald' : 'amber'} size="sm">
-                      {isTruth ? 'ПРАВДА' : 'БЛЕФ'}
-                    </Badge>
-                  </Button>
-                );
-              })}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectingDuelCard(false)}
-                title="Вернуться к выбору действия"
-              >
-                ◀ Назад
-              </Button>
-            </div>
-          </div>
-        );
-      }
-
+    if (redirectPicker) {
+      const options = players.filter(
+        p =>
+          p.id !== human.id &&
+          p.id !== attacker?.id &&
+          (pendingAction?.roleClaim !== 'Шантажист' || p.favor > 0)
+      );
       return (
-        <div className="player-actions-toolbar">
-          <div style={{ fontSize: '0.74rem', color: '#fef08a', fontWeight: 800, textAlign: 'center', marginBottom: '2px' }}>
-            ⚔️ {actor?.name} атакует вас ролью «{pendingAction?.roleClaim}»!
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: redirectIndex !== -1 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '6px' }}>
-            {/* Option 1: Accept */}
-            <Button 
-              variant="blue"
-              size="sm"
-              subtext="Без спора • 0 ⚡"
+        <Panel title="Перенаправление" note="Переведите нападение на другого придворного." alert>
+          {options.map(p => (
+            <Button
+              key={p.id}
+              tone="gold"
+              block
               onClick={() => {
-                setSelectingDuelCard(false);
-                targetAcceptAttack(human.id);
+                setRedirectPicker(false);
+                playInstant(human.id, 'Перенаправление', redirectIndex, p.id);
               }}
             >
-              🏳️ Принять
+              {p.name}
             </Button>
-            
-            {/* Option 2: Doubt */}
-            <Button 
-              variant="red"
-              size="sm"
-              disabled={!hasTokens}
-              subtext={hasTokens ? 'Стоит 1 ⚡' : '0 ⚡ (закрыто)'}
-              onClick={() => {
-                setSelectingDuelCard(false);
-                targetDoubtAttack(human.id);
-              }}
-              title={hasTokens ? 'Проверить на блеф (стоит 1 ⚡)' : 'Недостаточно жетонов действия (0 ⚡)'}
-            >
-              ⚔️ Не верю!
-            </Button>
-
-            {/* Option 3: Duel */}
-            <Button 
-              variant="gold"
-              size="sm"
-              subtext={`Щит ${blockingRoleDeclined} • 0 ⚡`}
-              onClick={() => setSelectingDuelCard(true)}
-            >
-              🤺 Дуэль!
-            </Button>
-
-            {/* Option 4: Redirection Instant if held in hand */}
-            {redirectIndex !== -1 && (
-              <Button 
-                variant="purple"
-                size="sm"
-                subtext="Инстант • 0 ⚡"
-                onClick={() => setSelectingRedirectTarget(true)}
-              >
-                🔀 Перенаправить
-              </Button>
-            )}
-          </div>
-        </div>
+          ))}
+          <Button tone="bare" size="sm" block onClick={() => setRedirectPicker(false)}>
+            Назад
+          </Button>
+        </Panel>
       );
     }
-  }
 
-  // 2. DUEL ATTACKER WINDOW (Attacker's decision)
-  if (turnPhase === 'DUEL_ATTACKER_WINDOW') {
-    if (isActor) {
+    if (duelPicker) {
       return (
-        <div className="player-actions-toolbar">
-          <Button 
-            variant="red"
-            size="md"
-            hotkey="2"
-            subtext="Одновременное вскрытие карт"
-            onClick={() => attackerAcceptDuel(human.id)}
-          >
-            ⚔️ Принять дуэль!
+        <Panel
+          title="Выбор щита"
+          note={`Положите карту взакрытую и заявите «${shieldRole}».`}
+          alert
+        >
+          {human.hand.map((card, idx) => {
+            const truthful = card === shieldRole;
+            return (
+              <Button
+                key={idx}
+                tone={truthful ? 'good' : 'gold'}
+                block
+                sub={truthful ? 'Правда — щит настоящий' : 'Блеф — рискованно'}
+                onClick={() => {
+                  setDuelPicker(false);
+                  targetDeclareDuel(human.id, idx);
+                }}
+              >
+                {card}
+              </Button>
+            );
+          })}
+          <Button tone="bare" size="sm" block onClick={() => setDuelPicker(false)}>
+            Назад
           </Button>
-          <Button 
-            variant="blue"
-            size="md"
-            hotkey="1"
-            subtext="Сбросить карту в сброс"
-            onClick={() => attackerRetreatDuel(human.id)}
-          >
-            🏳️ Отступить
-          </Button>
-        </div>
+        </Panel>
       );
     }
+
+    return (
+      <Panel
+        title="Вас атакуют"
+        note={
+          <>
+            {attacker?.name} заявляет роль «{pendingAction?.roleClaim}». Выберите ответ.
+          </>
+        }
+        alert
+      >
+        <Button
+          tone="calm"
+          block
+          hotkey="1"
+          sub="Позволить эффект • 0 ⚡"
+          onClick={() => targetAcceptAttack(human.id)}
+        >
+          Принять
+        </Button>
+        <Button
+          tone="danger"
+          block
+          hotkey="2"
+          disabled={!hasTokens}
+          sub={hasTokens ? 'Проверить заявление • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
+          onClick={() => targetDoubtAttack(human.id)}
+        >
+          Не верю
+        </Button>
+        <Button
+          tone="gold"
+          block
+          hotkey="3"
+          sub={`Щит «${shieldRole}» • 0 ⚡`}
+          onClick={() => setDuelPicker(true)}
+        >
+          Дуэль
+        </Button>
+        {redirectIndex !== -1 && (
+          <Button
+            tone="arcane"
+            block
+            sub="Инстант из руки • 0 ⚡"
+            onClick={() => setRedirectPicker(true)}
+          >
+            Перенаправить
+          </Button>
+        )}
+      </Panel>
+    );
   }
 
-  // 3. DOUBT WINDOW (Court check for truth vs bluff)
+  /* 2. Attacker answers a declared duel. */
+  if (turnPhase === 'DUEL_ATTACKER_WINDOW' && isActor) {
+    return (
+      <Panel title="Вызов на дуэль" note="Обе карты вскроются одновременно." alert>
+        <Button
+          tone="danger"
+          block
+          hotkey="2"
+          sub="Одновременное вскрытие"
+          onClick={() => attackerAcceptDuel(human.id)}
+        >
+          Принять бой
+        </Button>
+        <Button
+          tone="calm"
+          block
+          hotkey="1"
+          sub="Карта уходит в сброс"
+          onClick={() => attackerRetreatDuel(human.id)}
+        >
+          Отступить
+        </Button>
+      </Panel>
+    );
+  }
+
+  /* 3. The court may challenge a claim. */
   if (turnPhase === 'DOUBT_WINDOW' && !isActor) {
     return (
-      <div className="player-actions-toolbar" style={{ gap: '6px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%' }}>
-          <Button 
-            variant="red"
-            size="md"
-            hotkey="D"
-            disabled={!hasTokens}
-            subtext={hasTokens ? 'Разоблачить • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
-            onClick={() => doubtAction(human.id)}
-            title={hasTokens ? 'Проверить заявление на блеф (тратит 1 ⚡)' : 'У вас 0 жетонов действия'}
-          >
-            ⚔️ Не верю!
-          </Button>
-
-          <Button 
-            variant="green"
-            size="md"
-            hotkey="V"
-            subtext="Пропустить ход"
-            onClick={() => passDoubt(human.id)}
-          >
-            ✋ Верю
-          </Button>
-        </div>
-      </div>
+      <Panel
+        title="Окно сомнений"
+        note={<>Заявлена роль «{pendingAction?.roleClaim}». Проверить или пропустить?</>}
+        alert
+      >
+        <Button
+          tone="danger"
+          block
+          hotkey="D"
+          disabled={!hasTokens}
+          sub={hasTokens ? 'Разоблачить блеф • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
+          onClick={() => doubtAction(human.id)}
+        >
+          Не верю
+        </Button>
+        <Button tone="good" block hotkey="V" sub="Пропустить проверку" onClick={() => passDoubt(human.id)}>
+          Верю
+        </Button>
+      </Panel>
     );
   }
 
-  // 4. VETO_WINDOW (Dedicated window before applying effect)
+  /* 4. Veto window before the effect lands. */
   if (turnPhase === 'VETO_WINDOW') {
-    const vetoIdx = human.hand.indexOf('Право вето');
-    const canVeto = vetoIdx !== -1 && !useGameStore.getState().isVetoed;
-    const { proceedAfterVetoWindow } = useGameStore.getState();
-
+    const vetoIndex = human.hand.indexOf('Право вето');
+    const canVeto = vetoIndex !== -1 && !isVetoed;
     return (
-      <div className="player-actions-toolbar" style={{ gap: '6px', background: 'rgba(49, 10, 10, 0.95)', border: '1px solid #ef4444', borderRadius: '12px', padding: '10px' }}>
-        <div style={{ fontSize: '0.76rem', color: '#fecaca', fontWeight: 800, textAlign: 'center', width: '100%' }}>
-          🚫 ОКНО ВЕТО: Применяется эффект «{pendingAction?.roleClaim || pendingAction?.name}»!
-        </div>
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', width: '100%' }}>
-          {canVeto && (
-            <Button
-              variant="red"
-              size="md"
-              subtext="Отменить действие в сброс"
-              onClick={() => playInstant(human.id, 'Право вето', vetoIdx)}
-            >
-              🚫 НАЛОЖИТЬ ВЕТО! • 0 ⚡
-            </Button>
-          )}
-
+      <Panel
+        title="Окно вето"
+        note={<>Готовится эффект «{pendingAction?.roleClaim || pendingAction?.name}».</>}
+        alert
+      >
+        {canVeto && (
           <Button
-            variant="blue"
-            size="md"
-            subtext="Применить эффект"
-            onClick={proceedAfterVetoWindow}
+            tone="danger"
+            block
+            sub="Отменить действие • 0 ⚡"
+            onClick={() => playInstant(human.id, 'Право вето', vetoIndex)}
           >
-            ✨ Продолжить ➔
+            Наложить вето
           </Button>
-        </div>
-      </div>
+        )}
+        <Button tone="calm" block sub="Позволить эффект" onClick={proceedAfterVetoWindow}>
+          Продолжить
+        </Button>
+      </Panel>
     );
   }
 
-  // 5. DEFAULT IDLE ACTION BAR WITH 3-PHASE CONTROLS
-  const isNormalPhase = turnSubPhase === 'NORMAL_ACTION_PHASE' && !hasUsedNormalActionThisTurn;
+  /* 5. Own turn. */
+  const canUseNormalAction = turnSubPhase === 'NORMAL_ACTION_PHASE' && !hasUsedNormalActionThisTurn;
+  const conspiracyCharges =
+    human.activePlot?.type === 'Тайный заговор' ? (human.activePlot.charges ?? 0) : 0;
 
   return (
-    <div className="player-actions-toolbar" style={{ gap: '6px' }}>
-      {/* Subphase 2: Normal Action Button */}
-      <Button 
-        variant="blue"
-        size="md"
+    <Panel
+      title={isMyTurn ? 'Ваш ход' : 'Ожидание'}
+      note={isMyTurn ? undefined : 'Жетоны берегите на проверки.'}
+    >
+      <Button
+        tone="calm"
+        block
         hotkey="1"
-        disabled={!isMyTurn || !hasTokens || !isNormalPhase}
-        subtext={isNormalPhase ? 'Пир, Слух, Смена, Золото • 1 ⚡' : '⛔ Пропущено (1 на ход)'}
+        disabled={!isMyTurn || !hasTokens || !canUseNormalAction}
+        sub={canUseNormalAction ? '1 ⚡' : 'уже было'}
         onClick={onOpenNormalActions}
-        title={isNormalPhase ? 'Открыть меню обычных действий' : 'Фаза обычных действий пропущена или уже использована'}
       >
-        🕊️ Обычное действие
+        Действие двора
       </Button>
 
-      {/* Button to skip Normal Action and go directly to Cards */}
-      {isMyTurn && isNormalPhase && (
-        <Button 
-          variant="gold"
-          size="sm"
-          subtext="Фаза 3: Роли и Интриги"
-          onClick={skipNormalActionPhase}
-          title="Пропустить обычное действие и перейти сразу к розыгрышу карт из руки"
+      {isMyTurn && conspiracyCharges >= 2 && (
+        <Button
+          tone="arcane"
+          block
+          sub={
+            conspiracyCharges === 2
+              ? 'Сбить казну до 3 🪙 • 1 ⚡'
+              : conspiracyCharges === 3
+                ? 'Лишить цель 1 👑 • 1 ⚡'
+                : 'Удар без права вето • 1 ⚡'
+          }
+          onClick={() => openConspiracyDialog(false)}
         >
-          ⏭️ К картам ➔
+          Свершить заговор · {conspiracyCharges}/4
         </Button>
       )}
 
-      {/* Secret Conspiracy Activation Button in own turn (2, 3 or 4 charges) */}
-      {isMyTurn && human.activePlot?.type === 'Тайный заговор' && (human.activePlot.charges ?? 0) >= 2 && (
-        <Button 
-          variant="purple"
-          size="md"
-          subtext={human.activePlot.charges === 2 ? 'Сброс до 3 🪙 • 1 ⚡' : human.activePlot.charges === 3 ? 'Лишить 1 👑 • 1 ⚡' : '🛡️ Без Вето! • 1 ⚡'}
-          onClick={() => useGameStore.getState().openConspiracyDialog(false)}
-          title="Свершить Заговор (стоит 1 ⚡)"
-        >
-          ⚔️ Свершить Заговор ({human.activePlot.charges}/4)
-        </Button>
-      )}
-
-      {/* End Turn Manually Button */}
-      <Button 
-        variant="red"
-        size="md"
+      <Button
+        tone="gold"
+        block
         hotkey="Пробел"
         disabled={!isMyTurn}
-        subtext={human.actionTokens > 0 ? 'Сохранить жетоны на защиту' : 'Добор карт и передача хода'}
+        sub={
+          human.actionTokens > 0
+            ? `Сохранить ${human.actionTokens} ⚡ на защиту`
+            : 'Добор карт и передача хода'
+        }
         onClick={endTurnManually}
-        title="Завершить ход и сохранить оставшиеся жетоны действия для проверок на чужих ходах"
       >
-        ✋ {human.actionTokens > 0 ? `Завершить ход • ${human.actionTokens} ⚡` : 'Завершить ход'}
+        Завершить ход
       </Button>
-    </div>
+    </Panel>
   );
 };

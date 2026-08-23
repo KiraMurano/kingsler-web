@@ -1,6 +1,7 @@
 // Russian grammatical inflection helpers for player names and game events
 
 export function declineAcc(name: string): string {
+  if (name === 'Вы' || name === 'вы') return 'вас';
   if (name.endsWith('а')) return name.slice(0, -1) + 'у';
   if (name.endsWith('я')) return name.slice(0, -1) + 'ю';
   if (name.endsWith('й')) return name.slice(0, -1) + 'я';
@@ -10,6 +11,7 @@ export function declineAcc(name: string): string {
 }
 
 export function declineGen(name: string): string {
+  if (name === 'Вы' || name === 'вы') return 'вас';
   if (name.endsWith('а')) return name.slice(0, -1) + 'ы';
   if (name.endsWith('я')) return name.slice(0, -1) + 'и';
   if (name.endsWith('й')) return name.slice(0, -1) + 'я';

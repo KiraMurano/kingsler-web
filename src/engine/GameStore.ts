@@ -111,7 +111,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       {
         id: 'p1',
         name: 'Вы',
-        avatar: '👑',
+        avatar: '/avatars/anton.jpg',
         seatNumber: 1,
         isBot: false,
         gold: 2,

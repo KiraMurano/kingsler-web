@@ -1,29 +1,3 @@
-/* ==========================================================================
-   KINGLIER: MASTER STYLES ENTRY POINT
-   ========================================================================== */
-
-/* 1. Design Tokens & Variables */
-@import './variables.css';
-
-/* 2. Base Resets, Typography & Scrollbars */
-@import './base.css';
-
-/* 3. Master Viewport & Layout */
+@import './tokens.css';
 @import './layout.css';
-
-/* 4. Sidebars */
-@import './chronicle.css';
-@import './codex.css';
-
-/* 5. Center Arena & Oval Royal Table */
-@import './table.css';
-@import './staked-arena.css';
-
-/* 6. Player Command Station & Cards */
-@import './player-station.css';
-
-/* 7. Popups, Modals & Notifications */
-@import './popups.css';
-
-/* 8. Keyframes, Animations & Visual FX */
-@import './animations.css';
+@import './panels.css';

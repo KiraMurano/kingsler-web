@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useGameStore } from './engine/GameStore';
 import { startBotEngine } from './engine/Bot';
-import { Table } from './components/Table';
+import { TopBar } from './components/TopBar';
+import { SeatsRow } from './components/SeatsRow';
+import { Arena } from './components/Arena';
 import { Card } from './components/Card';
-import { PlayerStatusBar } from './components/PlayerStatusBar';
+import { PlayerCrest } from './components/PlayerCrest';
 import { ActionControls } from './components/ActionControls';
 import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
@@ -11,30 +13,25 @@ import { Modals } from './components/Modals';
 import { CardDetailModal } from './components/CardDetailModal';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
-import { Button } from './components/ui/Button';
-import { Badge } from './components/ui/Badge';
-import { 
-  ALL_ROLES, 
-  ALL_PLOTS, 
-  ALL_INSTANTS 
-} from './data/cardDescriptions';
-import { TOTAL_DECK_SIZE } from './engine/cards';
+import type { GameCard } from './engine/types';
+import type { PendingTargetAction } from './components/targeting';
 
-import type { Role, PlotType, InstantType, GameCard } from './engine/types';
-
-// Start intelligent bot engine once
 startBotEngine();
 
+interface Status {
+  text: string;
+  tone: 'idle' | 'mine' | 'alarm';
+  hint?: string;
+}
+
 export default function App() {
-  const { 
-    players, 
+  const {
+    players,
     activePlayerId,
     turnPhase,
     pendingAction,
     coronationCandidateId,
-    deck,
-    history,
-    startGame, 
+    startGame,
     restartGame,
     performAction,
     playPlotAction,
@@ -49,38 +46,22 @@ export default function App() {
     endTurn
   } = useGameStore();
 
-  const [showNormalModal, setShowNormalModal] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [showChronicleSheet, setShowChronicleSheet] = useState(false);
-  const [showCodexSheet, setShowCodexSheet] = useState(false);
+  const [normalActionsOpen, setNormalActionsOpen] = useState(false);
+  const [roleClaimOpen, setRoleClaimOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [codexOpen, setCodexOpen] = useState(false);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
   const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isVaBanqueComboLaunch, setIsVaBanqueComboLaunch] = useState(false);
-  
-  const [pendingTargetAction, setPendingTargetAction] = useState<{
-    type: 'normal' | 'role' | 'plot' | 'instant';
-    name: string;
-    cost: number;
-    roleClaim?: Role;
-    plotType?: PlotType;
-    instantType?: InstantType;
-    isPlotDirect?: boolean;
-    isInstantDirect?: boolean;
-    stakedCardIndex?: number;
-    withVaBanque?: boolean;
-  } | null>(null);
-
-  const [selectedStakedCardIndex, setSelectedStakedCardIndex] = useState<number>(0);
-  const [redirectModalCardIndex, setRedirectModalCardIndex] = useState<number | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [vaBanqueCombo, setVaBanqueCombo] = useState(false);
+  const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
+  const [stakedCardIndex, setStakedCardIndex] = useState(0);
+  const [redirectCardIndex, setRedirectCardIndex] = useState<number | null>(null);
 
   useEffect(() => {
     startGame();
-    
-    // Expose target trigger for modals
-    (window as any).__startTargeting = (act: any) => {
-      setPendingTargetAction(act);
-    };
+    (window as unknown as { __startTargeting: (a: PendingTargetAction) => void }).__startTargeting =
+      setPendingTarget;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -88,149 +69,128 @@ export default function App() {
   const activePlayer = players.find(p => p.id === activePlayerId);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE';
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
-  };
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 2400);
+  }, []);
 
-  const handleConfirmTarget = (targetId: string, cardIndex = 0) => {
-    if (!pendingTargetAction || !human) return;
+  const confirmTarget = (targetId: string) => {
+    if (!pendingTarget || !human) return;
 
-    if (pendingTargetAction.isPlotDirect && pendingTargetAction.plotType) {
-      playPlotAction(pendingTargetAction.plotType, pendingTargetAction.stakedCardIndex ?? 0, targetId);
-    } else if (pendingTargetAction.isInstantDirect && pendingTargetAction.instantType) {
-      playInstant(human.id, pendingTargetAction.instantType, pendingTargetAction.stakedCardIndex ?? 0, targetId);
+    if (pendingTarget.isPlotDirect && pendingTarget.plotType) {
+      playPlotAction(pendingTarget.plotType, pendingTarget.stakedCardIndex ?? 0, targetId);
+    } else if (pendingTarget.isInstantDirect && pendingTarget.instantType) {
+      playInstant(human.id, pendingTarget.instantType, pendingTarget.stakedCardIndex ?? 0, targetId);
     } else {
-      const withVB = !!pendingTargetAction.withVaBanque;
       performAction({
-        type: pendingTargetAction.type,
-        name: pendingTargetAction.name,
-        roleClaim: pendingTargetAction.roleClaim,
-        stakedCardIndex: pendingTargetAction.stakedCardIndex,
+        type: pendingTarget.type,
+        name: pendingTarget.name,
+        roleClaim: pendingTarget.roleClaim,
+        stakedCardIndex: pendingTarget.stakedCardIndex,
         actorId: human.id,
         targetId,
-        targetCardIndex: cardIndex,
-        withVaBanque: withVB,
-        costGold: pendingTargetAction.cost,
+        targetCardIndex: 0,
+        withVaBanque: !!pendingTarget.withVaBanque,
+        costGold: pendingTarget.cost,
         costTokens: 1,
-        description: `Действие ${pendingTargetAction.name} направлено на игрока.`
+        description: pendingTarget.description ?? `Действие «${pendingTarget.name}» направлено на игрока.`
       });
     }
-    setPendingTargetAction(null);
+    setPendingTarget(null);
   };
 
-  // Click on a Card in player's hand
-  const handleCardClick = (card: GameCard, cardIndex: number) => {
+  const handleCardClick = (card: GameCard, index: number) => {
     if (!human) return;
 
-    // 1. If clicking card in VETO_WINDOW:
-    if (turnPhase === 'VETO_WINDOW') {
-      if (card === 'Право вето') {
-        playInstant(human.id, 'Право вето', cardIndex);
-        return;
-      }
+    if (turnPhase === 'VETO_WINDOW' && card === 'Право вето') {
+      playInstant(human.id, 'Право вето', index);
+      return;
     }
 
-    // 2. If in TARGET_REACTION_WINDOW:
     if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
-      if (card === 'Перенаправление') {
-        setRedirectModalCardIndex(cardIndex);
-        return;
-      }
-      targetDeclareDuel(human.id, cardIndex);
+      if (card === 'Перенаправление') setRedirectCardIndex(index);
+      else targetDeclareDuel(human.id, index);
       return;
     }
 
-    // 3. If in own turn (IDLE):
     if (isMyTurn) {
-      setIsVaBanqueComboLaunch(false);
-      setSelectedStakedCardIndex(cardIndex);
-      setShowRoleModal(true);
+      setVaBanqueCombo(false);
+      setStakedCardIndex(index);
+      setRoleClaimOpen(true);
       return;
     }
 
-    // 4. If not my turn:
     if (card === 'Право вето') {
-      playInstant(human.id, 'Право вето', cardIndex);
+      playInstant(human.id, 'Право вето', index);
       return;
     }
-    const active = players.find(p => p.id === activePlayerId);
-    showToast(`Сейчас ход придворного: ${active?.name || 'другого игрока'}`);
+    showToast(`Сейчас распоряжается ${activePlayer?.name ?? 'другой придворный'}`);
   };
 
-  // Keyboard Shortcuts Listener
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       if (e.key === 'Escape') {
-        setShowNormalModal(false);
-        setShowRoleModal(false);
-        setShowRulesModal(false);
-        setShowChronicleSheet(false);
-        setShowCodexSheet(false);
+        setNormalActionsOpen(false);
+        setRoleClaimOpen(false);
+        setRulesOpen(false);
+        setCodexOpen(false);
+        setChronicleOpen(false);
         setInspectedCard(null);
-        setPendingTargetAction(null);
-        setRedirectModalCardIndex(null);
+        setPendingTarget(null);
+        setRedirectCardIndex(null);
         return;
       }
 
-      // 1. Idle turn hotkeys
-      if (isMyTurn && !showNormalModal && !showRoleModal && !pendingTargetAction && !showChronicleSheet && !showCodexSheet) {
-        if (e.key === '1') {
-          setShowNormalModal(true);
-        } else if (e.key === '2') {
-          setSelectedStakedCardIndex(0);
-          setShowRoleModal(true);
+      const overlayOpen = normalActionsOpen || roleClaimOpen || codexOpen || chronicleOpen || !!pendingTarget;
+
+      if (isMyTurn && !overlayOpen) {
+        if (e.key === '1') setNormalActionsOpen(true);
+        else if (e.key === '2') {
+          setStakedCardIndex(0);
+          setRoleClaimOpen(true);
         } else if (e.code === 'Space') {
           e.preventDefault();
           endTurn();
         }
       }
 
-      // 2. Doubt window hotkeys
-      if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== human?.id && human) {
-        if (e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'в') {
-          doubtAction(human.id);
-        } else if (e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 'м') {
-          passDoubt(human.id);
+      if (!human) return;
+
+      if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== human.id) {
+        const key = e.key.toLowerCase();
+        if (key === 'd' || key === 'в') doubtAction(human.id);
+        else if (key === 'v' || key === 'м') passDoubt(human.id);
+      }
+
+      if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
+        if (e.key === '1') targetAcceptAttack(human.id);
+        else if (e.key === '2') targetDoubtAttack(human.id);
+        else if (e.key === '3') {
+          const shield = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+          const index = human.hand.indexOf(shield);
+          targetDeclareDuel(human.id, index === -1 ? 0 : index);
         }
       }
 
-      // 3. Target reaction hotkeys
-      if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction && pendingAction.targetId === human?.id && human) {
-        if (e.key === '1') {
-          targetAcceptAttack(human.id);
-        } else if (e.key === '2' || e.key.toLowerCase() === 'd') {
-          targetDoubtAttack(human.id);
-        } else if (e.key === '3' || e.key.toLowerCase() === 'b') {
-          const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-          const matchIdx = human.hand.indexOf(blockingRole);
-          targetDeclareDuel(human.id, matchIdx !== -1 ? matchIdx : 0);
-        }
-      }
-
-      // 4. Duel attacker window hotkeys
-      if (turnPhase === 'DUEL_ATTACKER_WINDOW' && pendingAction?.actorId === human?.id && human) {
-        if (e.key === '1' || e.key.toLowerCase() === 'r') {
-          attackerRetreatDuel(human.id);
-        } else if (e.key === '2' || e.key.toLowerCase() === 'a') {
-          attackerAcceptDuel(human.id);
-        }
+      if (turnPhase === 'DUEL_ATTACKER_WINDOW' && pendingAction?.actorId === human.id) {
+        if (e.key === '1') attackerRetreatDuel(human.id);
+        else if (e.key === '2') attackerAcceptDuel(human.id);
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [
-    isMyTurn, 
-    showNormalModal, 
-    showRoleModal, 
-    pendingTargetAction, 
-    showChronicleSheet,
-    showCodexSheet,
-    turnPhase, 
-    pendingAction, 
+    isMyTurn,
+    normalActionsOpen,
+    roleClaimOpen,
+    codexOpen,
+    chronicleOpen,
+    pendingTarget,
+    turnPhase,
+    pendingAction,
     human,
     endTurn,
     doubtAction,
@@ -242,277 +202,180 @@ export default function App() {
     attackerAcceptDuel
   ]);
 
-  if (players.length === 0) {
-    return (
-      <div style={{ color: 'var(--gold-primary)', textAlign: 'center', marginTop: '40vh', fontSize: '1.2rem' }}>
-        Загрузка королевского двора...
-      </div>
-    );
+  if (players.length === 0 || !human) {
+    return <div className="booting">СОЗЫВ ДВОРА</div>;
   }
 
-  // Derive turn stage banner titles
-  let turnBannerTitle = isMyTurn ? 'ВАШ ХОД' : `ХОД ПРИДВОРНОГО: ${activePlayer?.name?.toUpperCase() || ''}`;
-  let turnBannerDesc = isMyTurn ? 'Сыграйте карту или выберите действие' : 'Обдумывает стратегию...';
+  const status: Status = (() => {
+    if (coronationCandidateId) {
+      const candidate = players.find(p => p.id === coronationCandidateId);
+      return {
+        text: `Круг коронации: ${candidate?.name}`,
+        tone: 'alarm',
+        hint: 'сбейте влияние до конца круга'
+      };
+    }
+    switch (turnPhase) {
+      case 'TARGET_REACTION_WINDOW': {
+        const victim = players.find(p => p.id === pendingAction?.targetId);
+        return { text: 'Целевая атака', tone: 'alarm', hint: `${victim?.name} выбирает защиту` };
+      }
+      case 'DUEL_ATTACKER_WINDOW':
+        return { text: 'Вызов на дуэль', tone: 'alarm', hint: `${activePlayer?.name} решает судьбу` };
+      case 'DOUBT_WINDOW':
+        return {
+          text: 'Окно сомнений',
+          tone: 'alarm',
+          hint: `заявлено «${pendingAction?.roleClaim}»`
+        };
+      case 'VETO_WINDOW':
+        return { text: 'Окно вето', tone: 'alarm', hint: 'последний шанс остановить эффект' };
+      default:
+        return isMyTurn
+          ? { text: 'Ваш ход', tone: 'mine', hint: 'разыграйте карту или действие' }
+          : { text: `Ход: ${activePlayer?.name ?? '—'}`, tone: 'idle', hint: 'придворный думает' };
+    }
+  })();
 
-  if (coronationCandidateId) {
-    const candidate = players.find(p => p.id === coronationCandidateId);
-    turnBannerTitle = '👑 КРУГ КОРОНАЦИИ!';
-    turnBannerDesc = `${candidate?.name || 'Лидер'} удерживает ${candidate?.favor || 6} 👑! Сбейте его влияние, пока круг не замкнулся!`;
-  } else if (turnPhase === 'TARGET_REACTION_WINDOW') {
-    const target = players.find(p => p.id === pendingAction?.targetId);
-    turnBannerTitle = 'ЦЕЛЕВАЯ АТАКА';
-    turnBannerDesc = `${target?.name || 'Жертва'} выбирает защиту от ${pendingAction?.roleClaim}`;
-  } else if (turnPhase === 'DUEL_ATTACKER_WINDOW') {
-    turnBannerTitle = 'ВЫЗОВ НА ДУЭЛЬ!';
-    turnBannerDesc = `${activePlayer?.name} решает: Отступить или Принять бой!`;
-  } else if (turnPhase === 'DOUBT_WINDOW') {
-    turnBannerTitle = 'ОКНО СОМНЕНИЙ ДВОРА';
-    turnBannerDesc = `Заявлена роль «${pendingAction?.roleClaim}». Кто усомнится?`;
-  } else if (turnPhase === 'VETO_WINDOW') {
-    turnBannerTitle = '🚫 ОКНО ВЕТО!';
-    turnBannerDesc = `Применяется «${pendingAction?.roleClaim || pendingAction?.name}»! Любой игрок может сыграть Право вето (0 ⚡).`;
-  }
+  const isTargetReaction =
+    turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
+  const isVetoWindow = turnPhase === 'VETO_WINDOW';
 
   return (
-    <div className="desktop-viewport">
-      {/* Background ambient lighting */}
-      <div className="ambient-glow-overlay" />
+    <div className="app">
+      <TopBar
+        statusText={status.text}
+        statusTone={status.tone}
+        hint={status.hint}
+        codexOpen={codexOpen}
+        chronicleOpen={chronicleOpen}
+        onOpenCodex={() => setCodexOpen(true)}
+        onOpenChronicle={() => setChronicleOpen(open => !open)}
+        onOpenRules={() => setRulesOpen(true)}
+        onRestart={restartGame}
+      />
 
-      {/* Toast Notice */}
-      {toastMessage && (
-        <div className="game-toast-notice">
-          {toastMessage}
-        </div>
-      )}
-
-      {/* 1. HERALDIC TOP BAR */}
-      <header className="top-nav-desktop">
-        {/* Brand */}
-        <div className="nav-brand">
-          <span className="brand-crest">👑</span>
-          <div>
-            <div className="brand-title cinzel-font gold-gradient-text">KINGLIER</div>
-            <div className="brand-subtitle">
-              {TOTAL_DECK_SIZE} Карт • {ALL_ROLES.length} Ролей • {ALL_PLOTS.length} Интриг • {ALL_INSTANTS.length} Инстантов
-            </div>
-          </div>
-        </div>
-
-        {/* Center: Dynamic Turn Stage & Action Status Pill */}
-        <div className={`top-turn-stage-pill ${coronationCandidateId ? 'final-round-active-banner' : ''}`}>
-          <span className="turn-pill-icon">{isMyTurn ? '⚔️' : (coronationCandidateId ? '👑' : '⏳')}</span>
-          <span className="turn-banner-title cinzel-font">
-            {turnBannerTitle}
-          </span>
-          <span className="turn-pill-divider">•</span>
-          <span className="turn-banner-desc">
-            {turnBannerDesc}
-          </span>
+      <main className="app__stage">
+        <div className="table">
+          <div className="table__rim" />
+          <SeatsRow
+            pendingTargetAction={pendingTarget}
+            onSelectTarget={confirmTarget}
+            onInspectCard={setInspectedCard}
+          />
+          <Arena
+            pendingTargetAction={pendingTarget}
+            onCancelTarget={() => setPendingTarget(null)}
+            onInspectCard={setInspectedCard}
+          />
         </div>
 
-        {/* Right Actions & Navigation Buttons */}
-        <div className="nav-actions">
-          {/* Coronation Goal Tracker */}
-          <div className="coronation-status-banner cinzel-font">
-            <div className="coronation-goal-text">
-              <span>ЦЕЛЬ: 6 👑</span>
-            </div>
-            <div className="crown-segments-track" title="Для победы удержите 6 корон круг">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className={`crown-segment ${(human?.favor ?? 0) > i ? 'filled' : ''}`}
-                >
-                  {(human?.favor ?? 0) > i ? '👑' : ''}
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="hero">
+          <PlayerCrest
+            player={human}
+            isActive={activePlayerId === human.id}
+            onInspectCard={setInspectedCard}
+          />
 
-          {/* Button: Chronicle (Летопись) */}
-          <Button
-            variant={showChronicleSheet ? 'gold' : 'secondary'}
-            size="sm"
-            onClick={() => setShowChronicleSheet(true)}
-            title="Открыть летопись дворцовых событий"
-          >
-            <span>📜 Летопись</span>
-            <Badge variant="gold" size="sm">{history.length}</Badge>
-          </Button>
+          <div className="hand">
+            {Array.from({ length: 2 }).map((_, index) => {
+              const card = human.hand[index];
+              if (!card) {
+                return <div key={index} className="handcard handcard--empty" />;
+              }
 
-          {/* Button: Codex (Кодекс) */}
-          <Button
-            variant={showCodexSheet ? 'gold' : 'secondary'}
-            size="sm"
-            onClick={() => setShowCodexSheet(true)}
-            title="Открыть кодекс всех карт и колоду"
-          >
-            <span>📖 Кодекс</span>
-            <Badge variant="sapphire" size="sm">🂠 {deck.length}</Badge>
-          </Button>
+              const staked =
+                pendingAction?.type === 'role' &&
+                pendingAction.actorId === human.id &&
+                turnPhase !== 'IDLE' &&
+                pendingAction.stakedCardIndex === index;
 
-          {/* Button: Rules */}
-          <Button 
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowRulesModal(true)}
-            title="Открыть свод правил игры"
-          >
-            ⚖️ Правила
-          </Button>
-
-          {/* Button: New Game */}
-          <Button 
-            variant="ghost"
-            size="sm"
-            onClick={restartGame}
-            title="Начать новую партию"
-          >
-            🔄 Новая игра
-          </Button>
-        </div>
-      </header>
-
-      {/* 2. FULL-STAGE ARENA (Center Focus on Royal Table & Player Heroes) */}
-      <main className="main-full-stage">
-        {/* Grand Oval Royal Table */}
-        <Table 
-          pendingTargetAction={pendingTargetAction}
-          onSelectTarget={handleConfirmTarget}
-          onCancelTarget={() => setPendingTargetAction(null)}
-          onInspectCard={(card) => setInspectedCard(card)}
-        />
-
-        {/* Bottom Player Command Station */}
-        <footer className="player-command-station">
-          {/* Player Dashboard (Name, Crowns, Gold, Seals, Tokens, Active Plot) */}
-          {human && (
-            <PlayerStatusBar 
-              player={human}
-              isActive={activePlayerId === human.id}
-              onInspectCard={(card) => setInspectedCard(card)}
-            />
-          )}
-
-          {/* Central Hero: Two Interactive Desktop Hand Cards */}
-          {human && (
-            <div className="player-hand-desktop">
-              {/* Floating Role Claim Popup directly above hand cards */}
-              {showRoleModal && (
-                <RoleClaimPopup 
-                  stakedCardIndex={selectedStakedCardIndex}
-                  initialWithVaBanque={isVaBanqueComboLaunch}
-                  onClose={() => {
-                    setShowRoleModal(false);
-                    setIsVaBanqueComboLaunch(false);
-                  }}
-                />
-              )}
-
-              {human.hand.map((card, idx) => {
-                const isStakedOnTable = pendingAction && pendingAction.type === 'role' && pendingAction.actorId === human.id && turnPhase !== 'IDLE' && (pendingAction.stakedCardIndex === idx);
-                if (isStakedOnTable) {
-                  return (
-                    <div 
-                      key={idx} 
-                      className="staked-hand-placeholder" 
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setInspectedCard((pendingAction.roleClaim || card) as GameCard)}
-                      title="Нажмите, чтобы открыть подробное описание заявленной карты"
-                    >
-                      <div className="staked-placeholder-inner">
-                        <span style={{ fontSize: '1.4rem' }}>🂠</span>
-                        <Badge variant="gold" size="sm">НА КОНУ</Badge>
-                        <span style={{ fontSize: '0.82rem', color: '#fef08a', marginTop: '2px', fontWeight: 800 }}>«{pendingAction.roleClaim || card}»</span>
-                      </div>
-                    </div>
-
-                  );
-                }
-                const isTargetReaction = turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
-                const isPlayable = isMyTurn || isTargetReaction;
-                const hintText = isTargetReaction ? 'НА ДУЭЛЬ' : undefined;
-
+              if (staked) {
                 return (
-                  <Card 
-                    key={idx} 
-                    role={card} 
-                    isPlayable={isPlayable}
-                    hintText={hintText}
-                    isSelected={showRoleModal && selectedStakedCardIndex === idx}
-                    onClick={() => handleCardClick(card, idx)}
-                  />
+                  <div
+                    key={index}
+                    className="handcard handcard--staked"
+                    onClick={() => setInspectedCard((pendingAction.roleClaim ?? card) as GameCard)}
+                    title="Карта выставлена на кон"
+                  >
+                    <span className="handcard__staked-label">на кону</span>
+                    <span className="handcard__staked-claim">
+                      «{pendingAction.roleClaim ?? card}»
+                    </span>
+                  </div>
                 );
-              })}
-            </div>
-          )}
+              }
 
-          {/* Action Buttons Toolbar with Direct Floating Normal Actions Popup */}
-          <div style={{ position: 'relative' }}>
-            {showNormalModal && (
-              <NormalActionsPopup 
-                onClose={() => setShowNormalModal(false)}
-              />
-            )}
-            <ActionControls 
-              onOpenNormalActions={() => setShowNormalModal(true)}
-            />
+              const vetoReady = isVetoWindow && card === 'Право вето';
+
+              return (
+                <Card
+                  key={index}
+                  card={card}
+                  isPlayable={isMyTurn || isTargetReaction || vetoReady}
+                  isSelected={roleClaimOpen && stakedCardIndex === index}
+                  hint={vetoReady ? 'вето' : isTargetReaction ? 'на дуэль' : undefined}
+                  onClick={() => handleCardClick(card, index)}
+                />
+              );
+            })}
           </div>
-        </footer>
+
+          <ActionControls onOpenNormalActions={() => setNormalActionsOpen(true)} />
+        </div>
       </main>
 
-      {/* 3. SLIDE-OUT SHEETS (Chronicle and Codex) */}
-      <Chronicle 
-        open={showChronicleSheet}
-        onClose={() => setShowChronicleSheet(false)}
-        onOpenRules={() => {
-          setShowChronicleSheet(false);
-          setShowRulesModal(true);
-        }}
+      <Chronicle
+        open={chronicleOpen}
+        onClose={() => setChronicleOpen(false)}
+        onOpenRules={() => setRulesOpen(true)}
       />
 
-      <Codex 
-        open={showCodexSheet}
-        onClose={() => setShowCodexSheet(false)}
-        onOpenRules={() => {
-          setShowCodexSheet(false);
-          setShowRulesModal(true);
-        }}
-        onSelectCardToInspect={(card) => {
-          setInspectedCard(card);
-        }}
+      <Codex
+        open={codexOpen}
+        onClose={() => setCodexOpen(false)}
+        onSelectCard={setInspectedCard}
       />
 
-      {/* 4. CARD DETAIL INSPECTION MODAL */}
-      <CardDetailModal
-        card={inspectedCard}
-        onClose={() => setInspectedCard(null)}
-      />
+      <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
 
-      {/* 5. GAME OUTCOME & ACTION MODALS */}
-      <Modals 
-        showRulesModal={showRulesModal}
-        onCloseRulesModal={() => setShowRulesModal(false)}
-        redirectModalCardIndex={redirectModalCardIndex}
-        onCloseRedirectModal={() => setRedirectModalCardIndex(null)}
-        onConfirmRedirectInstant={(cardIdx) => {
-          setRedirectModalCardIndex(null);
-          setPendingTargetAction({
+      {roleClaimOpen && (
+        <RoleClaimPopup
+          stakedCardIndex={stakedCardIndex}
+          initialWithVaBanque={vaBanqueCombo}
+          onClose={() => {
+            setRoleClaimOpen(false);
+            setVaBanqueCombo(false);
+          }}
+        />
+      )}
+      {normalActionsOpen && (
+        <NormalActionsPopup onClose={() => setNormalActionsOpen(false)} />
+      )}
+
+      <Modals
+        showRules={rulesOpen}
+        onCloseRules={() => setRulesOpen(false)}
+        redirectCardIndex={redirectCardIndex}
+        onCloseRedirect={() => setRedirectCardIndex(null)}
+        onRedirectAsInstant={cardIndex => {
+          setRedirectCardIndex(null);
+          setPendingTarget({
             type: 'instant',
             name: 'Перенаправление',
             instantType: 'Перенаправление',
             isInstantDirect: true,
-            stakedCardIndex: cardIdx,
+            stakedCardIndex: cardIndex,
             cost: 0
           });
         }}
-        onConfirmRedirectDuelBluff={(cardIdx) => {
-          setRedirectModalCardIndex(null);
-          if (human) {
-            targetDeclareDuel(human.id, cardIdx);
-          }
+        onRedirectAsDuelBluff={cardIndex => {
+          setRedirectCardIndex(null);
+          targetDeclareDuel(human.id, cardIndex);
         }}
       />
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }

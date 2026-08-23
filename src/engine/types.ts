@@ -6,7 +6,6 @@ export type BotPersonalityType = 'gambler' | 'cautious' | 'pragmatic' | 'provoca
 export interface BotArchetype {
   type: BotPersonalityType;
   title: string;          // e.g. "Азартная", "Стратег", "Тактик"
-  badge: string;          // e.g. "🎲", "🛡️", "⚖️", "🎭", "🗡️"
   description: string;
   bluffRate: number;      // Base willingness to bluff (0.15 - 0.60)
   doubtAggression: number;// Base multiplier on suspicion (0.7 - 1.4)
