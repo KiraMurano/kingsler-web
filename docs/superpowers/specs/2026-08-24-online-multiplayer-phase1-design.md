@@ -65,18 +65,26 @@ Node. This means the ~5,000 lines of game rules and bot AI can run
 **unchanged** on the server — the work is in orchestration, not in
 rewriting rules.
 
-The one required engine change: several pieces are currently module-level
-singletons, which is fine for one browser tab but breaks when one Node
-process hosts many concurrent rooms:
+Several pieces are currently module-level singletons (`useGameStore`,
+`timerManager`, `botMemory`, the bot engine's own timer registry), which
+is fine for one browser tab but breaks the moment one Node process hosts
+many concurrent rooms — two rooms would stomp on each other's timers and
+bot memory. Rather than threading instances through ~15 files and ~150
+call sites (invasive, and risks subtly changing bot behavior), Phase 1
+isolates each room's entire engine inside its own `worker_threads` Worker
+(Node's built-in module, no new dependency). A Worker gets a fresh V8
+context and module registry, so within it `useGameStore` etc. are
+correctly scoped to that one room automatically — **zero changes needed**
+to the singletons themselves. The only engine change required is
+parameterizing `startGame` to accept the real joined players instead of
+always assuming exactly one human.
 
-- `useGameStore` (`src/engine/GameStore.ts`) — must become a
-  `createGameStore()` factory, one instance per room.
-- `timerManager` (`src/engine/utils/timerManager.ts`) — instance per room.
-- `BotTimerRegistry` and `botMemory` (`src/engine/bot/botEngine.ts`,
-  `src/engine/bot/botMemory.ts`) — instance per room.
-
-This refactor is required regardless of which transport/framework is
-chosen, since it's about multi-tenancy, not networking.
+The main process (one per Colyseus room) talks to its Worker over
+`postMessage`/`parentPort`: it forwards allowed action calls in, and
+receives full authoritative state snapshots out, redacting them
+per-viewer before they reach any browser. A worker crash from a latent
+engine bug only takes down that one match, not the whole server — a
+useful side effect of this isolation choice.
 
 ## Repository Layout
 
@@ -183,8 +191,11 @@ minimizes changes to `src/components/**`.
 
 Single Docker image for Phase 1:
 
-- Multi-stage build: build `apps/web` (Vite `dist/`), build `apps/server`
-  (TypeScript → JS), copy both into a final Node runtime image.
+- Multi-stage build: install workspace dependencies, build `apps/web`
+  (Vite `dist/`), type-check `packages/engine`/`apps/server` with `tsc
+  --noEmit`. `apps/server` itself ships as TypeScript and runs directly
+  via `tsx` in the final image (no separate JS build step — this project
+  already runs its `*.check.ts` tests the same way).
 - `apps/server`'s Colyseus app (an Express app under the hood) serves the
   static `apps/web/dist` files and the WebSocket upgrade on the same
   port. One container, one exposed port.
@@ -199,13 +210,13 @@ Single Docker image for Phase 1:
 Follows the project's existing lightweight convention (`*.check.ts`,
 assert-based, no test framework, run with `npx tsx`):
 
-- `packages/engine/redaction.check.ts` — the redaction leak check
+- `packages/engine/src/net/redaction.check.ts` — the redaction leak check
   described above (the one genuinely new, risky piece of logic).
 - Existing `*.check.ts` files move with their modules into
   `packages/engine` unchanged.
-- Room lifecycle (join/start/bot-fill/reconnect) gets a similar
-  `apps/server/room.check.ts` smoke check once the room implementation
-  exists, exercised at plan/implementation time.
+- Room lifecycle (join/start/act/reconnect-to-bot) gets equivalent
+  `apps/server/src/KinglierRoom.*.check.ts` smoke checks, connecting real
+  `@colyseus/sdk` clients to a locally started server instance.
 
 ## Explicitly Out of Scope for Phase 1
 
