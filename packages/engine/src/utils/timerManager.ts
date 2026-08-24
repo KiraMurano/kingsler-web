@@ -1,8 +1,14 @@
 // Centralized Timer and Interval Manager for the Game Engine
 
+// Portable handle types: the browser's setTimeout/setInterval return a
+// number, Node's return a Timeout object. This engine runs in both (browser
+// tab offline, worker_thread online), so the handle type must not assume one.
+type TimeoutHandle = ReturnType<typeof globalThis.setTimeout>;
+type IntervalHandle = ReturnType<typeof globalThis.setInterval>;
+
 class TimerManager {
-  private countdownInterval: number | null = null;
-  private delayTimeout: number | null = null;
+  private countdownInterval: IntervalHandle | null = null;
+  private delayTimeout: TimeoutHandle | null = null;
 
   public clearAll(): void {
     if (this.countdownInterval !== null) {

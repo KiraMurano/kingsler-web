@@ -9,12 +9,18 @@ import {
   type BotScheduler
 } from './botReactions';
 
+// Portable handle type: browser setTimeout returns a number, Node's returns
+// a Timeout object. This engine runs in both (browser tab offline,
+// worker_thread online), so the handle type must not assume one — using the
+// bare global (not `window.setTimeout`) keeps it correct in both runtimes.
+type TimeoutHandle = ReturnType<typeof setTimeout>;
+
 class BotTimerRegistry {
-  private timers: Map<string, number> = new Map();
+  private timers: Map<string, TimeoutHandle> = new Map();
 
   public schedule(timerKey: string, callback: () => void, delayMs: number): void {
     this.clear(timerKey);
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       this.timers.delete(timerKey);
       callback();
     }, delayMs);

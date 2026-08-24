@@ -42,12 +42,12 @@ export function addSealsToPlayer(
 
   triggerResourceFloat(set, playerId, `+${count} ⚜️`, true);
   if (hasRoyalCharter) {
-    window.setTimeout(() => {
+    setTimeout(() => {
       triggerResourceFloat(set, playerId, '+1 🪙 Булла', true);
     }, 250);
   }
   if (gainedCrowns > 0) {
-    window.setTimeout(() => {
+    setTimeout(() => {
       triggerResourceFloat(set, playerId, `+${gainedCrowns} 👑`, true);
     }, 450);
   }
