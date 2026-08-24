@@ -4,6 +4,27 @@ import { GameWorkerClient, type SeatInput } from './GameWorkerClient.ts';
 import { redactStateForPlayer } from '@kinglier/engine/net/redaction';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
 
+const ACTIVE_PLAYER_ONLY_ACTIONS = new Set([
+  'performAction', 'skipNormalActionPhase', 'endTurnManually',
+  'playPlotAction', 'openConspiracyDialog', 'endTurn'
+]);
+
+const SELF_ONLY_ACTIONS = new Set([
+  'doubtAction', 'passDoubt', 'targetAcceptAttack', 'targetDoubtAttack',
+  'targetDeclareDuel', 'attackerRetreatDuel', 'attackerAcceptDuel',
+  'activateConspiracy', 'playInstant'
+]);
+
+const UNRESTRICTED_ACTIONS = new Set([
+  'closeDuelOutcome', 'closeInformantPeek', 'closeRevealOutcome',
+  'proceedAfterVetoWindow', 'closeConspiracyDialog'
+]);
+
+interface ActionMessage {
+  method: string;
+  args: unknown[];
+}
+
 type Phase = 'WAITING' | 'PLAYING' | 'GAME_OVER';
 
 interface Seat {
@@ -33,7 +54,8 @@ export class KinglierRoom extends Room {
   protected latestState: GameStateData | null = null;
 
   messages = {
-    start: (client: Client) => this.handleStart(client)
+    start: (client: Client) => this.handleStart(client),
+    action: (client: Client, payload: ActionMessage) => this.handleAction(client, payload)
   };
 
   onJoin(client: Client, options: JoinOptions) {
@@ -91,5 +113,23 @@ export class KinglierRoom extends Room {
   protected sendState(client: Client, playerId: string): void {
     if (!this.latestState) return;
     client.send('state', redactStateForPlayer(this.latestState, playerId));
+  }
+
+  protected handleAction(client: Client, payload: ActionMessage): void {
+    if (this.phase !== 'PLAYING' || !this.worker || !this.latestState) return;
+    const seat = this.seats.find(s => s.sessionId === client.sessionId);
+    if (!seat) return;
+
+    const { method, args } = payload;
+
+    if (ACTIVE_PLAYER_ONLY_ACTIONS.has(method)) {
+      if (this.latestState.activePlayerId !== seat.playerId) return;
+    } else if (SELF_ONLY_ACTIONS.has(method)) {
+      if (args[0] !== seat.playerId) return;
+    } else if (!UNRESTRICTED_ACTIONS.has(method)) {
+      return; // unknown method: reject
+    }
+
+    this.worker.call(method, args);
   }
 }
