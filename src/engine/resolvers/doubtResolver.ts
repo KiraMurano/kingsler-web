@@ -465,10 +465,12 @@ export function proceedAfterVetoWindow(
     return;
   }
 
-  if (isPendingActionAfterTruthChallenge) {
-    triggerSingleCardFlight(set, 'to_discard', pendingAction.actorId, pendingAction.roleClaim);
-  } else if (pendingAction.roleClaim) {
-    triggerSingleCardFlight(set, 'to_hand', pendingAction.actorId, pendingAction.roleClaim);
+  if (!pendingAction.cardAlreadyResolved) {
+    if (isPendingActionAfterTruthChallenge) {
+      triggerSingleCardFlight(set, 'to_discard', pendingAction.actorId, pendingAction.roleClaim);
+    } else if (pendingAction.roleClaim) {
+      triggerSingleCardFlight(set, 'to_hand', pendingAction.actorId, pendingAction.roleClaim);
+    }
   }
 
   get()._resolvePendingActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);

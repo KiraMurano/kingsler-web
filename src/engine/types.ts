@@ -56,6 +56,8 @@ export interface Action {
   isMorningTrigger?: boolean;
   conspiracyEffect?: 'gold' | 'crown';
   cannotBeVetoed?: boolean;
+  /** Set once a duel's cards have already flown to discard — the table must not re-stage them. */
+  cardAlreadyResolved?: boolean;
   description: string;
 }
 

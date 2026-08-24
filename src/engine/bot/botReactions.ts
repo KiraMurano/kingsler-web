@@ -80,7 +80,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   const redirectIdx = target.hand.indexOf('Перенаправление');
   if (redirectIdx !== -1 && Math.random() < 0.70) {
     const otherOpponents = players.filter(p => p.id !== attacker.id && p.id !== target.id);
-    const newTarget = selectBestRedirectionTarget(attacker, target, otherOpponents);
+    const newTarget = selectBestRedirectionTarget(attacker, target, otherOpponents, pendingAction.roleClaim);
     if (newTarget) {
       schedule('target_block', () => {
         const curState = useGameStore.getState();

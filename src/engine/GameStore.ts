@@ -280,7 +280,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasPlayedRoleThisTurn: action.type === 'role' ? true : state.hasPlayedRoleThisTurn,
       isVaBanqueActive: withVaBanque,
       isVetoed: false,
-      overlayInstant: null,
+      overlayInstant: withVaBanque ? { card: 'Ва-банк', actorId: actor.id } : null,
       isPendingActionAfterTruthChallenge: false
     }));
 

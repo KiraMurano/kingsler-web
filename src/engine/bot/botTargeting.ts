@@ -1,4 +1,4 @@
-import type { Player } from '../types';
+import type { Player, Role } from '../types';
 import { isRole } from '../cards';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
@@ -234,9 +234,15 @@ export function selectBestRumorTarget(opponents: Player[]): Player | null {
 export function selectBestRedirectionTarget(
   _attacker: Player,
   currentTarget: Player,
-  allOpponents: Player[]
+  allOpponents: Player[],
+  roleClaim?: Role
 ): Player | null {
-  const possibleTargets = allOpponents.filter(p => p.id !== currentTarget.id);
+  const possibleTargets = allOpponents.filter(p => {
+    if (p.id === currentTarget.id) return false;
+    if (roleClaim === 'Шантажист' && p.favor === 0) return false;
+    if (roleClaim === 'Вор' && p.gold === 0) return false;
+    return true;
+  });
   if (possibleTargets.length === 0) return null;
 
   possibleTargets.sort((a, b) => (b.favor * 2 + b.gold) - (a.favor * 2 + a.gold));

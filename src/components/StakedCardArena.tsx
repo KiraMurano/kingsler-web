@@ -89,7 +89,7 @@ const FaceCard: React.FC<{
 };
 
 function overlayClass(card: InstantType): string {
-  return card === 'Право вето' ? 'tablecard--veto' : 'tablecard--overlay';
+  return card === 'Право вето' || card === 'Ва-банк' ? 'tablecard--veto' : 'tablecard--overlay';
 }
 
 /** Last word of a titled name: «Графиня Елена» → «Елена». */
@@ -278,10 +278,13 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
     (!!isPendingActionAfterTruthChallenge && !!pendingAction?.roleClaim) ||
     (isSingleFlight && cardFlightEvent?.flightType === 'to_discard');
 
-  const showPile = !hasCardDeparted || isSingleFlight || !!overlayInstant;
+  const showPile =
+    !pendingAction?.cardAlreadyResolved && (!hasCardDeparted || isSingleFlight || !!overlayInstant);
 
   const badge = overlayInstant
-    ? overlayInstant.card
+    ? overlayInstant.card === 'Перенаправление'
+      ? claimBadge(overlayInstant.card, target?.name)
+      : overlayInstant.card
     : claimBadge(String(claimed), target?.name);
 
   return (

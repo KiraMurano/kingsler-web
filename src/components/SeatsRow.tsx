@@ -30,6 +30,7 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
     if (pendingTargetAction.instantType === 'Перенаправление') {
       if (pendingAction?.actorId === player.id) return false;
       if (pendingAction?.roleClaim === 'Шантажист' && player.favor === 0) return false;
+      if (pendingAction?.roleClaim === 'Вор' && player.gold === 0) return false;
     }
     if (pendingTargetAction.roleClaim === 'Шантажист' && player.favor === 0) return false;
     return true;

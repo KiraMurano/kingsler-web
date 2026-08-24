@@ -79,14 +79,16 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   if (turnPhase === 'TARGET_REACTION_WINDOW' && isTarget) {
     const attacker = players.find(p => p.id === pendingAction?.actorId);
     const shieldRole: Role = pendingAction?.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+    const redirectOptions = players.filter(
+      p =>
+        p.id !== human.id &&
+        p.id !== attacker?.id &&
+        (pendingAction?.roleClaim !== 'Шантажист' || p.favor > 0) &&
+        (pendingAction?.roleClaim !== 'Вор' || p.gold > 0)
+    );
 
     if (redirectPicker) {
-      const options = players.filter(
-        p =>
-          p.id !== human.id &&
-          p.id !== attacker?.id &&
-          (pendingAction?.roleClaim !== 'Шантажист' || p.favor > 0)
-      );
+      const options = redirectOptions;
       return (
         <Panel title="Перенаправление" note="Переведите нападение на другого придворного." alert>
           {options.map(p => (
@@ -179,7 +181,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
         >
           Дуэль
         </Button>
-        {redirectIndex !== -1 && (
+        {redirectIndex !== -1 && redirectOptions.length > 0 && (
           <Button
             tone="arcane"
             block

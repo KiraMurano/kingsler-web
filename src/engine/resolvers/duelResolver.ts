@@ -207,7 +207,9 @@ export function closeDuelOutcome(
   set({ duelOutcome: null });
 
   if (breakthrough) {
-    get()._triggerVetoWindowOrResolveEffect(pendingAction);
+    const resolvedAction = { ...pendingAction, cardAlreadyResolved: true };
+    set({ pendingAction: resolvedAction });
+    get()._triggerVetoWindowOrResolveEffect(resolvedAction);
   } else {
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();

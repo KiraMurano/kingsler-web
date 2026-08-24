@@ -4,7 +4,12 @@
  */
 import assert from 'node:assert/strict';
 import type { Player } from '../types.ts';
-import { shouldPlaySearchNow, shouldActivateConspiracyNow, selectBestConspiracyTarget } from './botTargeting.ts';
+import {
+  shouldPlaySearchNow,
+  shouldActivateConspiracyNow,
+  selectBestConspiracyTarget,
+  selectBestRedirectionTarget
+} from './botTargeting.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -120,5 +125,19 @@ const poorLeader = player({ id: 'a', name: 'Лидер', favor: 5, gold: 0 });
 const fat = player({ id: 'b', name: 'Богач', favor: 1, gold: 6 });
 assert.equal(selectBestConspiracyTarget([fat, poorLeader], 3)?.id, 'a');
 assert.equal(selectBestConspiracyTarget([fat, poorLeader], 2)?.id, 'b');
+
+const attacker = player({ id: 'atk', name: 'Атакующий' });
+const brokeTarget = player({ id: 'p2', name: 'Бедняк', gold: 0, favor: 3 });
+const richTarget = player({ id: 'p3', name: 'Богач', gold: 5, favor: 0 });
+assert.equal(
+  selectBestRedirectionTarget(attacker, brokeTarget, [richTarget], 'Вор')?.id,
+  'p3',
+  'Вор redirect must skip a target with no gold to steal'
+);
+assert.equal(
+  selectBestRedirectionTarget(attacker, brokeTarget, [richTarget], 'Шантажист')?.id,
+  undefined,
+  'Шантажист redirect must skip a target with no crowns to steal'
+);
 
 console.log('botTargeting.check: ok');

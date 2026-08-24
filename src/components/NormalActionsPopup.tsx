@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowRight } from 'lucide-react';
 import { useGameStore } from '../engine/GameStore';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
@@ -71,7 +72,13 @@ export const NormalActionsPopup: React.FC<{ onClose: () => void }> = ({ onClose 
             <div className="opt__row">
               <span className="opt__name">Устроить пир</span>
               <Tag tone={feastBlocked ? 'danger' : 'gold'}>
-                {feastBlocked ? `предел ${FEAST_CROWN_CAP} 👑` : '3 🪙 → +1 👑'}
+                {feastBlocked ? (
+                  `предел ${FEAST_CROWN_CAP} 👑`
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    3 🪙 <ArrowRight size={11} /> +1 👑
+                  </span>
+                )}
               </Tag>
             </div>
             <div className="opt__desc">
@@ -96,7 +103,11 @@ export const NormalActionsPopup: React.FC<{ onClose: () => void }> = ({ onClose 
           >
             <div className="opt__row">
               <span className="opt__name">Распустить слух</span>
-              <Tag tone="gold">5 🪙 → -1 👑</Tag>
+              <Tag tone="gold">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  5 🪙 <ArrowRight size={11} /> -1 👑
+                </span>
+              </Tag>
             </div>
             <div className="opt__desc">
               Сбивает корону у соперника, срывает Королевский приём и круг коронации.

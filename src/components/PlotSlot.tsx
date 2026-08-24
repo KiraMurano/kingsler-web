@@ -55,6 +55,7 @@ export const PlotSlot: React.FC<PlotSlotProps> = ({ plot, ownerId, ownerName, on
     >
       <img className="feltplot__img" src={info.artImage} alt={info.name} />
       <span className="feltplot__name">{info.name}</span>
+      {target && <span className="feltplot__owner">{target.name}</span>}
       {shown.charges !== undefined && (
         <span className="plotcard__charge">
           {shown.charges}
