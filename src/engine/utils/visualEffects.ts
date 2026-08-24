@@ -51,6 +51,24 @@ export function triggerSingleCardFlight(
   }, 850);
 }
 
+/** Fly an already face-up card (instant/plot) off the table — no flip reveal needed. */
+export function triggerFaceCardFlight(
+  set: StateSetter,
+  flightType: 'to_discard' | 'to_plot',
+  actorId: string,
+  card: GameCard
+): void {
+  const id = Math.random().toString(36).substring(7);
+  set({
+    hasCardDeparted: true,
+    cardFlightEvent: { id, isDuel: false, flightType, actorId, card }
+  });
+
+  globalThis.setTimeout(() => {
+    set({ cardFlightEvent: null });
+  }, 850);
+}
+
 export function triggerDuelCardFlight(
   set: StateSetter,
   attackerFlight: 'to_discard' | 'to_hand',

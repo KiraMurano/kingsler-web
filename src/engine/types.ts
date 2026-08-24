@@ -128,6 +128,8 @@ export interface CardFlightEvent {
   roleClaim?: Role;
   revealedRole?: GameCard;
   wasTruth?: boolean;
+  /** Instant/plot cards that are already face-up — no flip reveal, just a flight. */
+  card?: GameCard;
   attackerFlight?: 'to_discard' | 'to_hand';
   attackerId?: string;
   attackerRevealedRole?: GameCard;

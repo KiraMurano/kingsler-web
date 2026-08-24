@@ -334,6 +334,26 @@ export function closeRevealOutcome(
   }, 800);
 }
 
+/**
+ * A staked role card that never got revealed by a challenge flies back to its
+ * owner's hand; one that was already shown (truth-challenge path) flies to
+ * the discard. Shared by every place a pending role action stops being
+ * "on the table" — resolved, vetoed, or vetoed-after-truth-reveal — so the
+ * staked card never just vanishes off the arena.
+ */
+function flightHomeOrDiscard(
+  set: StateSetter,
+  action: Action,
+  isAfterTruthChallenge: boolean
+): void {
+  if (action.cardAlreadyResolved || !action.roleClaim) return;
+  if (isAfterTruthChallenge) {
+    triggerSingleCardFlight(set, 'to_discard', action.actorId, action.roleClaim);
+  } else {
+    triggerSingleCardFlight(set, 'to_hand', action.actorId, action.roleClaim);
+  }
+}
+
 export function proceedAfterDoubtPassed(
   get: StateGetter,
   set: StateSetter,
@@ -364,7 +384,9 @@ export function triggerVetoWindowOrResolveEffect(
   }
 
   if (isVetoed) {
+    flightHomeOrDiscard(set, action, isAfterTruthChallenge);
     set(state => ({
+      overlayInstant: null,
       history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
     }));
     timerManager.scheduleDelay(() => {
@@ -400,8 +422,8 @@ export function triggerVetoWindowOrResolveEffect(
       }
     }, 2200);
   } else {
+    flightHomeOrDiscard(set, action, isAfterTruthChallenge);
     set({
-      hasCardDeparted: false,
       turnPhase: 'IDLE'
     });
     timerManager.scheduleDelay(() => {
@@ -447,7 +469,9 @@ export function proceedAfterVetoWindow(
   }
 
   if (isVetoed) {
+    flightHomeOrDiscard(set, pendingAction, !!isPendingActionAfterTruthChallenge);
     set(state => ({
+      overlayInstant: null,
       history: [`🚫 Действие «${pendingAction.roleClaim || pendingAction.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
     }));
     if (pendingAction.isMorningTrigger) {
@@ -465,13 +489,7 @@ export function proceedAfterVetoWindow(
     return;
   }
 
-  if (!pendingAction.cardAlreadyResolved) {
-    if (isPendingActionAfterTruthChallenge) {
-      triggerSingleCardFlight(set, 'to_discard', pendingAction.actorId, pendingAction.roleClaim);
-    } else if (pendingAction.roleClaim) {
-      triggerSingleCardFlight(set, 'to_hand', pendingAction.actorId, pendingAction.roleClaim);
-    }
-  }
+  flightHomeOrDiscard(set, pendingAction, !!isPendingActionAfterTruthChallenge);
 
   get()._resolvePendingActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
 }

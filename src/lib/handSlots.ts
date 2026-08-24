@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { GameCard } from '../engine/types';
+import type { Action, GameCard } from '../engine/types';
 
 export type HandSlots = [GameCard | null, GameCard | null];
 
@@ -48,6 +48,28 @@ export function compactIndex(hand: GameCard[], slots: HandSlots, slot: number): 
     }
   }
   return hand.indexOf(card);
+}
+
+/**
+ * A staked role card stays hidden behind the "на кону" placeholder for as
+ * long as `pendingAction` still references it — from the claim all the way
+ * through doubt/veto windows and the departure flight. Gating this on
+ * `turnPhase` instead (as it used to) let turnPhase flip back to IDLE while
+ * the action was still resolving, revealing the real card in hand at the same
+ * time the arena was still showing (or animating) the staked card: a visible
+ * duplicate.
+ */
+export function isCardStaked(
+  pendingAction: Pick<Action, 'type' | 'actorId' | 'stakedCardIndex'> | null | undefined,
+  playerId: string,
+  engineIndex: number
+): boolean {
+  return (
+    pendingAction?.type === 'role' &&
+    pendingAction.actorId === playerId &&
+    engineIndex >= 0 &&
+    pendingAction.stakedCardIndex === engineIndex
+  );
 }
 
 /** Two visual seats that keep occupancy when the engine splices the compact hand. */

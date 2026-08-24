@@ -201,14 +201,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --------------------------------------------------------------------------
 
   skipNormalActionPhase: () => {
-    const { turnPhase, turnSubPhase } = get();
-    if (turnPhase !== 'IDLE' || turnSubPhase !== 'NORMAL_ACTION_PHASE') return;
+    const { turnPhase, turnSubPhase, pendingAction } = get();
+    if (turnPhase !== 'IDLE' || turnSubPhase !== 'NORMAL_ACTION_PHASE' || pendingAction) return;
     set({ turnSubPhase: 'CARD_PLAY_PHASE' });
   },
 
   endTurnManually: () => {
-    const { turnPhase, activePlayerId, players } = get();
-    if (turnPhase !== 'IDLE') return;
+    const { turnPhase, activePlayerId, players, pendingAction } = get();
+    // A normal action briefly sits as a pendingAction while turnPhase is
+    // still IDLE, waiting for its ACTION_HOLD_MS timer to apply its effect.
+    // Ending the turn here would clear that timer and drop the effect.
+    if (turnPhase !== 'IDLE' || pendingAction) return;
     const actor = players.find(p => p.id === activePlayerId);
     if (!actor) return;
     set(state => ({
@@ -298,9 +301,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     const stakeNotice = action.roleClaim ? ' (карта на кону)' : '';
     const vbNotice = withVaBanque ? ' 🎲 [ВА-БАНК x2 при проверке!]' : '';
 
-    const speechText = action.type === 'normal'
-      ? `«${action.name}»`
-      : `«Заявляю: ${action.roleClaim}!${withVaBanque ? ' ВА-БАНК!' : ''}${target ? ` Цель: ${target.name}` : ''}»`;
+    const isCardExchange = action.type === 'normal' && action.name.includes('Сменить');
+    const exchangesTwoCards = (action.stakedCardIndices?.length ?? 1) >= 2;
+    const speechText = isCardExchange
+      ? `«Меняю карт${exchangesTwoCards ? 'ы' : 'у'}»`
+      : action.type === 'normal'
+        ? `«${action.name}»`
+        : `«Заявляю: ${action.roleClaim}!${withVaBanque ? ' ВА-БАНК!' : ''}${target ? ` Цель: ${target.name}` : ''}»`;
 
     set(state => ({
       hasCardDeparted: false,

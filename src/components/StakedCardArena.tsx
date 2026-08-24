@@ -149,24 +149,37 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
 
   /* 1. Plain court action — a badge, no card is staked. */
   if (pendingAction?.type === 'normal') {
+    const isCardExchange = pendingAction.name.includes('Сменить');
+    const actorName = players.find(p => p.id === pendingAction.actorId)?.name ?? '';
+    const exchangesTwoCards = (pendingAction.stakedCardIndices?.length ?? 1) >= 2;
+    const label = isCardExchange
+      ? `${actorName} меняет карт${exchangesTwoCards ? 'ы' : 'у'}`
+      : courtly(pendingAction.name);
     return (
       <div className="staked">
         <span className="claimbadge claimbadge--solo">
-          {claimBadge(courtly(pendingAction.name), target?.name)}
+          {claimBadge(label, target?.name)}
         </span>
       </div>
     );
   }
 
-  /* 1b. Instant laid openly on the table. */
-  if (pendingAction?.type === 'instant') {
-    const laid = (pendingAction.instantType || pendingAction.name) as GameCard;
+  /* 1b. Instant laid openly on the table — kept mounted while it flies to
+     discard so it never just pops out of existence when it resolves. */
+  const faceFlight = !cardFlightEvent?.isDuel ? cardFlightEvent?.card : undefined;
+  if (pendingAction?.type === 'instant' || (!pendingAction && faceFlight)) {
+    const laid = pendingAction?.type === 'instant'
+      ? (pendingAction.instantType || pendingAction.name) as GameCard
+      : (faceFlight as GameCard);
+    const flightClass = !pendingAction && faceFlight
+      ? flightClassFor(cardFlightEvent?.flightType, cardFlightEvent?.actorId)
+      : '';
     return (
       <div className="staked">
         <div className="staked__pile">
-          <FaceCard card={laid} onClick={() => inspect(laid)} />
+          <FaceCard card={laid} className={flightClass} onClick={() => inspect(laid)} />
           {overlayEl}
-          <span className="claimbadge">{claimBadge(laid, target?.name)}</span>
+          {pendingAction && <span className="claimbadge">{claimBadge(laid, target?.name)}</span>}
         </div>
       </div>
     );
@@ -278,8 +291,10 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
     (!!isPendingActionAfterTruthChallenge && !!pendingAction?.roleClaim) ||
     (isSingleFlight && cardFlightEvent?.flightType === 'to_discard');
 
-  const showPile =
-    !pendingAction?.cardAlreadyResolved && (!hasCardDeparted || isSingleFlight || !!overlayInstant);
+  // Once the staked card has actually departed (its flight finished), it must
+  // never pop back — a lingering overlayInstant (e.g. the veto stamp) is not
+  // a reason to redraw a card that already flew off the table.
+  const showPile = !pendingAction?.cardAlreadyResolved && (!hasCardDeparted || isSingleFlight);
 
   const badge = overlayInstant
     ? overlayInstant.card === 'Перенаправление'
@@ -287,10 +302,12 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
       : overlayInstant.card
     : claimBadge(String(claimed), target?.name);
 
+  if (!showPile && !overlayEl) return null;
+
   return (
     <div className="staked">
-      {showPile && (
-        <div className="staked__pile">
+      <div className="staked__pile">
+        {showPile && (
           <FlipCard
             artImage={revealed ? CARD_INFO[revealed]?.artImage : undefined}
             category={revealed ? CARD_INFO[revealed]?.category : CARD_INFO[claimed]?.category}
@@ -305,9 +322,9 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
             badge={badge}
             onClick={() => inspect(revealed || claimed)}
           />
-          {overlayEl}
-        </div>
-      )}
+        )}
+        {overlayEl}
+      </div>
     </div>
   );
 };

@@ -70,7 +70,7 @@ export default function App() {
 
   const human = players.find(p => !p.isBot);
   const activePlayer = players.find(p => p.id === activePlayerId);
-  const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE';
+  const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -280,7 +280,6 @@ export default function App() {
           <Hand
             player={human}
             pendingAction={pendingAction}
-            turnPhase={turnPhase}
             isMyTurn={isMyTurn}
             isTargetReaction={isTargetReaction}
             isVetoWindow={isVetoWindow}

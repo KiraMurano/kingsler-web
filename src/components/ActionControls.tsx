@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../engine/GameStore';
 import type { Role } from '../engine/types';
 import { Button } from './ui/Button';
@@ -11,14 +11,21 @@ const Panel: React.FC<{
   title: string;
   note?: React.ReactNode;
   alert?: boolean;
+  busy?: string | null;
   children: React.ReactNode;
-}> = ({ title, note, alert, children }) => (
-  <div key={title} className={`actions ${alert ? 'actions--alert' : ''}`}>
+}> = ({ title, note, alert, busy, children }) => (
+  <div className={`actions ${alert ? 'actions--alert' : ''}`}>
     <div className="actions__head">
       <span className="actions__title">{title}</span>
     </div>
     {note && <div className="actions__note">{note}</div>}
-    <div className="actions__grid">{children}</div>
+    <div className={`actions__grid${busy ? ' actions__grid--busy' : ''}`}>{children}</div>
+    {busy && (
+      <div className="actions__busy">
+        <span className="actions__busy-dot" />
+        {busy}
+      </div>
+    )}
   </div>
 );
 
@@ -47,11 +54,29 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
 
   const [duelPicker, setDuelPicker] = useState(false);
   const [redirectPicker, setRedirectPicker] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [vetoDismissed, setVetoDismissed] = useState(false);
 
   const human = players.find(p => !p.isBot);
+
+  // Any real change to the reaction window means the click landed and the
+  // game moved on — drop the "waiting" indicator so it never gets stuck.
+  const windowKey = `${turnPhase}|${activePlayerId}|${pendingAction?.id ?? ''}|${pendingDoubtDoubterId ?? ''}|${isVetoed}`;
+  useEffect(() => {
+    setBusy(null);
+    setVetoDismissed(false);
+  }, [windowKey]);
+
+  /** Wrap a button's handler so clicking it immediately shows a "waiting" state
+   *  instead of leaving the player guessing whether the click registered. */
+  const act = (label: string, fn: () => void) => () => {
+    setBusy(label);
+    fn();
+  };
+
   if (!human) return null;
 
-  const isMyTurn = activePlayerId === human.id && turnPhase === 'IDLE';
+  const isMyTurn = activePlayerId === human.id && turnPhase === 'IDLE' && !pendingAction;
   const isActor = pendingAction?.actorId === human.id;
   const isTarget = pendingAction?.targetId === human.id;
   const hasTokens = human.actionTokens >= 1;
@@ -90,16 +115,16 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     if (redirectPicker) {
       const options = redirectOptions;
       return (
-        <Panel title="Перенаправление" note="Переведите нападение на другого придворного." alert>
+        <Panel title="Перенаправление" note="Переведите нападение на другого придворного." alert busy={busy}>
           {options.map(p => (
             <Button
               key={p.id}
               tone="gold"
               block
-              onClick={() => {
+              onClick={act('Перенаправляем атаку…', () => {
                 setRedirectPicker(false);
                 playInstant(human.id, 'Перенаправление', redirectIndex, p.id);
-              }}
+              })}
             >
               {p.name}
             </Button>
@@ -117,6 +142,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           title="Выбор щита"
           note={`Положите карту взакрытую и заявите «${shieldRole}».`}
           alert
+          busy={busy}
         >
           {human.hand.map((card, idx) => {
             const truthful = card === shieldRole;
@@ -126,10 +152,10 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
                 tone={truthful ? 'good' : 'gold'}
                 block
                 sub={truthful ? 'Правда — щит настоящий' : 'Блеф — рискованно'}
-                onClick={() => {
+                onClick={act('Готовим дуэль…', () => {
                   setDuelPicker(false);
                   targetDeclareDuel(human.id, idx);
-                }}
+                })}
               >
                 {card}
               </Button>
@@ -151,13 +177,14 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           </>
         }
         alert
+        busy={busy}
       >
         <Button
           tone="calm"
           block
           hotkey="1"
           sub="Позволить эффект • 0 ⚡"
-          onClick={() => targetAcceptAttack(human.id)}
+          onClick={act('Действие вступает в силу…', () => targetAcceptAttack(human.id))}
         >
           Принять
         </Button>
@@ -167,7 +194,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           hotkey="2"
           disabled={!hasTokens}
           sub={hasTokens ? 'Проверить заявление • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
-          onClick={() => targetDoubtAttack(human.id)}
+          onClick={act('Вскрываем карту…', () => targetDoubtAttack(human.id))}
         >
           Не верю
         </Button>
@@ -198,13 +225,13 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   /* 2. Attacker answers a declared duel. */
   if (turnPhase === 'DUEL_ATTACKER_WINDOW' && isActor) {
     return (
-      <Panel title="Вызов на дуэль" note="Обе карты вскроются одновременно." alert>
+      <Panel title="Вызов на дуэль" note="Обе карты вскроются одновременно." alert busy={busy}>
         <Button
           tone="danger"
           block
           hotkey="2"
           sub="Одновременное вскрытие"
-          onClick={() => attackerAcceptDuel(human.id)}
+          onClick={act('Вскрываем карты…', () => attackerAcceptDuel(human.id))}
         >
           Принять бой
         </Button>
@@ -213,7 +240,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           block
           hotkey="1"
           sub="Карта уходит в сброс"
-          onClick={() => attackerRetreatDuel(human.id)}
+          onClick={act('Карта уходит в сброс…', () => attackerRetreatDuel(human.id))}
         >
           Отступить
         </Button>
@@ -228,6 +255,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
         title="Окно сомнений"
         note={<>Заявлена роль «{pendingAction?.roleClaim}». Проверить или пропустить?</>}
         alert
+        busy={busy}
       >
         <Button
           tone="danger"
@@ -235,19 +263,26 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           hotkey="D"
           disabled={!hasTokens}
           sub={hasTokens ? 'Разоблачить блеф • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
-          onClick={() => doubtAction(human.id)}
+          onClick={act('Вскрываем карту…', () => doubtAction(human.id))}
         >
           Не верю
         </Button>
-        <Button tone="good" block hotkey="V" sub="Пропустить проверку" onClick={() => passDoubt(human.id)}>
+        <Button
+          tone="good"
+          block
+          hotkey="V"
+          sub="Пропустить проверку"
+          onClick={act('Ждём остальных игроков…', () => passDoubt(human.id))}
+        >
           Верю
         </Button>
       </Panel>
     );
   }
 
-  /* 4. Veto window before the effect lands. */
-  if (turnPhase === 'VETO_WINDOW') {
+  /* 4. Veto window before the effect lands. Closes immediately on click,
+     same as every other action popup — no lingering panel. */
+  if (turnPhase === 'VETO_WINDOW' && !vetoDismissed) {
     const vetoIndex = human.hand.indexOf('Право вето');
     const canVeto = vetoIndex !== -1 && !isVetoed;
     return (
@@ -261,12 +296,23 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
             tone="danger"
             block
             sub="Отменить действие • 0 ⚡"
-            onClick={() => playInstant(human.id, 'Право вето', vetoIndex)}
+            onClick={() => {
+              setVetoDismissed(true);
+              playInstant(human.id, 'Право вето', vetoIndex);
+            }}
           >
             Наложить вето
           </Button>
         )}
-        <Button tone="calm" block sub="Позволить эффект" onClick={proceedAfterVetoWindow}>
+        <Button
+          tone="calm"
+          block
+          sub="Позволить эффект"
+          onClick={() => {
+            setVetoDismissed(true);
+            proceedAfterVetoWindow();
+          }}
+        >
           Продолжить
         </Button>
       </Panel>
@@ -279,10 +325,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     human.activePlot?.type === 'Тайный заговор' ? (human.activePlot.charges ?? 0) : 0;
 
   return (
-    <Panel
-      title={isMyTurn ? 'Ваш ход' : 'Ожидание'}
-      note={isMyTurn ? undefined : 'Жетоны берегите на проверки.'}
-    >
+    <Panel title={isMyTurn ? 'Ваш ход' : 'Ожидание'} busy={busy}>
       <Button
         tone="calm"
         block
@@ -321,7 +364,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
             ? `Сохранить ${human.actionTokens} ⚡ на защиту`
             : 'Добор карт и передача хода'
         }
-        onClick={endTurnManually}
+        onClick={act('Передаём ход…', endTurnManually)}
       >
         Завершить ход
       </Button>
