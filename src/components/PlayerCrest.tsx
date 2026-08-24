@@ -57,7 +57,7 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
             </span>
           </div>
           <div className={`crest__state ${isActive ? 'crest__state--mine' : ''}`}>
-            {isActive ? 'ваш ход' : 'ожидание'}
+            <span key={isActive ? 'mine' : 'wait'}>{isActive ? 'ваш ход' : 'ожидание'}</span>
           </div>
         </div>
       </div>

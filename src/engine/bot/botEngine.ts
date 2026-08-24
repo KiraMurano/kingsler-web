@@ -1,5 +1,6 @@
 import { useGameStore } from '../GameStore';
 import { makeBotMove } from './botTurnPlanner';
+import { BOT_MOVE_MS, BOT_MOVE_JITTER_MS } from '../timing';
 import {
   handleDoubtPhase,
   handleTargetReactionPhase,
@@ -56,7 +57,6 @@ function checkAndScheduleBotMove(): void {
     !state.pendingAction &&
     !state.revealOutcome &&
     !state.duelOutcome &&
-    !state.spyPeekData &&
     !state.informantPeekData &&
     !state.winnerId
   ) {
@@ -70,7 +70,6 @@ function checkAndScheduleBotMove(): void {
             !curState.pendingAction &&
             !curState.revealOutcome &&
             !curState.duelOutcome &&
-            !curState.spyPeekData &&
             !curState.informantPeekData &&
             !curState.winnerId
           ) {
@@ -85,7 +84,7 @@ function checkAndScheduleBotMove(): void {
               }
             }
           }
-        }, 800 + Math.random() * 400);
+        }, BOT_MOVE_MS + Math.random() * BOT_MOVE_JITTER_MS);
       }
     } else {
       botTimers.clear('bot_move');

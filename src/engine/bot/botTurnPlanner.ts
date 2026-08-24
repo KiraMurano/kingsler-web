@@ -5,10 +5,18 @@ import { getBotArchetype } from '../botsConfig';
 import {
   selectBestThiefTarget,
   selectBestBlackmailerTarget,
-  selectBestSpyTarget,
+  selectBestSearchTarget,
+  shouldPlaySearchNow,
+  selectBestConspiracyTarget,
+  shouldActivateConspiracyNow,
   selectBestRumorTarget,
   selectBestDossierTarget
 } from './botTargeting';
+
+function bluffStakeIndex(hand: string[]): number {
+  const i = hand.indexOf('Обыск покоев');
+  return i < 0 ? 0 : i;
+}
 
 /**
  * Планирует и выполняет ход активного бота.
@@ -100,7 +108,7 @@ export function makeBotMove(botId: string): void {
     if (bot.hand.length > 0 && Math.random() < 0.25) {
       const badIndices = bot.hand
         .map((c, i) => ({ c, i }))
-        .filter(({ c }) => c === 'Шпион' || c === 'Дворцовый переполох' || c === 'Право вето' || c === 'Перенаправление')
+        .filter(({ c }) => c === 'Дворцовый переполох' || c === 'Право вето' || c === 'Перенаправление')
         .map(({ i }) => i);
 
       if (badIndices.length > 0) {
@@ -129,16 +137,18 @@ export function makeBotMove(botId: string): void {
   // ШАГ 2: ФАЗА РОЗЫГРЫША КАРТ (ФАЗА 3)
   // ==========================================================================
 
-  // Приоритет 0: Активация готового «Тайного заговора» (при 2, 3 или 4 зарядах) в свой ход (1 ⚡)
-  if (bot.activePlot?.type === 'Тайный заговор' && (bot.activePlot.charges ?? 0) >= 2 && bot.actionTokens >= 1) {
+  // Приоритет 0: «Тайный заговор» — только сильный удар, иначе копить / роль
+  if (bot.activePlot?.type === 'Тайный заговор' && bot.actionTokens >= 1) {
     const charges = bot.activePlot.charges ?? 0;
-    const target = leader || opponents[0];
-    if (target) {
-      const effect: 'gold' | 'crown' = (charges >= 3 && target.favor >= 1) ? 'crown' : 'gold';
-      if (charges >= 3 || target.gold >= 2 || Math.random() < 0.75) {
-        useGameStore.getState().activateConspiracy(bot.id, target.id, effect, false);
-        return;
-      }
+    const target = selectBestConspiracyTarget(opponents, charges);
+    if (
+      target &&
+      shouldActivateConspiracyNow(bot, target, charges, state.coronationCandidateId)
+    ) {
+      const effect: 'gold' | 'crown' =
+        charges >= 3 && target.favor >= 1 ? 'crown' : 'gold';
+      useGameStore.getState().activateConspiracy(bot.id, target.id, effect, false);
+      return;
     }
   }
 
@@ -173,7 +183,7 @@ export function makeBotMove(botId: string): void {
     }
   }
 
-  // Приоритет 2: Розыгрыш Инстантов ⚡ (Обвинение в измене, Шпион, Дворцовый переполох)
+  // Приоритет 2: Розыгрыш Инстантов ⚡ (Обвинение в измене, Обыск покоев, Дворцовый переполох)
   const treasonIdx = bot.hand.indexOf('Обвинение в измене');
   if (treasonIdx !== -1) {
     const target = leader && leader.favor >= 1
@@ -186,11 +196,18 @@ export function makeBotMove(botId: string): void {
     }
   }
 
-  const spyIdx = bot.hand.indexOf('Шпион');
-  if (spyIdx !== -1 && Math.random() < 0.70) {
-    const target = selectBestSpyTarget(bot, opponents);
-    if (target) {
-      useGameStore.getState().playInstant(bot.id, 'Шпион', spyIdx, target.id);
+  const searchIdx = bot.hand.indexOf('Обыск покоев');
+  if (searchIdx !== -1) {
+    const target = selectBestSearchTarget(bot, opponents);
+    if (
+      target &&
+      shouldPlaySearchNow(bot, target, {
+        players: state.players,
+        activePlayerId: state.activePlayerId,
+        coronationCandidateId: state.coronationCandidateId
+      })
+    ) {
+      useGameStore.getState().playInstant(bot.id, 'Обыск покоев', searchIdx, target.id);
       return;
     }
   }
@@ -255,7 +272,7 @@ export function makeBotMove(botId: string): void {
           name: 'Наследник',
           roleClaim: 'Наследник',
           actorId: bot.id,
-          stakedCardIndex: 0,
+          stakedCardIndex: bluffStakeIndex(bot.hand),
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -397,7 +414,7 @@ export function makeBotMove(botId: string): void {
             roleClaim: 'Вор',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: 0,
+            stakedCardIndex: bluffStakeIndex(bot.hand),
             withVaBanque: withVB,
             costGold: 0,
             costTokens: vbTokens,
@@ -416,7 +433,7 @@ export function makeBotMove(botId: string): void {
             roleClaim: 'Шантажист',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: 0,
+            stakedCardIndex: bluffStakeIndex(bot.hand),
             costGold: 0,
             costTokens: 1,
             description: `Заявляет «Шантажист» против ${target.name}.`
@@ -432,7 +449,7 @@ export function makeBotMove(botId: string): void {
         name: safeClaim,
         roleClaim: safeClaim,
         actorId: bot.id,
-        stakedCardIndex: 0,
+        stakedCardIndex: bluffStakeIndex(bot.hand),
         costGold: 0,
         costTokens: 1,
         description: `Заявляет «${safeClaim}».`

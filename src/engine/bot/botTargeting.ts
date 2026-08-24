@@ -1,4 +1,5 @@
 import type { Player } from '../types';
+import { isRole } from '../cards';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
 
@@ -66,34 +67,146 @@ export function selectBestBlackmailerTarget(bot: Player, opponents: Player[]): P
 }
 
 /**
- * Выбор цели для инстанта «Шпион» (тайно посмотреть карты).
- * Интеллектуальный приоритет: шпионить за опасными игроками, карты которых еще НЕ известны боту!
+ * Выбор цели для инстанта «Обыск покоев» (сброс активной интриги).
  */
-export function selectBestSpyTarget(bot: Player, opponents: Player[]): Player | null {
-  if (opponents.length === 0) return null;
-
-  const valid = [...opponents];
+export function selectBestSearchTarget(_bot: Player, opponents: Player[]): Player | null {
+  const valid = opponents.filter(p => p.activePlot);
+  if (valid.length === 0) return null;
 
   valid.sort((a, b) => {
-    const knownA = botMemory.getKnownCardsForBot(bot.id, a.id).length;
-    const knownB = botMemory.getKnownCardsForBot(bot.id, b.id).length;
-
-    let scoreA = (a.favor * 3.0 + a.gold * 1.0);
-    let scoreB = (b.favor * 3.0 + b.gold * 1.0);
-
-    // Бонус за неизвестность: шпионить за тем, чьих карт бот не знает
-    if (knownA === 0) scoreA += 5.0;
-    else if (knownA === 1) scoreA += 2.0;
-    else scoreA -= 10.0; // Обе карты уже известны — нет смысла тратить шпиона
-
-    if (knownB === 0) scoreB += 5.0;
-    else if (knownB === 1) scoreB += 2.0;
-    else scoreB -= 10.0;
-
-    return scoreB - scoreA;
+    const score = (p: Player) => {
+      const plot = p.activePlot!;
+      let s = p.favor * 2;
+      if (plot.type === 'Тайный заговор') s += 8 + (plot.charges ?? 0) * 3;
+      else if (plot.type === 'Королевский приём') s += 6;
+      else if (plot.type === 'Золотая булла') s += 5;
+      else s += 3;
+      return s;
+    };
+    return score(b) - score(a);
   });
 
-  return valid[0] || null;
+  return valid[0] ?? null;
+}
+
+function nextPlayerId(players: Player[], activePlayerId: string): string | undefined {
+  const seated = [...players].sort((a, b) => a.seatNumber - b.seatNumber);
+  if (seated.length === 0) return undefined;
+  const idx = seated.findIndex(p => p.id === activePlayerId);
+  if (idx < 0) return seated[0]?.id;
+  return seated[(idx + 1) % seated.length].id;
+}
+
+/**
+ * Играть «Обыск покоев» сейчас или оставить карту на роль / блеф.
+ * Срочно: заговор 2+, утренний триггер следующего игрока, лидер на 5 👑 / в круге коронации.
+ */
+export function shouldPlaySearchNow(
+  bot: Player,
+  target: Player,
+  ctx: {
+    players: Player[];
+    activePlayerId: string;
+    coronationCandidateId: string | null;
+  },
+  rng: () => number = Math.random
+): boolean {
+  const plot = target.activePlot;
+  if (!plot) return false;
+
+  // Свой ход на 5 👑 важнее: обыск заканчивает ход, коронацию не взять.
+  if (bot.favor >= 5) return false;
+
+  const nextId = nextPlayerId(ctx.players, ctx.activePlayerId);
+  const morningPlot = plot.type === 'Королевский приём' || plot.type === 'Золотая булла';
+  const urgent =
+    (plot.type === 'Тайный заговор' && (plot.charges ?? 0) >= 2) ||
+    target.favor >= 5 ||
+    ctx.coronationCandidateId === target.id ||
+    (target.id === nextId && morningPlot);
+  if (urgent) return true;
+
+  const hasWinRole = bot.hand.includes('Наследник') || bot.hand.includes('Шантажист');
+  if (hasWinRole) return false;
+
+  const weakPlot =
+    plot.type === 'Досье' ||
+    plot.type === 'Чёрная книга' ||
+    plot.type === 'Сеть информаторов';
+  if (weakPlot && target.favor < 4 && bot.hand.some(isRole)) return false;
+
+  const arch = getBotArchetype(bot.id);
+  let chance = 0.22 + arch.targetAggression * 0.28 - arch.bluffRate * 0.25;
+  if (morningPlot) chance += 0.2;
+  if (plot.type === 'Тайный заговор') chance += 0.12 + (plot.charges ?? 0) * 0.08;
+  if (bot.hand.some(isRole)) chance -= 0.2;
+  return rng() < chance;
+}
+
+/**
+ * Кого бить «Тайным заговором»: с 3+ — лидера по коронам, иначе богатого.
+ */
+export function selectBestConspiracyTarget(
+  opponents: Player[],
+  charges: number
+): Player | null {
+  const valid = charges >= 3
+    ? opponents.filter(p => p.favor > 0 || p.gold > 0)
+    : opponents.filter(p => p.gold > 0);
+  if (valid.length === 0) return null;
+
+  valid.sort((a, b) => {
+    const score = (p: Player) => {
+      let s = p.favor * 3 + p.gold;
+      if (p.favor >= 5) s += 12;
+      else if (p.favor >= 4) s += 4;
+      if (charges >= 3 && p.favor > 0) s += 6;
+      return s;
+    };
+    return score(b) - score(a);
+  });
+  return valid[0] ?? null;
+}
+
+/**
+ * Слить заговор сейчас или копить / отдать ход роли.
+ * Срочно: 4 заряда (пока не обыскали), корона с лидера 5 👑 / круга коронации.
+ */
+export function shouldActivateConspiracyNow(
+  bot: Player,
+  target: Player,
+  charges: number,
+  coronationCandidateId: string | null,
+  rng: () => number = Math.random
+): boolean {
+  if (charges < 1) return false;
+  if (bot.favor >= 5) return false;
+
+  const canCrown = charges >= 3 && target.favor >= 1;
+  const goldHit = Math.min(charges, target.gold);
+  const hasWinRole = bot.hand.includes('Наследник') || bot.hand.includes('Шантажист');
+  const hasAnyRole = bot.hand.some(isRole);
+
+  if (canCrown && (target.favor >= 5 || coronationCandidateId === target.id)) return true;
+  if (charges >= 4 && (canCrown || goldHit >= 2)) return true;
+
+  if (hasWinRole) return false;
+
+  if (charges === 3) {
+    if (canCrown && target.favor >= 3) return true;
+    if (goldHit >= 3 && !hasAnyRole) return true;
+    if (canCrown) {
+      const arch = getBotArchetype(bot.id);
+      return rng() < 0.40 + arch.targetAggression * 0.25;
+    }
+    return false;
+  }
+
+  if (goldHit < charges) return false;
+  if (hasAnyRole) return false;
+  if (goldHit <= 1) return false;
+  const arch = getBotArchetype(bot.id);
+  return rng() < 0.12 + arch.greed * 0.4;
 }
 
 /**

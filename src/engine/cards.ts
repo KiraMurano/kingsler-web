@@ -40,7 +40,7 @@ export const CARD_COPIES_MAP: Record<GameCard, number> = {
   'Перенаправление': 2,
   'Ва-банк': 2,
   'Дворцовый переполох': 2,
-  'Шпион': 2
+  'Обыск покоев': 2
 };
 
 export const getCardMaxCopies = (card: GameCard): number => CARD_COPIES_MAP[card] ?? CARD_DESCRIPTIONS[card]?.copiesCount ?? 2;

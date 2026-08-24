@@ -1,5 +1,6 @@
 import type { GameState, Player } from '../types';
 import { triggerResourceFloat } from '../utils/visualEffects';
+import { beginCoronationIfNeeded } from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -13,7 +14,7 @@ export function addSealsToPlayer(
   count: number
 ): void {
   if (count <= 0) return;
-  const { players, coronationCandidateId } = get();
+  const { players } = get();
   const pIdx = players.findIndex(p => p.id === playerId);
   if (pIdx === -1) return;
 
@@ -61,10 +62,7 @@ export function addSealsToPlayer(
     history: [`⚜️ ${player.name} получает +${count} ⚜️ Королевскую печать.${charterNotice}${conversionNotice}`, ...state.history].slice(0, 50)
   }));
 
-  if (updatedPlayer.favor >= 6 && !coronationCandidateId) {
-    set(state => ({
-      coronationCandidateId: updatedPlayer.id,
-      history: [`👑 КРУГ КОРОНАЦИИ! ${updatedPlayer.name} набрал 6 👑 через печати! Если никто не собьёт его короны за круг, он станет Королём!`, ...state.history].slice(0, 50)
-    }));
+  if (updatedPlayer.favor >= 6) {
+    beginCoronationIfNeeded(get, set, updatedPlayer.id);
   }
 }

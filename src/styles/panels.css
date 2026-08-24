@@ -636,6 +636,19 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fade-sink {
+  to { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes hand-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes hand-out {
+  to { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+
 @keyframes slide-from-right {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
@@ -659,6 +672,16 @@
 @keyframes card-deal {
   from { opacity: 0; transform: translateY(26px) scale(0.8); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes overlay-lay {
+  from { opacity: 0; transform: rotate(4deg) translate(6%, -16px) scale(0.92); }
+  to { opacity: 1; transform: rotate(8deg) translate(10%, -4%) scale(1); }
+}
+
+@keyframes veto-lay {
+  from { opacity: 0; transform: rotate(6deg) translate(8%, -20px) scale(0.92); }
+  to { opacity: 1; transform: rotate(16deg) translate(16%, -6%) scale(1); }
 }
 
 @keyframes plaque-out {

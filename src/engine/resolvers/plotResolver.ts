@@ -1,7 +1,10 @@
-import type { GameState, PlotType, Player, GameCard } from '../types';
+import type { Action, GameState, PlotType, Player, GameCard } from '../types';
+import { CARD_INFO } from '../cards';
 import { declineGen } from '../utils/russianText';
-import { triggerResourceFloat, triggerSingleCardFlight } from '../utils/visualEffects';
+import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
+import { ACTION_HOLD_MS } from '../timing';
+import { fallenCoronationPatch, beginCoronationIfNeeded } from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -39,55 +42,83 @@ export function playPlotAction(
   targetPlayerId?: string
 ): void {
   timerManager.clearAll();
-  const { players, activePlayerId, discardPile } = get();
+  const { players, activePlayerId } = get();
   const actor = players.find(p => p.id === activePlayerId);
   if (!actor || actor.actionTokens < 1) return;
 
   const playedCard = actor.hand[cardIndex];
   if (playedCard !== plotType) return;
 
-  // Remove plot card from hand without immediate refill (deferred draw at end of turn)
   const newHand = [...actor.hand];
   newHand.splice(cardIndex, 1);
-
-  const oldPlot = actor.activePlot;
-  const updatedDiscard = oldPlot ? [...discardPile, oldPlot.type] : discardPile;
-
-  const newPlotData = {
-    id: Math.random().toString(36).substring(7),
-    type: plotType,
-    targetPlayerId,
-    charges: plotType === 'Сеть информаторов' ? 2 : plotType === 'Тайный заговор' ? 0 : undefined
-  };
 
   const newPlayers = players.map(p => p.id === actor.id ? {
     ...p,
     actionTokens: p.actionTokens - 1,
-    hand: newHand,
-    activePlot: newPlotData
+    hand: newHand
   } : p);
 
-  triggerSingleCardFlight(set, 'to_plot', actor.id, undefined, plotType);
   triggerResourceFloat(set, actor.id, '-1 ⚡', false);
 
   const target = targetPlayerId ? players.find(p => p.id === targetPlayerId) : null;
   const targetText = target ? ` (цель: ${target.name})` : '';
 
+  const action: Action = {
+    id: Math.random().toString(36).substring(7),
+    type: 'plot',
+    name: plotType,
+    plotType,
+    actorId: actor.id,
+    targetId: targetPlayerId,
+    costGold: 0,
+    costTokens: 1,
+    description: CARD_INFO[plotType]?.shortDescription ?? ''
+  };
+
   set(state => ({
     players: newPlayers,
-    discardPile: updatedDiscard,
+    pendingAction: action,
     hasPlayedPlotThisTurn: true,
+    isVetoed: false,
+    overlayInstant: null,
+    isPendingActionAfterTruthChallenge: false,
     turnSubPhase: 'CARD_PLAY_PHASE',
     history: [`🎴 ${actor.name} разыгрывает Интригу «${plotType}»${targetText} (потрачен 1 ⚡).`, ...state.history].slice(0, 50)
   }));
 
+  get()._triggerVetoWindowOrResolveEffect(action, false);
+}
+
+export function landPlot(get: StateGetter, set: StateSetter, action: Action): void {
+  const { players, discardPile } = get();
+  const actor = players.find(p => p.id === action.actorId);
+  const plotType = action.plotType;
+  if (!actor || !plotType) {
+    get()._checkEndgameAndAdvanceTurn();
+    return;
+  }
+
+  const oldPlot = actor.activePlot;
+  const updatedDiscard = oldPlot ? [...discardPile, oldPlot.type] : discardPile;
+  const newPlotData = {
+    id: Math.random().toString(36).substring(7),
+    type: plotType,
+    targetPlayerId: action.targetId,
+    charges: plotType === 'Сеть информаторов' ? 2 : plotType === 'Тайный заговор' ? 0 : undefined
+  };
+
+  set(state => ({
+    players: state.players.map(p => p.id === actor.id ? { ...p, activePlot: newPlotData } : p),
+    discardPile: updatedDiscard
+  }));
+
   timerManager.scheduleDelay(() => {
     get()._checkEndgameAndAdvanceTurn();
-  }, 1500);
+  }, ACTION_HOLD_MS);
 }
 
 /**
- * Заряжает все активные «Тайные заговоры» на столе при триггерах (сомнения, дуэли, кражи).
+ * Заряжает активные «Тайные заговоры» только от проверок («НЕ ВЕРЮ!») и дуэлей.
  */
 export function chargeActiveConspiracies(
   get: StateGetter,
@@ -98,21 +129,9 @@ export function chargeActiveConspiracies(
   const conspiracyHolders = players.filter(p => p.activePlot?.type === 'Тайный заговор' && (p.activePlot.charges ?? 0) < 4);
   if (conspiracyHolders.length === 0) return;
 
-  let promptData: { playerId: string; charges: number; isImmediateReaction: boolean } | null = null;
-
   const newPlayers = players.map(p => {
     if (p.activePlot?.type === 'Тайный заговор' && (p.activePlot.charges ?? 0) < 4) {
-      const curCharges = p.activePlot.charges ?? 0;
-      const nextCharges = Math.min(4, curCharges + 1);
-
-      if (!p.isBot && nextCharges >= 2) {
-        promptData = {
-          playerId: p.id,
-          charges: nextCharges,
-          isImmediateReaction: true
-        };
-      }
-
+      const nextCharges = Math.min(4, (p.activePlot.charges ?? 0) + 1);
       return {
         ...p,
         activePlot: {
@@ -136,40 +155,8 @@ export function chargeActiveConspiracies(
 
   set(state => ({
     players: newPlayers,
-    conspiracyPrompt: promptData || state.conspiracyPrompt,
     history: [...logs, ...state.history].slice(0, 50)
   }));
-
-  // Bot AI instant reaction evaluation
-  conspiracyHolders.forEach(p => {
-    if (p.isBot) {
-      const nextCharges = Math.min(4, (p.activePlot?.charges ?? 0) + 1);
-      if (nextCharges >= 2) {
-        timerManager.scheduleDelay(() => {
-          const curState = get();
-          const curBot = curState.players.find(pl => pl.id === p.id);
-          if (!curBot || curBot.activePlot?.type !== 'Тайный заговор') return;
-          const charges = curBot.activePlot.charges ?? 0;
-          if (charges < 2) return;
-
-          const opponents = curState.players.filter(pl => pl.id !== p.id);
-          if (opponents.length === 0) return;
-
-          const sortedOpponents = [...opponents].sort((a, b) => {
-            if (b.favor !== a.favor) return b.favor - a.favor;
-            return b.gold - a.gold;
-          });
-          const target = sortedOpponents[0];
-
-          if (charges >= 3 && target.favor >= 1) {
-            activateConspiracy(get, set, p.id, target.id, 'crown', true);
-          } else if (target.gold >= 2 || charges === 4 || Math.random() < 0.65) {
-            activateConspiracy(get, set, p.id, target.id, 'gold', true);
-          }
-        }, 1200);
-      }
-    }
-  });
 }
 
 /**
@@ -183,7 +170,7 @@ export function openConspiracyDialog(
   const human = get().players.find(p => !p.isBot);
   if (!human || human.activePlot?.type !== 'Тайный заговор') return;
   const charges = human.activePlot.charges ?? 0;
-  if (charges < 2) return;
+  if (charges < 1) return;
 
   set({
     conspiracyPrompt: {
@@ -212,100 +199,173 @@ export function activateConspiracy(
   playerId: string,
   targetPlayerId: string,
   effect: 'gold' | 'crown',
-  isFreeReaction = false
+  _isFreeReaction = false
 ): void {
-  const { players, discardPile, coronationCandidateId } = get();
+  const { players } = get();
   const player = players.find(p => p.id === playerId);
   const target = players.find(p => p.id === targetPlayerId);
   if (!player || !target || player.activePlot?.type !== 'Тайный заговор') return;
 
   const charges = player.activePlot.charges ?? 0;
-  if (charges < 2) return;
+  if (charges < 1) return;
   if (effect === 'crown' && charges < 3) return;
+  if (player.actionTokens < 1) return;
 
-  if (!isFreeReaction && player.actionTokens < 1) return;
-
-  const tokenCost = isFreeReaction ? 0 : 1;
-  const isUnvetoable = charges >= 4;
-
-  let newPlayers = [...players];
-  let newCoronationCandidateId = coronationCandidateId;
-  const newDiscard: GameCard[] = [...discardPile, 'Тайный заговор'];
+  const tokenCost = 1;
+  const cannotBeVetoed = charges >= 4;
 
   if (tokenCost > 0) {
     triggerResourceFloat(set, player.id, '-1 ⚡', false);
   }
 
+  const action: Action = {
+    id: Math.random().toString(36).substring(7),
+    type: 'plot',
+    name: 'Тайный заговор',
+    plotType: 'Тайный заговор',
+    actorId: player.id,
+    targetId: target.id,
+    costGold: 0,
+    costTokens: tokenCost,
+    conspiracyEffect: effect,
+    cannotBeVetoed,
+    description: CARD_INFO['Тайный заговор']?.shortDescription ?? ''
+  };
+
+  set(state => ({
+    players: tokenCost > 0
+      ? state.players.map(p => p.id === player.id ? { ...p, actionTokens: p.actionTokens - tokenCost } : p)
+      : state.players,
+    pendingAction: action,
+    conspiracyPrompt: null,
+    isVetoed: false,
+    overlayInstant: null,
+    history: [
+      `⚔️ ${player.name} свершает «Тайный заговор» (${charges} зар.)${cannotBeVetoed ? ' [🛡️ Нельзя отменить Вето]' : ''}!`,
+      ...state.history
+    ].slice(0, 50)
+  }));
+
+  if (cannotBeVetoed) {
+    applyConspiracyEffect(get, set, action);
+    return;
+  }
+  get()._triggerVetoWindowOrResolveEffect(action, false);
+}
+
+export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action: Action): void {
+  const { players, discardPile, coronationCandidateId } = get();
+  const player = players.find(p => p.id === action.actorId);
+  const target = players.find(p => p.id === action.targetId);
+  if (!player || !target || player.activePlot?.type !== 'Тайный заговор') {
+    get()._checkEndgameAndAdvanceTurn();
+    return;
+  }
+
+  const charges = player.activePlot.charges ?? 0;
+  const effect = action.conspiracyEffect ?? 'gold';
+  const newDiscard: GameCard[] = [...discardPile, 'Тайный заговор'];
+
   if (effect === 'gold') {
-    const goldLoss = Math.min(3, target.gold);
-    newPlayers = newPlayers.map(p => {
-      if (p.id === target.id) {
-        return { ...p, gold: p.gold - goldLoss };
-      }
-      if (p.id === player.id) {
-        return {
-          ...p,
-          actionTokens: p.actionTokens - tokenCost,
-          activePlot: null
-        };
-      }
+    const goldLoss = Math.min(charges, target.gold);
+    const newPlayers = players.map(p => {
+      if (p.id === target.id) return { ...p, gold: p.gold - goldLoss };
+      if (p.id === player.id) return { ...p, activePlot: null };
       return p;
     });
-
+    set(state => ({
+      players: newPlayers,
+      discardPile: newDiscard,
+      conspiracyPrompt: null,
+      history: [
+        `⚔️ «Тайный заговор» (${charges} зар.): ${target.name} теряет ${goldLoss} 🪙 в казну!`,
+        ...state.history
+      ].slice(0, 50)
+    }));
     if (goldLoss > 0) {
       get()._disruptPlayerPlotsOnLoss(target.id, 'удара Заговора');
       triggerResourceFloat(set, target.id, `-${goldLoss} 🪙 Заговор`, false);
     }
     triggerResourceFloat(set, player.id, `⚔️ Сброс ${goldLoss} 🪙!`, true);
-
-    set(state => ({
-      players: newPlayers,
-      discardPile: newDiscard,
-      conspiracyPrompt: null,
-      history: [
-        `⚔️ ${player.name} свершает «Тайный заговор» (${charges} зар.)! ${target.name} теряет ${goldLoss} 🪙 в казну!${isFreeReaction ? ' (Мгновенная реакция, 0 ⚡)' : ''}${isUnvetoable ? ' [🛡️ Нельзя отменить Вето]' : ''}`,
-        ...state.history
-      ].slice(0, 50)
-    }));
   } else {
-    // Effect === 'crown'
     const favorLoss = Math.min(1, target.favor);
     const newTargetFavor = Math.max(0, target.favor - favorLoss);
-    if (target.id === coronationCandidateId && newTargetFavor < 6) {
-      newCoronationCandidateId = null;
-    }
-
-    newPlayers = newPlayers.map(p => {
-      if (p.id === target.id) {
-        return { ...p, favor: newTargetFavor };
-      }
-      if (p.id === player.id) {
-        return {
-          ...p,
-          actionTokens: p.actionTokens - tokenCost,
-          activePlot: null
-        };
-      }
+    const newPlayers = players.map(p => {
+      if (p.id === target.id) return { ...p, favor: newTargetFavor };
+      if (p.id === player.id) return { ...p, activePlot: null };
       return p;
     });
-
-    if (favorLoss > 0) {
-      get()._disruptPlayerPlotsOnLoss(target.id, 'удара Заговора');
-      triggerResourceFloat(set, target.id, `-1 👑 Заговор!`, false);
-    }
-    triggerResourceFloat(set, player.id, `⚔️ Лишение 1 👑 у ${target.name}!`, true);
-
     set(state => ({
       players: newPlayers,
       discardPile: newDiscard,
-      coronationCandidateId: newCoronationCandidateId,
+      ...fallenCoronationPatch(coronationCandidateId, target.id, newTargetFavor),
       conspiracyPrompt: null,
       history: [
-        `💥 ${player.name} свершает «Тайный заговор» (${charges} зар.)! ${target.name} лишается 1 👑 короны!${isFreeReaction ? ' (Мгновенная реакция, 0 ⚡)' : ''}${isUnvetoable ? ' [🛡️ Нельзя отменить Вето]' : ''}`,
+        `💥 «Тайный заговор» (${charges} зар.): ${target.name} лишается 1 👑 короны!`,
         ...state.history
       ].slice(0, 50)
     }));
+    if (favorLoss > 0) {
+      get()._disruptPlayerPlotsOnLoss(target.id, 'удара Заговора');
+      triggerResourceFloat(set, target.id, '-1 👑 Заговор!', false);
+    }
+    triggerResourceFloat(set, player.id, `⚔️ Лишение 1 👑 у ${target.name}!`, true);
   }
+
+  timerManager.scheduleDelay(() => {
+    get()._checkEndgameAndAdvanceTurn();
+  }, ACTION_HOLD_MS);
+}
+
+export function applyMorningPlotReward(get: StateGetter, set: StateSetter, action: Action): void {
+  const { players, discardPile, coronationCandidateId } = get();
+  const idx = players.findIndex(p => p.id === action.actorId);
+  const player = idx >= 0 ? players[idx] : null;
+  const plotType = player?.activePlot?.type;
+  if (!player || (plotType !== 'Королевский приём' && plotType !== 'Золотая булла')) {
+    set({
+      pendingAction: null,
+      turnPhase: 'IDLE',
+      turnSubPhase: 'NORMAL_ACTION_PHASE'
+    });
+    return;
+  }
+
+  const result = resolveMorningPlots(
+    [...players],
+    idx,
+    discardPile,
+    coronationCandidateId,
+    set
+  );
+  set({
+    players: result.updatedPlayers,
+    discardPile: result.curDiscard,
+    pendingAction: null,
+    turnPhase: 'IDLE',
+    turnSubPhase: 'NORMAL_ACTION_PHASE'
+  });
+  if (result.coronationTriggeredByReception) {
+    beginCoronationIfNeeded(get, set, result.nextPlayerUpdated.id);
+  }
+}
+
+export function discardMorningPlot(get: StateGetter, set: StateSetter, actorId: string): void {
+  const { players, discardPile } = get();
+  const player = players.find(p => p.id === actorId);
+  const plotType = player?.activePlot?.type;
+  if (!player || !plotType) {
+    set({ pendingAction: null, turnPhase: 'IDLE', turnSubPhase: 'NORMAL_ACTION_PHASE' });
+    return;
+  }
+  set(state => ({
+    players: state.players.map(p => p.id === actorId ? { ...p, activePlot: null } : p),
+    discardPile: [...discardPile, plotType],
+    pendingAction: null,
+    turnPhase: 'IDLE',
+    turnSubPhase: 'NORMAL_ACTION_PHASE',
+    history: [`🛡️ Утренний эффект «${plotType}» ${declineGen(player.name)} отменён Вето.`, ...state.history].slice(0, 50)
+  }));
 }
 
 export function resolveMorningPlots(

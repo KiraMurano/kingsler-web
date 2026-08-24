@@ -2,6 +2,8 @@ import React from 'react';
 import type { GameCard, Player } from '../engine/types';
 import { useGameStore } from '../engine/GameStore';
 import { courtly } from '../lib/text';
+import { useHandSlots } from '../lib/handSlots';
+import { usePresence } from '../lib/presence';
 import { Bolts, Deltas, Res, Seals } from './ui/Res';
 import { Portrait } from './Portrait';
 import { PlotSlot } from './PlotSlot';
@@ -19,17 +21,18 @@ interface OpponentSeatProps {
   onInspectCard?: (card: GameCard) => void;
 }
 
-function useSeatSpeech(player: Player, isActive: boolean): string | null {
+function useSeatSpeech(player: Player): string | null {
   const { pendingAction, turnPhase, duelOutcome, revealOutcome, activeSpeechReactions } =
     useGameStore();
 
   const scripted = activeSpeechReactions[player.id];
   if (scripted) return courtly(scripted);
-  if (turnPhase === 'IDLE') return null;
+  if (turnPhase === 'IDLE' && !pendingAction) return null;
 
-  if (isActive && pendingAction?.actorId === player.id) {
+  if (pendingAction?.actorId === player.id) {
     if (pendingAction.type === 'normal') return `«${courtly(pendingAction.name)}»`;
     if (pendingAction.type === 'plot') return `«Интрига: ${pendingAction.plotType}»`;
+    if (pendingAction.type === 'instant') return `«${pendingAction.instantType}»`;
     return `«Заявляю: ${pendingAction.roleClaim}»`;
   }
   if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === player.id) {
@@ -62,7 +65,9 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
 }) => {
   const { floatingResourceEvents } = useGameStore();
 
-  const speech = useSeatSpeech(player, isActive);
+  const speech = useSeatSpeech(player);
+  const { shown: spoken, exiting: speechOut } = usePresence(speech);
+  const { slots, leaving } = useHandSlots(player.hand);
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
 
   return (
@@ -122,22 +127,33 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           </div>
         </div>
 
-        {speech && <div className="bubble">{speech}</div>}
+        {spoken && (
+          <div key={spoken} className={`bubble${speechOut ? ' bubble--out' : ''}`}>
+            {spoken}
+          </div>
+        )}
       </div>
 
       <div className="seat__hand" title="Карты в руке">
-        {Array.from({ length: 2 }, (_, i) =>
-          i < player.hand.length ? (
-            <img
-              key={i}
-              className="minicard"
-              src="/assets/cards/back-dual-face.png"
-              alt=""
-            />
-          ) : (
-            <span key={i} className="minicard minicard--empty" />
-          )
-        )}
+        {([0, 1] as const).map(i => {
+          const live = slots[i];
+          const gone = leaving[i];
+          return (
+            <span key={i} className="minislot">
+              <span className="minicard minicard--empty" />
+              {live && !gone && (
+                <img className="minicard" src="/assets/cards/back-dual-face.png" alt="" />
+              )}
+              {gone && (
+                <img
+                  className="minicard minicard--out"
+                  src="/assets/cards/back-dual-face.png"
+                  alt=""
+                />
+              )}
+            </span>
+          );
+        })}
       </div>
     </div>
   );

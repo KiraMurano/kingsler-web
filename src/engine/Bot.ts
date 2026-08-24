@@ -20,7 +20,8 @@ export { botMemory, BotMemoryEngine, type KnownCardRecord } from './bot/botMemor
 export {
   selectBestThiefTarget,
   selectBestBlackmailerTarget,
-  selectBestSpyTarget,
+  selectBestSearchTarget,
+  selectBestConspiracyTarget,
   selectBestRumorTarget,
   selectBestRedirectionTarget,
   selectBestDossierTarget

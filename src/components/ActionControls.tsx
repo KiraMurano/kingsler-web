@@ -13,7 +13,7 @@ const Panel: React.FC<{
   alert?: boolean;
   children: React.ReactNode;
 }> = ({ title, note, alert, children }) => (
-  <div className={`actions ${alert ? 'actions--alert' : ''}`}>
+  <div key={title} className={`actions ${alert ? 'actions--alert' : ''}`}>
     <div className="actions__head">
       <span className="actions__title">{title}</span>
     </div>
@@ -154,7 +154,8 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           tone="gold"
           block
           hotkey="3"
-          sub={`Щит «${shieldRole}» • 0 ⚡`}
+          disabled={!hasTokens}
+          sub={hasTokens ? `Щит «${shieldRole}» • 1 ⚡` : 'Нет жетонов • 0 ⚡'}
           onClick={() => setDuelPicker(true)}
         >
           Дуэль
@@ -272,16 +273,16 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
         Действие двора
       </Button>
 
-      {isMyTurn && conspiracyCharges >= 2 && (
+      {isMyTurn && conspiracyCharges >= 1 && (
         <Button
           tone="arcane"
           block
           sub={
-            conspiracyCharges === 2
-              ? 'Сбить казну до 3 🪙 • 1 ⚡'
+            conspiracyCharges <= 2
+              ? `Сбить до ${conspiracyCharges} 🪙 • 1 ⚡`
               : conspiracyCharges === 3
-                ? 'Лишить цель 1 👑 • 1 ⚡'
-                : 'Удар без права вето • 1 ⚡'
+                ? 'До 3 🪙 или 1 👑 • 1 ⚡'
+                : 'До 4 🪙 или 1 👑 • без вето'
           }
           onClick={() => openConspiracyDialog(false)}
         >

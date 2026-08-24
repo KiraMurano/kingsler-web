@@ -67,10 +67,14 @@
   --z-stage: 10;
   --z-float: 40;
   --z-header: 60;
+  --z-tabled: 70;
   --z-backdrop: 800;
   --z-sheet: 900;
   --z-dialog: 1000;
   --z-toast: 1200;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-move: 280ms;
 }
 
 *,
@@ -185,6 +189,7 @@ img {
   font-size: 0.9em;
   line-height: 1;
   filter: saturate(0.85);
+  transition: opacity var(--dur-move) var(--ease-out), filter var(--dur-move) var(--ease-out);
 }
 
 .res--crown {
@@ -224,4 +229,9 @@ img {
   height: 26px;
   font-size: 0.92rem;
   padding: 0 11px 0 8px;
+}
+
+.res__n {
+  display: inline-block;
+  animation: rise-in 0.22s var(--ease-out);
 }

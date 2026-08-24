@@ -3,6 +3,8 @@ import { drawCardsFromDeck } from '../cards';
 import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
+import { ACTION_HOLD_MS } from '../timing';
+import { fallenCoronationPatch } from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -18,6 +20,8 @@ export function executeNormalAction(
   const actorIdx = newPlayers.findIndex(p => p.id === action.actorId);
   if (actorIdx === -1) return;
   let actor = newPlayers[actorIdx];
+
+  let rumorVictimId: string | null = null;
 
   if (action.name.includes('Просить') || action.name.includes('содержание')) {
     actor = { ...actor, gold: actor.gold + 1 };
@@ -35,12 +39,11 @@ export function executeNormalAction(
       if (targetIdx !== -1 && newPlayers[targetIdx].favor > 0) {
         newPlayers[targetIdx] = { ...newPlayers[targetIdx], favor: newPlayers[targetIdx].favor - 1 };
         triggerResourceFloat(set, action.targetId, '-1 👑', false);
-
-        get()._disruptPlayerPlotsOnLoss(action.targetId, 'распущенных слухов');
+        rumorVictimId = action.targetId;
 
         if (get().coronationCandidateId === action.targetId && newPlayers[targetIdx].favor < 6) {
           set(state => ({
-            coronationCandidateId: null,
+            ...fallenCoronationPatch(state.coronationCandidateId, action.targetId!, newPlayers[targetIdx].favor),
             history: [`⚖️ Коронация ${newPlayers[targetIdx].name} сорвана слухами! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
           }));
         }
@@ -86,8 +89,11 @@ export function executeNormalAction(
   }
 
   set({ players: newPlayers });
+  if (rumorVictimId) {
+    get()._disruptPlayerPlotsOnLoss(rumorVictimId, 'распущенных слухов');
+  }
 
   timerManager.scheduleDelay(() => {
     get()._checkEndgameAndAdvanceTurn();
-  }, 1200);
+  }, ACTION_HOLD_MS);
 }

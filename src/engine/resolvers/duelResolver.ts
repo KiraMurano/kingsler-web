@@ -1,6 +1,7 @@
 import type { GameState, DuelOutcome, DuelResultType } from '../types';
-import { triggerSingleCardFlight, triggerDuelCardFlight } from '../utils/visualEffects';
+import { triggerSingleCardFlight, triggerDuelCardFlight, triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
+import { ACTION_HOLD_MS } from '../timing';
 import { chargeActiveConspiracies } from './plotResolver';
 
 type StateGetter = () => GameState;
@@ -21,10 +22,16 @@ export function targetDeclareDuel(
   const actor = players.find(p => p.id === pendingAction.actorId);
   const target = players.find(p => p.id === targetId);
   if (!actor || !target) return;
+  if (target.actionTokens < 1) return;
 
   const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
 
+  triggerResourceFloat(set, target.id, '-1 ⚡', false);
+
   set(state => ({
+    players: state.players.map(p =>
+      p.id === target.id ? { ...p, actionTokens: p.actionTokens - 1 } : p
+    ),
     turnPhase: 'DUEL_ATTACKER_WINDOW',
     pendingDuelDefenderCardIndex: stakedCardIndex,
     pendingDuelDefenderRoleClaim: blockingRole,
@@ -34,7 +41,7 @@ export function targetDeclareDuel(
       ...state.activeSpeechReactions,
       [target.id]: `«ДУЭЛЬ! Мой щит — ${blockingRole}!»`
     },
-    history: [`🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}»!`, ...state.history].slice(0, 50)
+    history: [`🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}» (потрачен 1 ⚡)!`, ...state.history].slice(0, 50)
   }));
 
   // Charge active conspiracies on duel declaration
@@ -70,6 +77,7 @@ export function attackerRetreatDuel(
     turnPhase: 'IDLE',
     turnSubPhase: 'CARD_PLAY_PHASE',
     pendingAction: null,
+    overlayInstant: null,
     activeSpeechReactions: {
       ...state.activeSpeechReactions,
       [actor.id]: '«Я отступаю... в этот раз.»'
@@ -79,7 +87,7 @@ export function attackerRetreatDuel(
 
   timerManager.scheduleDelay(() => {
     get()._checkEndgameAndAdvanceTurn();
-  }, 1200);
+  }, ACTION_HOLD_MS);
 }
 
 export function attackerAcceptDuel(

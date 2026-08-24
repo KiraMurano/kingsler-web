@@ -44,7 +44,7 @@ export interface Action {
   name: string;
   actorId: string;
   targetId?: string;
-  targetCardIndex?: number; // For Spy
+  targetCardIndex?: number;
   roleClaim?: Role;
   plotType?: PlotType;
   instantType?: InstantType;
@@ -53,6 +53,9 @@ export interface Action {
   costGold: number;
   costTokens: number;
   withVaBanque?: boolean;   // Played together with Va-banque instant modifier (x2 on challenge)
+  isMorningTrigger?: boolean;
+  conspiracyEffect?: 'gold' | 'crown';
+  cannotBeVetoed?: boolean;
   description: string;
 }
 
@@ -64,7 +67,6 @@ export type TurnPhase =
   | 'VETO_WINDOW'           // Court instant window before effect application
   | 'REVEAL_OUTCOME'        // Showing card reveal / challenge result modal
   | 'DUEL_OUTCOME'          // Showing simultaneous 2-card duel clash result modal
-  | 'SPY_PEEK'              // Spy is looking at target's card
   | 'INFORMANT_PEEK'        // Informant Network owner peeking at opponent's new card
   | 'GAME_OVER';
 
@@ -101,12 +103,6 @@ export interface DuelOutcome {
   sealsWinnerId?: string;
   bothLostCoin?: boolean;
   message: string;
-}
-
-export interface SpyPeekData {
-  actorId: string;
-  targetId: string;
-  targetCards: GameCard[];
 }
 
 export interface InformantPeekData {
@@ -159,6 +155,8 @@ export interface GameState {
   timerMaxSeconds: number;
   isTimerPaused: boolean;
   coronationCandidateId: string | null;
+  /** Player whose turn it was when the circle started; win is checked at their next turn start. */
+  coronationOriginId: string | null;
   
   // Pending Action state
   pendingAction: Action | null;
@@ -172,7 +170,6 @@ export interface GameState {
   
   // Outcome Modals
   revealOutcome: RevealOutcome | null;
-  spyPeekData: SpyPeekData | null;
   duelOutcome: DuelOutcome | null;
   informantPeekData: InformantPeekData | null;
   conspiracyPrompt: ConspiracyPromptData | null;
@@ -186,6 +183,8 @@ export interface GameState {
   floatingResourceEvents: FloatingResourceEvent[];
   cardFlightEvent: CardFlightEvent | null;
   hasCardDeparted: boolean;
+  /** Instant laid on the table on top of the current action (veto / redirect). */
+  overlayInstant: { card: InstantType; actorId: string } | null;
   
   winnerId: string | null;
   history: string[];
@@ -209,8 +208,6 @@ export interface GameState {
   attackerAcceptDuel: (attackerId: string) => void;
   closeDuelOutcome: () => void;
 
-  // Spy & outcome actions
-  completeSpyAction: (takeCardIndex?: number | null) => void;
   closeInformantPeek: () => void;
   closeRevealOutcome: () => void;
   openConspiracyDialog: (isImmediateReaction?: boolean) => void;
@@ -227,6 +224,7 @@ export interface GameState {
   _triggerVetoWindowOrResolveEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
   _executeRevealOutcome: (doubterId: string) => void;
   _resolveRoleActionEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
+  _resolvePendingActionEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
   _checkEndgameAndAdvanceTurn: () => void;
   _disruptPlayerPlotsOnLoss: (playerId: string, reason: string) => void;
   _drawCardForPlayerWithInformantCheck: (playerIndex: number) => GameCard;

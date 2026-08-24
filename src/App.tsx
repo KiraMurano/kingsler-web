@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { usePresence } from './lib/presence';
 import { useGameStore } from './engine/GameStore';
 import { startBotEngine } from './engine/Bot';
 import { TopBar } from './components/TopBar';
 import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
-import { Card } from './components/Card';
+import { Hand } from './components/Hand';
 import { PlayerCrest } from './components/PlayerCrest';
 import { ActionControls } from './components/ActionControls';
 import { Chronicle } from './components/Chronicle';
@@ -31,6 +32,7 @@ export default function App() {
     turnPhase,
     pendingAction,
     coronationCandidateId,
+    coronationOriginId,
     startGame,
     restartGame,
     performAction,
@@ -57,6 +59,7 @@ export default function App() {
   const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
   const [stakedCardIndex, setStakedCardIndex] = useState(0);
   const [redirectCardIndex, setRedirectCardIndex] = useState<number | null>(null);
+  const toastPresence = usePresence(toast);
 
   useEffect(() => {
     startGame();
@@ -120,10 +123,6 @@ export default function App() {
       return;
     }
 
-    if (card === 'Право вето') {
-      playInstant(human.id, 'Право вето', index);
-      return;
-    }
     showToast(`Сейчас распоряжается ${activePlayer?.name ?? 'другой придворный'}`);
   };
 
@@ -209,10 +208,11 @@ export default function App() {
   const status: Status = (() => {
     if (coronationCandidateId) {
       const candidate = players.find(p => p.id === coronationCandidateId);
+      const origin = players.find(p => p.id === coronationOriginId);
       return {
         text: `Круг коронации: ${candidate?.name}`,
         tone: 'alarm',
-        hint: 'сбейте влияние до конца круга'
+        hint: origin ? `до хода ${origin.name}` : 'сбейте влияние до конца круга'
       };
     }
     switch (turnPhase) {
@@ -277,49 +277,18 @@ export default function App() {
             onInspectCard={setInspectedCard}
           />
 
-          <div className="hand">
-            {Array.from({ length: 2 }).map((_, index) => {
-              const card = human.hand[index];
-              if (!card) {
-                return <div key={index} className="handcard handcard--empty" />;
-              }
-
-              const staked =
-                pendingAction?.type === 'role' &&
-                pendingAction.actorId === human.id &&
-                turnPhase !== 'IDLE' &&
-                pendingAction.stakedCardIndex === index;
-
-              if (staked) {
-                return (
-                  <div
-                    key={index}
-                    className="handcard handcard--staked"
-                    onClick={() => setInspectedCard((pendingAction.roleClaim ?? card) as GameCard)}
-                    title="Карта выставлена на кон"
-                  >
-                    <span className="handcard__staked-label">на кону</span>
-                    <span className="handcard__staked-claim">
-                      «{pendingAction.roleClaim ?? card}»
-                    </span>
-                  </div>
-                );
-              }
-
-              const vetoReady = isVetoWindow && card === 'Право вето';
-
-              return (
-                <Card
-                  key={index}
-                  card={card}
-                  isPlayable={isMyTurn || isTargetReaction || vetoReady}
-                  isSelected={roleClaimOpen && stakedCardIndex === index}
-                  hint={vetoReady ? 'вето' : isTargetReaction ? 'на дуэль' : undefined}
-                  onClick={() => handleCardClick(card, index)}
-                />
-              );
-            })}
-          </div>
+          <Hand
+            player={human}
+            pendingAction={pendingAction}
+            turnPhase={turnPhase}
+            isMyTurn={isMyTurn}
+            isTargetReaction={isTargetReaction}
+            isVetoWindow={isVetoWindow}
+            roleClaimOpen={roleClaimOpen}
+            stakedCardIndex={stakedCardIndex}
+            onCardClick={handleCardClick}
+            onInspectStaked={setInspectedCard}
+          />
 
           <ActionControls onOpenNormalActions={() => setNormalActionsOpen(true)} />
         </div>
@@ -375,7 +344,11 @@ export default function App() {
         }}
       />
 
-      {toast && <div className="toast">{toast}</div>}
+      {toastPresence.shown && (
+        <div key={toastPresence.shown} className={`toast${toastPresence.exiting ? ' toast--out' : ''}`}>
+          {toastPresence.shown}
+        </div>
+      )}
     </div>
   );
 }

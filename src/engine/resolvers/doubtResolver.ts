@@ -4,7 +4,10 @@ import { declineAcc, verbDoubted, verbCaught } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
 import { triggerResourceFloat, triggerSingleCardFlight } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { chargeActiveConspiracies } from './plotResolver';
+import { ACTION_HOLD_MS } from '../timing';
+import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
+import { resolveInstantEffect } from './instantResolver';
+import { beginCoronationIfNeeded } from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -63,7 +66,7 @@ export function doubtAction(
 
   timerManager.scheduleDelay(() => {
     get()._executeRevealOutcome(doubter.id);
-  }, 1200);
+  }, ACTION_HOLD_MS);
 }
 
 export function passDoubt(
@@ -149,11 +152,8 @@ export function executeRevealOutcome(
         triggerResourceFloat(set, actor.id, `+${gained} 👑`, true);
       }
 
-      if (newPlayers[actorIdx].favor >= 6 && !get().coronationCandidateId) {
-        set(state => ({
-          coronationCandidateId: actor.id,
-          history: [`👑 КРУГ КОРОНАЦИИ! ${actor.name} через ловушку Шута набрал 6 👑! Если никто не собьёт его короны за круг, он победит!`, ...state.history].slice(0, 50)
-        }));
+      if (newPlayers[actorIdx].favor >= 6) {
+        beginCoronationIfNeeded(get, set, actor.id);
       }
     } else {
       // Under Va-banque, truth does NOT grant seals to actor (0 seals, only x2 role effect)
@@ -184,11 +184,8 @@ export function executeRevealOutcome(
       }
       set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
 
-      if (newPlayers[doubterIdx].favor >= 6 && !get().coronationCandidateId) {
-        set(state => ({
-          coronationCandidateId: doubter.id,
-          history: [`👑 КРУГ КОРОНАЦИИ! ${doubter.name} через Чёрную книгу набрал(а) 6 👑! Если никто не собьёт короны за круг, он(а) победит!`, ...state.history].slice(0, 50)
-        }));
+      if (newPlayers[doubterIdx].favor >= 6) {
+        beginCoronationIfNeeded(get, set, doubter.id);
       }
     } else {
       // Normal doubt / Va-banque doubt: awards seals
@@ -211,11 +208,8 @@ export function executeRevealOutcome(
       triggerResourceFloat(set, dossierOwner.id, `+${dGained} 👑 Досье!`, true);
       set(state => ({ discardPile: [...state.discardPile, 'Досье'] }));
 
-      if (newPlayers[dIdx].favor >= 6 && !get().coronationCandidateId) {
-        set(state => ({
-          coronationCandidateId: dossierOwner.id,
-          history: [`👑 КРУГ КОРОНАЦИИ! ${dossierOwner.name} через Досье набрал(а) 6 👑! Если никто не собьёт короны за круг, он(а) победит!`, ...state.history].slice(0, 50)
-        }));
+      if (newPlayers[dIdx].favor >= 6) {
+        beginCoronationIfNeeded(get, set, dossierOwner.id);
       }
     }
   }
@@ -301,6 +295,21 @@ export function closeRevealOutcome(
   const { revealOutcome, pendingAction } = get();
   if (!revealOutcome) return;
 
+  const goesToVeto =
+    revealOutcome.wasTruth &&
+    (revealOutcome.claimedRole !== 'Шут' || revealOutcome.vaBanqueBonus) &&
+    !!pendingAction;
+
+  if (goesToVeto) {
+    set({
+      revealOutcome: null,
+      hasCardDeparted: false,
+      isPendingActionAfterTruthChallenge: true
+    });
+    get()._triggerVetoWindowOrResolveEffect(pendingAction, true);
+    return;
+  }
+
   triggerSingleCardFlight(
     set,
     'to_discard',
@@ -310,14 +319,9 @@ export function closeRevealOutcome(
     revealOutcome.wasTruth
   );
   set({ revealOutcome: null });
-
-  if (revealOutcome.wasTruth && (revealOutcome.claimedRole !== 'Шут' || revealOutcome.vaBanqueBonus) && pendingAction) {
-    get()._triggerVetoWindowOrResolveEffect(pendingAction, true);
-  } else {
-    timerManager.scheduleDelay(() => {
-      get()._checkEndgameAndAdvanceTurn();
-    }, 800);
-  }
+  timerManager.scheduleDelay(() => {
+    get()._checkEndgameAndAdvanceTurn();
+  }, 800);
 }
 
 export function proceedAfterDoubtPassed(
@@ -327,9 +331,8 @@ export function proceedAfterDoubtPassed(
 ): void {
   timerManager.clearAll();
 
-  triggerSingleCardFlight(set, 'to_hand', action.actorId, action.roleClaim);
-
   set(state => ({
+    hasCardDeparted: false,
     history: [`🂠 Действие «${action.roleClaim}» от ${state.players.find(p => p.id === action.actorId)?.name || 'игрока'} не оспорено двором (карта остаётся в руке).`, ...state.history].slice(0, 50)
   }));
 
@@ -345,13 +348,18 @@ export function triggerVetoWindowOrResolveEffect(
   timerManager.clearAll();
   const { isVetoed, players } = get();
 
+  if (action.cannotBeVetoed) {
+    get()._resolvePendingActionEffect(action, isAfterTruthChallenge);
+    return;
+  }
+
   if (isVetoed) {
     set(state => ({
       history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
     }));
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();
-    }, 1200);
+    }, ACTION_HOLD_MS);
     return;
   }
 
@@ -361,17 +369,17 @@ export function triggerVetoWindowOrResolveEffect(
   const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
 
   if (humanHoldsVeto) {
-    // Wait for human decision without timer
     set({
       turnPhase: 'VETO_WINDOW',
+      hasCardDeparted: false,
       timerSeconds: 0,
       timerMaxSeconds: 0,
       isPendingActionAfterTruthChallenge: isAfterTruthChallenge
     });
   } else if (botHoldsVeto) {
-    // Bots evaluate veto. If no bot plays veto, proceed after delay
     set({
       turnPhase: 'VETO_WINDOW',
+      hasCardDeparted: false,
       timerSeconds: 0,
       timerMaxSeconds: 0,
       isPendingActionAfterTruthChallenge: isAfterTruthChallenge
@@ -383,9 +391,34 @@ export function triggerVetoWindowOrResolveEffect(
     }, 2200);
   } else {
     timerManager.scheduleDelay(() => {
-      get()._resolveRoleActionEffect(action, isAfterTruthChallenge);
+      get()._resolvePendingActionEffect(action, isAfterTruthChallenge);
     }, 800);
   }
+}
+
+export function resolvePendingActionEffect(
+  get: StateGetter,
+  set: StateSetter,
+  action: Action,
+  isAfterTruthChallenge = false
+): void {
+  if (action.isMorningTrigger) {
+    applyMorningPlotReward(get, set, action);
+    return;
+  }
+  if (action.conspiracyEffect) {
+    applyConspiracyEffect(get, set, action);
+    return;
+  }
+  if (action.type === 'instant') {
+    resolveInstantEffect(get, set, action);
+    return;
+  }
+  if (action.type === 'plot') {
+    landPlot(get, set, action);
+    return;
+  }
+  get()._resolveRoleActionEffect(action, isAfterTruthChallenge);
 }
 
 export function proceedAfterVetoWindow(
@@ -403,10 +436,26 @@ export function proceedAfterVetoWindow(
     set(state => ({
       history: [`🚫 Действие «${pendingAction.roleClaim || pendingAction.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
     }));
+    if (pendingAction.isMorningTrigger) {
+      discardMorningPlot(get, set, pendingAction.actorId);
+      return;
+    }
+    if (pendingAction.type === 'plot' && !pendingAction.conspiracyEffect && pendingAction.plotType) {
+      set(state => ({
+        discardPile: [...state.discardPile, pendingAction.plotType!]
+      }));
+    }
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();
-    }, 1200);
-  } else {
-    get()._resolveRoleActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
+    }, ACTION_HOLD_MS);
+    return;
   }
+
+  if (isPendingActionAfterTruthChallenge) {
+    triggerSingleCardFlight(set, 'to_discard', pendingAction.actorId, pendingAction.roleClaim);
+  } else if (pendingAction.roleClaim) {
+    triggerSingleCardFlight(set, 'to_hand', pendingAction.actorId, pendingAction.roleClaim);
+  }
+
+  get()._resolvePendingActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
 }

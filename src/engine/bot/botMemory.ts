@@ -13,7 +13,7 @@ export class BotMemoryEngine {
   private consecutiveRoleClaims: Record<string, { role: Role; count: number }> = {};
 
   /**
-   * Записывает результат просмотра карты через инстант «Шпион».
+   * Записывает результат просмотра карты соперника.
    */
   public recordSpyPeek(botId: string, targetId: string, cardIndex: number, seenRole: GameCard): void {
     this.knownCards = this.knownCards.filter(

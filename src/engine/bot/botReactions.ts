@@ -3,6 +3,13 @@ import type { GameState, Role } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { evaluateBotDoubt } from './botEvaluator';
 import { selectBestRedirectionTarget } from './botTargeting';
+import {
+  ACTION_HOLD_MS,
+  BOT_REACTION_MS,
+  BOT_REACTION_JITTER_MS,
+  BOT_VETO_MS,
+  BOT_VETO_JITTER_MS
+} from '../timing';
 
 export type BotScheduler = (timerKey: string, callback: () => void, delayMs: number) => void;
 
@@ -36,7 +43,7 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
 
     if (decision.shouldDoubt) {
       botWillDoubt = true;
-      const delay = 1200 + Math.random() * 800;
+      const delay = BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS;
       schedule('doubt', () => {
         const curState = useGameStore.getState();
         if (curState.turnPhase === 'DOUBT_WINDOW') {
@@ -54,7 +61,7 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
       if (curState.turnPhase === 'DOUBT_WINDOW' && curState.pendingAction) {
         curState._proceedAfterDoubtPassed(curState.pendingAction);
       }
-    }, 1200);
+    }, ACTION_HOLD_MS);
   }
 }
 
@@ -80,7 +87,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
         if (curState.turnPhase === 'TARGET_REACTION_WINDOW') {
           curState.playInstant(target.id, 'Перенаправление', redirectIdx, newTarget.id);
         }
-      }, 1200);
+      }, ACTION_HOLD_MS);
       return;
     }
   }
@@ -106,7 +113,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   if (hasCard) {
     if (doubtEval.shouldDoubt && doubtEval.score >= 0.98 && target.actionTokens >= 1) {
       chosenAction = 'doubt';
-    } else {
+    } else if (target.actionTokens >= 1) {
       chosenAction = 'duel';
     }
   } else {
@@ -118,7 +125,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
         fakeDuelChance = 0.65;
       }
 
-      if (Math.random() < fakeDuelChance) {
+      if (target.actionTokens >= 1 && Math.random() < fakeDuelChance) {
         chosenAction = 'duel';
       } else {
         chosenAction = 'accept';
@@ -137,7 +144,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
         curState.targetAcceptAttack(target.id);
       }
     }
-  }, 1800 + Math.random() * 800);
+  }, BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS);
 }
 
 /**
@@ -171,7 +178,7 @@ export function handleDuelAttackerPhase(state: GameState, schedule: BotScheduler
         curState.attackerRetreatDuel(attacker.id);
       }
     }
-  }, 1600 + Math.random() * 800);
+  }, BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS);
 }
 
 /**
@@ -211,7 +218,7 @@ export function handleVetoPhase(state: GameState, schedule: BotScheduler): void 
         if (cur.turnPhase === 'VETO_WINDOW' && !cur.isVetoed) {
           cur.playInstant(bot.id, 'Право вето', vetoIdx);
         }
-      }, 500 + Math.random() * 400);
+      }, BOT_VETO_MS + Math.random() * BOT_VETO_JITTER_MS);
       break;
     }
   }

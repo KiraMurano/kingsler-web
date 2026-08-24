@@ -19,7 +19,7 @@ class TimerManager {
     if (this.delayTimeout !== null) {
       clearTimeout(this.delayTimeout);
     }
-    this.delayTimeout = window.setTimeout(() => {
+    this.delayTimeout = globalThis.setTimeout(() => {
       this.delayTimeout = null;
       callback();
     }, delayMs);
@@ -35,7 +35,7 @@ class TimerManager {
     }
 
     let remaining = initialSeconds;
-    this.countdownInterval = window.setInterval(() => {
+    this.countdownInterval = globalThis.setInterval(() => {
       if (remaining <= 1) {
         this.clearAll();
         onComplete();

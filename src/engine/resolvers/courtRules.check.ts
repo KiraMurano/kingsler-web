@@ -1,0 +1,400 @@
+/**
+ * Court timing: plot disruption, conspiracy charges, veto-before-effect, duel cost.
+ * Run: node --experimental-strip-types src/engine/resolvers/courtRules.check.ts
+ */
+import assert from 'node:assert/strict';
+import type { Action, GameState, Player } from '../types.ts';
+import { playPlotAction, disruptPlayerPlotsOnLoss, chargeActiveConspiracies, applyConspiracyEffect } from './plotResolver.ts';
+import { resolveRoleActionEffect } from './roleResolver.ts';
+import { playInstant } from './instantResolver.ts';
+import { targetDeclareDuel } from './duelResolver.ts';
+import {
+  triggerVetoWindowOrResolveEffect,
+  proceedAfterVetoWindow,
+  resolvePendingActionEffect
+} from './doubtResolver.ts';
+
+if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
+  (globalThis as { window: typeof globalThis }).window = globalThis;
+}
+
+function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
+  return {
+    avatar: '',
+    seatNumber: 1,
+    isBot: false,
+    gold: 4,
+    favor: 3,
+    seals: 0,
+    actionTokens: 2,
+    hand: ['Наследник', 'Право вето'],
+    activePlot: null,
+    ...partial
+  };
+}
+
+function action(partial: Partial<Action> & Pick<Action, 'type' | 'name' | 'actorId'>): Action {
+  return {
+    id: 'a1',
+    costGold: 0,
+    costTokens: 1,
+    description: '',
+    ...partial
+  };
+}
+
+function makeHarness(overrides: Partial<GameState> = {}) {
+  const api = {
+    players: [] as Player[],
+    deck: [] as GameState['deck'],
+    discardPile: [] as GameState['discardPile'],
+    activePlayerId: 'p1',
+    turnPhase: 'IDLE' as GameState['turnPhase'],
+    turnSubPhase: 'CARD_PLAY_PHASE' as GameState['turnSubPhase'],
+    timerSeconds: 0,
+    timerMaxSeconds: 0,
+    isTimerPaused: false,
+    coronationCandidateId: null as string | null,
+    coronationOriginId: null as string | null,
+    pendingAction: null as Action | null,
+    pendingDoubtDoubterId: null as string | null,
+    hasUsedNormalActionThisTurn: false,
+    hasPlayedRoleThisTurn: false,
+    hasPlayedPlotThisTurn: false,
+    isVaBanqueActive: false,
+    isVetoed: false,
+    isPendingActionAfterTruthChallenge: false,
+    revealOutcome: null,
+    duelOutcome: null,
+    informantPeekData: null,
+    conspiracyPrompt: null,
+    pendingDuelDefenderCardIndex: null as number | null,
+    pendingDuelDefenderRoleClaim: null,
+    activeSpeechReactions: {} as Record<string, string>,
+    floatingResourceEvents: [] as GameState['floatingResourceEvents'],
+    cardFlightEvent: null,
+    hasCardDeparted: false,
+    overlayInstant: null,
+    winnerId: null,
+    history: [] as string[],
+    ...overrides
+  };
+
+  const get = () => api as unknown as GameState;
+  const set = (partial: Partial<GameState> | ((state: GameState) => Partial<GameState>)) => {
+    const patch = typeof partial === 'function' ? partial(get()) : partial;
+    Object.assign(api, patch);
+  };
+
+  const state = api as unknown as GameState;
+  state._disruptPlayerPlotsOnLoss = (id, reason) => disruptPlayerPlotsOnLoss(get, set, id, reason);
+  state._triggerVetoWindowOrResolveEffect = (a, after) =>
+    triggerVetoWindowOrResolveEffect(get, set, a, after);
+  state._resolvePendingActionEffect = (a, after) => resolvePendingActionEffect(get, set, a, after);
+  state._resolveRoleActionEffect = (a, after) => resolveRoleActionEffect(get, set, a, after);
+  state._checkEndgameAndAdvanceTurn = () => {
+    api.turnPhase = 'IDLE';
+    api.pendingAction = null;
+    api.overlayInstant = null;
+    api.isVetoed = false;
+    api.isPendingActionAfterTruthChallenge = false;
+  };
+  state.addSealsToPlayer = () => {};
+  state.playInstant = (id, type, index, target) => playInstant(get, set, id, type, index, target);
+  state.proceedAfterVetoWindow = () => proceedAfterVetoWindow(get, set);
+
+  return { get, set, api };
+}
+
+{
+  const { get, set, api } = makeHarness({
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Шантажист', 'Вор'] }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        favor: 2,
+        gold: 3,
+        hand: ['Казначей', 'Рыцарь'],
+        activePlot: { id: 'pl1', type: 'Королевский приём' }
+      })
+    ]
+  });
+
+  resolveRoleActionEffect(get, set, action({
+    type: 'role',
+    name: 'Шантажист',
+    actorId: 'p1',
+    targetId: 'p2',
+    roleClaim: 'Шантажист'
+  }));
+  const after = api.players.find(p => p.id === 'p2')!;
+  assert.equal(after.favor, 1);
+  assert.equal(after.activePlot, null);
+  assert.ok(api.discardPile.includes('Королевский приём'));
+}
+
+{
+  const { get, set, api } = makeHarness({
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Вор', 'Шут'] }),
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 3, hand: ['Казначей', 'Рыцарь'] }),
+      player({
+        id: 'p3',
+        name: 'Вера',
+        isBot: true,
+        hand: ['Наследник', 'Шут'],
+        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 0 }
+      })
+    ]
+  });
+
+  resolveRoleActionEffect(get, set, action({
+    type: 'role',
+    name: 'Вор',
+    actorId: 'p1',
+    targetId: 'p2',
+    roleClaim: 'Вор'
+  }));
+  const plot = api.players.find(p => p.id === 'p3')!.activePlot;
+  assert.equal(plot?.type, 'Тайный заговор');
+  assert.equal(plot?.charges, 0);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    activePlayerId: 'p2',
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Право вето', 'Наследник'], favor: 2 }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        actionTokens: 2,
+        hand: ['Обвинение в измене', 'Шут'],
+        favor: 1
+      })
+    ]
+  });
+
+  playInstant(get, set, 'p2', 'Обвинение в измене', 0, 'p1');
+  assert.equal(api.turnPhase, 'VETO_WINDOW');
+  assert.equal(api.players.find(p => p.id === 'p1')!.favor, 2);
+
+  playInstant(get, set, 'p1', 'Право вето', 0);
+  assert.equal(api.isVetoed, true);
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.players.find(p => p.id === 'p1')!.favor, 2);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    activePlayerId: 'p2',
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Право вето', 'Наследник'], favor: 2 }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        actionTokens: 2,
+        hand: ['Обвинение в измене', 'Шут']
+      })
+    ]
+  });
+
+  playInstant(get, set, 'p2', 'Обвинение в измене', 0, 'p1');
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.players.find(p => p.id === 'p1')!.favor, 1);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    activePlayerId: 'p2',
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Право вето', 'Наследник'] }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        actionTokens: 2,
+        hand: ['Королевский приём', 'Шут']
+      })
+    ]
+  });
+
+  playPlotAction(get, set, 'Королевский приём', 0);
+  assert.equal(api.turnPhase, 'VETO_WINDOW');
+  assert.equal(api.players.find(p => p.id === 'p2')!.activePlot, null);
+
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.players.find(p => p.id === 'p2')!.activePlot?.type, 'Королевский приём');
+}
+
+{
+  const pending = action({
+    type: 'role',
+    name: 'Вор',
+    actorId: 'p1',
+    targetId: 'p2',
+    roleClaim: 'Вор'
+  });
+  const { get, set, api } = makeHarness({
+    turnPhase: 'TARGET_REACTION_WINDOW',
+    pendingAction: pending,
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Вор', 'Шут'] }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        actionTokens: 2,
+        hand: ['Казначей', 'Рыцарь']
+      })
+    ]
+  });
+
+  targetDeclareDuel(get, set, 'p2', 0);
+  assert.equal(api.players.find(p => p.id === 'p2')!.actionTokens, 1);
+  assert.equal(api.turnPhase, 'DUEL_ATTACKER_WINDOW');
+}
+
+{
+  const pending = action({
+    type: 'role',
+    name: 'Вор',
+    actorId: 'p1',
+    targetId: 'p2',
+    roleClaim: 'Вор'
+  });
+  const { get, set, api } = makeHarness({
+    turnPhase: 'TARGET_REACTION_WINDOW',
+    pendingAction: pending,
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Вор', 'Шут'] }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        actionTokens: 0,
+        hand: ['Казначей', 'Рыцарь']
+      })
+    ]
+  });
+
+  targetDeclareDuel(get, set, 'p2', 0);
+  assert.equal(api.turnPhase, 'TARGET_REACTION_WINDOW');
+  assert.equal(api.players.find(p => p.id === 'p2')!.actionTokens, 0);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    isPendingActionAfterTruthChallenge: true,
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: ['Наследник', 'Шут'] }),
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: ['Право вето', 'Рыцарь'] })
+    ]
+  });
+  const rolePlay = action({
+    type: 'role',
+    name: 'Наследник',
+    actorId: 'p1',
+    roleClaim: 'Наследник'
+  });
+  api.pendingAction = rolePlay;
+  triggerVetoWindowOrResolveEffect(get, set, rolePlay, false);
+  assert.equal(api.turnPhase, 'VETO_WINDOW');
+  assert.equal(api.isPendingActionAfterTruthChallenge, false);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    activePlayerId: 'p2',
+    players: [
+      player({
+        id: 'p1',
+        name: 'Анна',
+        hand: ['Право вето', 'Наследник'],
+        activePlot: { id: 'pl1', type: 'Королевский приём' }
+      }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        actionTokens: 2,
+        hand: ['Обыск покоев', 'Шут']
+      })
+    ]
+  });
+
+  playInstant(get, set, 'p2', 'Обыск покоев', 0, 'p1');
+  assert.equal(api.turnPhase, 'VETO_WINDOW');
+  assert.equal(api.players.find(p => p.id === 'p1')!.activePlot?.type, 'Королевский приём');
+
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null);
+  assert.ok(api.discardPile.includes('Королевский приём'));
+}
+
+{
+  const { get, set, api } = makeHarness({
+    players: [
+      player({
+        id: 'p1',
+        name: 'Анна',
+        actionTokens: 1,
+        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 0 }
+      }),
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: ['Казначей', 'Рыцарь'] })
+    ]
+  });
+  chargeActiveConspiracies(get, set, 'проверку');
+  assert.equal(api.players.find(p => p.id === 'p1')!.activePlot?.charges, 1);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    players: [
+      player({
+        id: 'p1',
+        name: 'Анна',
+        actionTokens: 1,
+        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 1 }
+      }),
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: ['Казначей', 'Рыцарь'] })
+    ]
+  });
+  applyConspiracyEffect(get, set, action({
+    type: 'plot',
+    name: 'Тайный заговор',
+    actorId: 'p1',
+    targetId: 'p2',
+    conspiracyEffect: 'gold'
+  }));
+  assert.equal(api.players.find(p => p.id === 'p2')!.gold, 4);
+  assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null);
+}
+
+{
+  const { get, set, api } = makeHarness({
+    players: [
+      player({
+        id: 'p1',
+        name: 'Анна',
+        actionTokens: 1,
+        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 4 }
+      }),
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, favor: 3, hand: ['Казначей', 'Рыцарь'] })
+    ]
+  });
+  applyConspiracyEffect(get, set, action({
+    type: 'plot',
+    name: 'Тайный заговор',
+    actorId: 'p1',
+    targetId: 'p2',
+    conspiracyEffect: 'gold'
+  }));
+  assert.equal(api.players.find(p => p.id === 'p2')!.gold, 1);
+}
+
+console.log('courtRules.check: ok');

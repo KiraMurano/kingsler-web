@@ -14,6 +14,7 @@ import { botMemory } from './Bot';
 import { ALL_BOT_CANDIDATES, BOT_ARCHETYPES, getBotArchetype, type BotCandidate } from './botsConfig';
 import { declineAcc, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
+import { ACTION_HOLD_MS } from './timing';
 import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
@@ -40,7 +41,8 @@ import {
   closeRevealOutcome,
   proceedAfterDoubtPassed,
   triggerVetoWindowOrResolveEffect,
-  proceedAfterVetoWindow
+  proceedAfterVetoWindow,
+  resolvePendingActionEffect
 } from './resolvers/doubtResolver';
 import { playInstant } from './resolvers/instantResolver';
 import { checkEndgameAndAdvanceTurn, endTurn } from './resolvers/turnResolver';
@@ -62,6 +64,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   hasPlayedPlotThisTurn: false,
 
   coronationCandidateId: null,
+  coronationOriginId: null,
   pendingAction: null,
   pendingDoubtDoubterId: null,
 
@@ -78,7 +81,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   isTimerPaused: false,
 
   revealOutcome: null,
-  spyPeekData: null,
   informantPeekData: null,
   conspiracyPrompt: null,
 
@@ -86,6 +88,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   floatingResourceEvents: [],
   cardFlightEvent: null,
   hasCardDeparted: false,
+  overlayInstant: null,
 
   winnerId: null,
   history: [],
@@ -148,7 +151,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasPlayedRoleThisTurn: false,
       hasPlayedPlotThisTurn: false,
       coronationCandidateId: null,
+      coronationOriginId: null,
       pendingAction: null,
+      overlayInstant: null,
       isVaBanqueActive: false,
       isVetoed: false,
       isPendingActionAfterTruthChallenge: false,
@@ -158,7 +163,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       timerSeconds: 0,
       timerMaxSeconds: 14,
       revealOutcome: null,
-      spyPeekData: null,
       informantPeekData: null,
       activeSpeechReactions: {},
       floatingResourceEvents: [],
@@ -276,6 +280,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasPlayedRoleThisTurn: action.type === 'role' ? true : state.hasPlayedRoleThisTurn,
       isVaBanqueActive: withVaBanque,
       isVetoed: false,
+      overlayInstant: null,
       isPendingActionAfterTruthChallenge: false
     }));
 
@@ -308,7 +313,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ pendingAction: action, turnPhase: 'IDLE' });
       timerManager.scheduleDelay(() => {
         get()._executeNormalAction(action);
-      }, 1500);
+      }, ACTION_HOLD_MS);
       return;
     }
 
@@ -441,6 +446,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     triggerVetoWindowOrResolveEffect(get, set, action, isAfterTruthChallenge);
   },
 
+  _resolvePendingActionEffect: (action, isAfterTruthChallenge = false) => {
+    resolvePendingActionEffect(get, set, action, isAfterTruthChallenge);
+  },
+
   proceedAfterVetoWindow: () => {
     proceedAfterVetoWindow(get, set);
   },
@@ -455,11 +464,6 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   _resolveRoleActionEffect: (action, isAfterTruthChallenge = false) => {
     resolveRoleActionEffect(get, set, action, isAfterTruthChallenge);
-  },
-
-  completeSpyAction: () => {
-    set({ spyPeekData: null });
-    get()._checkEndgameAndAdvanceTurn();
   },
 
   // --------------------------------------------------------------------------

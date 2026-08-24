@@ -8,9 +8,10 @@ export interface CardProps {
   isPlayable?: boolean;
   isSelected?: boolean;
   hint?: string;
+  className?: string;
 }
 
-export const Card: React.FC<CardProps> = ({ card, onClick, isPlayable, isSelected, hint }) => {
+export const Card: React.FC<CardProps> = ({ card, onClick, isPlayable, isSelected, hint, className }) => {
   const info = CARD_DESCRIPTIONS[card] ?? CARD_DESCRIPTIONS['Наследник'];
 
   return (
@@ -19,7 +20,8 @@ export const Card: React.FC<CardProps> = ({ card, onClick, isPlayable, isSelecte
         'handcard',
         `cardframe cardframe--${info.category}`,
         isPlayable ? 'handcard--playable' : 'handcard--idle',
-        isSelected ? 'handcard--selected' : ''
+        isSelected ? 'handcard--selected' : '',
+        className
       ]
         .filter(Boolean)
         .join(' ')}

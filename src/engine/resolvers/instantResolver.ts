@@ -1,15 +1,35 @@
-import type { GameState, InstantType } from '../types';
-import { drawCardsFromDeck, isRole } from '../cards';
+import type { Action, GameState, InstantType } from '../types';
+import { CARD_INFO, drawCardsFromDeck } from '../cards';
 import { botMemory } from '../Bot';
 import { declineGen } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { chargeActiveConspiracies } from './plotResolver';
+import { ACTION_HOLD_MS } from '../timing';
+import { fallenCoronationPatch } from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
   partial: Partial<GameState> | ((state: GameState) => Partial<GameState>)
 ) => void;
+
+function instantAction(
+  actorId: string,
+  instantType: InstantType,
+  targetPlayerId: string | undefined,
+  tokenCost: number
+): Action {
+  return {
+    id: Math.random().toString(36).substring(7),
+    type: 'instant',
+    name: instantType,
+    instantType,
+    actorId,
+    targetId: targetPlayerId,
+    costGold: 0,
+    costTokens: tokenCost,
+    description: CARD_INFO[instantType]?.shortDescription ?? ''
+  };
+}
 
 export function playInstant(
   get: StateGetter,
@@ -19,7 +39,7 @@ export function playInstant(
   cardIndex: number,
   targetPlayerId?: string
 ): void {
-  const { players, pendingAction, discardPile, activePlayerId } = get();
+  const { players, pendingAction, discardPile } = get();
   const actor = players.find(p => p.id === playerId);
   if (!actor) return;
 
@@ -29,37 +49,57 @@ export function playInstant(
   const card = actor.hand[cardIndex];
   if (card !== instantType) return;
 
-  // Remove instant from hand to discard (deferred draw at end of turn)
   const newHand = [...actor.hand];
   newHand.splice(cardIndex, 1);
   const updatedDiscard = [...discardPile, instantType];
 
   const tokenCost = isFreeInstant ? 0 : 1;
-  const updatedPlayers = players.map(p => p.id === actor.id ? {
-    ...p,
-    actionTokens: p.actionTokens - tokenCost,
-    hand: newHand
-  } : p);
+  const updatedPlayers = players.map(p =>
+    p.id === actor.id
+      ? {
+          ...p,
+          actionTokens: p.actionTokens - tokenCost,
+          hand: newHand
+        }
+      : p
+  );
   if (tokenCost > 0) {
     triggerResourceFloat(set, actor.id, '-1 ⚡', false);
   }
 
-  const isOwnTurn = actor.id === activePlayerId;
+  const laid = instantAction(actor.id, instantType, targetPlayerId, tokenCost);
+  const speech = `«${instantType}!»`;
 
   if (instantType === 'Ва-банк') {
     set(state => ({
       players: updatedPlayers,
       discardPile: updatedDiscard,
       isVaBanqueActive: true,
-      history: [`🎲 ${actor.name} играет инстант ⚡ «ВА-БАНК» (потрачен 1 ⚡)! Награда за этот спор удваивается (2 ⚜️ = 1 👑)!`, ...state.history].slice(0, 50)
+      pendingAction: laid,
+      overlayInstant: null,
+      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+      history: [
+        `🎲 ${actor.name} играет инстант ⚡ «ВА-БАНК» (потрачен 1 ⚡)! Награда за этот спор удваивается (2 ⚜️ = 1 👑)!`,
+        ...state.history
+      ].slice(0, 50)
     }));
     triggerResourceFloat(set, actor.id, '⚡ ВА-БАНК! (x2)', true);
+    timerManager.scheduleDelay(() => {
+      if (get().pendingAction?.instantType === 'Ва-банк') {
+        set({ pendingAction: null });
+      }
+    }, ACTION_HOLD_MS);
   } else if (instantType === 'Право вето') {
     set(state => ({
       players: updatedPlayers,
       discardPile: updatedDiscard,
       isVetoed: true,
-      history: [`🚫 ${actor.name} играет инстант ⚡ «ПРАВО ВЕТО»! Эффект действия отменён!`, ...state.history].slice(0, 50)
+      overlayInstant: { card: 'Право вето', actorId: actor.id },
+      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+      history: [
+        `🚫 ${actor.name} играет инстант ⚡ «ПРАВО ВЕТО»! Эффект действия отменён!`,
+        ...state.history
+      ].slice(0, 50)
     }));
     triggerResourceFloat(set, actor.id, '🚫 ПРАВО ВЕТО!', false);
 
@@ -67,7 +107,7 @@ export function playInstant(
       timerManager.clearAll();
       timerManager.scheduleDelay(() => {
         get().proceedAfterVetoWindow();
-      }, 1200);
+      }, ACTION_HOLD_MS);
     }
   } else if (instantType === 'Перенаправление' && targetPlayerId) {
     const newTarget = players.find(p => p.id === targetPlayerId);
@@ -77,107 +117,173 @@ export function playInstant(
         players: updatedPlayers,
         discardPile: updatedDiscard,
         pendingAction: updatedAction,
+        overlayInstant: { card: 'Перенаправление', actorId: actor.id },
         turnPhase: 'TARGET_REACTION_WINDOW',
         timerSeconds: 0,
         timerMaxSeconds: 0,
-        history: [`🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ»! Новая цель атаки: ${newTarget.name}!`, ...state.history].slice(0, 50)
+        activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+        history: [
+          `🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ»! Новая цель атаки: ${newTarget.name}!`,
+          ...state.history
+        ].slice(0, 50)
       }));
     }
   } else if (instantType === 'Дворцовый переполох' && targetPlayerId) {
-    const targetIdx = updatedPlayers.findIndex(p => p.id === targetPlayerId);
+    set(state => ({
+      players: updatedPlayers,
+      discardPile: updatedDiscard,
+      pendingAction: laid,
+      overlayInstant: null,
+      isPendingActionAfterTruthChallenge: false,
+      isVetoed: false,
+      turnSubPhase: 'CARD_PLAY_PHASE',
+      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+      history: [
+        `⚡ ${actor.name} разыгрывает инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (потрачен 1 ⚡)! Двор может наложить Вето до смены руки ${declineGen(players.find(p => p.id === targetPlayerId)?.name ?? 'цели')}.`,
+        ...state.history
+      ].slice(0, 50)
+    }));
+    get()._triggerVetoWindowOrResolveEffect(laid, false);
+  } else if (instantType === 'Обыск покоев' && targetPlayerId) {
+    set(state => ({
+      players: updatedPlayers,
+      discardPile: updatedDiscard,
+      pendingAction: laid,
+      overlayInstant: null,
+      isPendingActionAfterTruthChallenge: false,
+      isVetoed: false,
+      turnSubPhase: 'CARD_PLAY_PHASE',
+      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+      history: [
+        `🔍 ${actor.name} разыгрывает инстант ⚡ «ОБЫСК ПОКОЕВ» (потрачен 1 ⚡) против ${players.find(p => p.id === targetPlayerId)?.name ?? 'цели'}! Двор может наложить Вето.`,
+        ...state.history
+      ].slice(0, 50)
+    }));
+    get()._triggerVetoWindowOrResolveEffect(laid, false);
+  } else if (instantType === 'Обвинение в измене' && targetPlayerId) {
+    set(state => ({
+      players: updatedPlayers,
+      discardPile: updatedDiscard,
+      pendingAction: laid,
+      overlayInstant: null,
+      isPendingActionAfterTruthChallenge: false,
+      isVetoed: false,
+      turnSubPhase: 'CARD_PLAY_PHASE',
+      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+      history: [
+        `⛓️ ${actor.name} разыгрывает инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (потрачен 1 ⚡) против ${players.find(p => p.id === targetPlayerId)?.name ?? 'цели'}! Двор может наложить Вето.`,
+        ...state.history
+      ].slice(0, 50)
+    }));
+    get()._triggerVetoWindowOrResolveEffect(laid, false);
+  }
+}
+
+export function resolveInstantEffect(
+  get: StateGetter,
+  set: StateSetter,
+  action: Action
+): void {
+  const { players, discardPile, activePlayerId } = get();
+  const actor = players.find(p => p.id === action.actorId);
+  const instantType = action.instantType;
+  if (!actor || !instantType) {
+    get()._checkEndgameAndAdvanceTurn();
+    return;
+  }
+
+  const isOwnTurn = actor.id === activePlayerId;
+  const holdThenAdvance = () => {
+    timerManager.scheduleDelay(() => {
+      get()._checkEndgameAndAdvanceTurn();
+    }, ACTION_HOLD_MS);
+  };
+
+  if (instantType === 'Дворцовый переполох' && action.targetId) {
+    const targetIdx = players.findIndex(p => p.id === action.targetId);
     if (targetIdx !== -1) {
-      const victim = updatedPlayers[targetIdx];
-      const { drawn: newTwo, deck: d2, discardPile: disc2 } = drawCardsFromDeck(2, get().deck, [...updatedDiscard, ...victim.hand]);
-      updatedPlayers[targetIdx] = { ...victim, hand: newTwo };
-
+      const victim = players[targetIdx];
+      const {
+        drawn: newTwo,
+        deck: d2,
+        discardPile: disc2
+      } = drawCardsFromDeck(2, get().deck, [...discardPile, ...victim.hand]);
+      const newPlayers = players.map(p => p.id === victim.id ? { ...p, hand: newTwo } : p);
       botMemory.invalidatePlayerHand(victim.id);
-
       set(state => ({
-        players: updatedPlayers,
+        players: newPlayers,
         deck: d2,
         discardPile: disc2,
-        history: [`⚡ ${actor.name} играет инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (потрачен 1 ⚡)! ${victim.name} сбрасывает руку и берет 2 новые карты!`, ...state.history].slice(0, 50)
+        history: [
+          `⚡ «Дворцовый переполох»: ${victim.name} сбрасывает руку и берёт 2 новые карты!`,
+          ...state.history
+        ].slice(0, 50)
       }));
       triggerResourceFloat(set, victim.id, '🔄 Смена руки!', false);
     }
-    if (isOwnTurn) {
-      set({ turnSubPhase: 'CARD_PLAY_PHASE' });
-      timerManager.scheduleDelay(() => {
-        get()._checkEndgameAndAdvanceTurn();
-      }, 1200);
-    }
-  } else if (instantType === 'Шпион' && targetPlayerId) {
-    const target = updatedPlayers.find(p => p.id === targetPlayerId);
-    if (target) {
-      if (!actor.isBot) {
-        set(state => ({
-          players: updatedPlayers,
-          discardPile: updatedDiscard,
-          turnSubPhase: 'CARD_PLAY_PHASE',
-          spyPeekData: {
-            actorId: actor.id,
-            targetId: target.id,
-            targetCards: [...target.hand]
-          },
-          turnPhase: 'SPY_PEEK',
-          history: [`👁️ ${actor.name} играет инстант ⚡ «ШПИОН» (потрачен 1 ⚡) и тайно изучает карты ${declineGen(target.name)}!`, ...state.history].slice(0, 50)
-        }));
-      } else {
-        if (isRole(target.hand[0])) botMemory.recordSpyPeek(actor.id, target.id, 0, target.hand[0]);
-        if (target.hand.length > 1 && isRole(target.hand[1])) {
-          botMemory.recordSpyPeek(actor.id, target.id, 1, target.hand[1]);
-        }
-        set(state => ({
-          players: updatedPlayers,
-          discardPile: updatedDiscard,
-          turnSubPhase: 'CARD_PLAY_PHASE',
-          history: [`👁️ ${actor.name} играет инстант ⚡ «ШПИОН» (потрачен 1 ⚡) и тайно изучает карты ${declineGen(target.name)}!`, ...state.history].slice(0, 50)
-        }));
-        if (isOwnTurn) {
-          timerManager.scheduleDelay(() => {
-            get()._checkEndgameAndAdvanceTurn();
-          }, 1200);
-        }
-      }
-    }
-  } else if (instantType === 'Обвинение в измене' && targetPlayerId) {
-    const targetIdx = updatedPlayers.findIndex(p => p.id === targetPlayerId);
-    if (targetIdx !== -1) {
-      const victim = updatedPlayers[targetIdx];
-      if (victim.favor > 0) {
-        updatedPlayers[targetIdx] = { ...victim, favor: victim.favor - 1 };
-
-        get()._disruptPlayerPlotsOnLoss(victim.id, 'обвинения в измене');
-        chargeActiveConspiracies(get, set, `лишение короны Обвинением в измене (${actor.name})`);
-
-        if (get().coronationCandidateId === victim.id && updatedPlayers[targetIdx].favor < 6) {
-          set(state => ({
-            coronationCandidateId: null,
-            history: [`⚖️ Коронация ${victim.name} сорвана Обвинением в измене! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
-          }));
-        }
-
-        set(state => ({
-          players: updatedPlayers,
-          discardPile: updatedDiscard,
-          turnSubPhase: 'CARD_PLAY_PHASE',
-          history: [`⛓️ ${actor.name} играет инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (потрачен 1 ⚡)! ${victim.name} теряет -1 👑!`, ...state.history].slice(0, 50)
-        }));
-        triggerResourceFloat(set, victim.id, '-1 👑 Измена!', false);
-        triggerResourceFloat(set, actor.id, `⛓️ Донос на ${victim.name}!`, true);
-      } else {
-        set(state => ({
-          players: updatedPlayers,
-          discardPile: updatedDiscard,
-          turnSubPhase: 'CARD_PLAY_PHASE',
-          history: [`⛓️ ${actor.name} играет инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (потрачен 1 ⚡) против ${victim.name}, но у цели 0 👑!`, ...state.history].slice(0, 50)
-        }));
-      }
-    }
-    if (isOwnTurn) {
-      timerManager.scheduleDelay(() => {
-        get()._checkEndgameAndAdvanceTurn();
-      }, 1200);
-    }
+    if (isOwnTurn) holdThenAdvance();
+    return;
   }
+
+  if (instantType === 'Обыск покоев' && action.targetId) {
+    const victim = players.find(p => p.id === action.targetId);
+    if (victim?.activePlot) {
+      const plotType = victim.activePlot.type;
+      const newPlayers = players.map(p =>
+        p.id === victim.id ? { ...p, activePlot: null } : p
+      );
+      set(state => ({
+        players: newPlayers,
+        discardPile: [...state.discardPile, plotType],
+        history: [
+          `🔍 «Обыск покоев»: интрига ${declineGen(victim.name)} («${plotType}») сброшена!`,
+          ...state.history
+        ].slice(0, 50)
+      }));
+      triggerResourceFloat(set, victim.id, '🔍 Интрига сброшена!', false);
+    } else if (victim) {
+      set(state => ({
+        history: [
+          `🔍 «Обыск покоев» против ${victim.name} не сработал: у цели нет активной интриги.`,
+          ...state.history
+        ].slice(0, 50)
+      }));
+    }
+    if (isOwnTurn) holdThenAdvance();
+    return;
+  }
+
+  if (instantType === 'Обвинение в измене' && action.targetId) {
+    const victim = players.find(p => p.id === action.targetId);
+    if (victim && victim.favor > 0) {
+      const newPlayers = players.map(p =>
+        p.id === victim.id ? { ...p, favor: p.favor - 1 } : p
+      );
+      set(state => ({
+        players: newPlayers,
+        ...fallenCoronationPatch(state.coronationCandidateId, victim.id, victim.favor - 1),
+        history: [
+          `⛓️ «Обвинение в измене»: ${victim.name} теряет -1 👑!`,
+          ...(state.coronationCandidateId === victim.id && victim.favor - 1 < 6
+            ? [`⚖️ Коронация ${victim.name} сорвана Обвинением в измене! Влияние упало ниже 6 👑!`]
+            : []),
+          ...state.history
+        ].slice(0, 50)
+      }));
+      get()._disruptPlayerPlotsOnLoss(victim.id, 'обвинения в измене');
+      triggerResourceFloat(set, victim.id, '-1 👑 Измена!', false);
+      triggerResourceFloat(set, actor.id, `⛓️ Донос на ${victim.name}!`, true);
+    } else if (victim) {
+      set(state => ({
+        history: [
+          `⛓️ «Обвинение в измене» против ${victim.name} не сработало: у цели 0 👑!`,
+          ...state.history
+        ].slice(0, 50)
+      }));
+    }
+    if (isOwnTurn) holdThenAdvance();
+    return;
+  }
+
+  if (isOwnTurn) holdThenAdvance();
 }

@@ -11,13 +11,13 @@ import { startTargeting } from './targeting';
 const TARGETED_INSTANTS: InstantType[] = [
   'Дворцовый переполох',
   'Перенаправление',
-  'Шпион',
+  'Обыск покоев',
   'Обвинение в измене'
 ];
 
 /** Instants a player may lay down openly on their own turn. */
 const OPENLY_PLAYABLE_INSTANTS: InstantType[] = [
-  'Шпион',
+  'Обыск покоев',
   'Дворцовый переполох',
   'Обвинение в измене'
 ];

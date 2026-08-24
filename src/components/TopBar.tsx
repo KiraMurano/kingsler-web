@@ -41,11 +41,15 @@ export const TopBar: React.FC<TopBarProps> = ({
         }`}
       >
         <span className="turnchip__dot" />
-        <span>{statusText}</span>
+        <span key={statusText} className="turnchip__copy">
+          {statusText}
+        </span>
         {hint && (
           <>
             <span className="turnchip__sep" />
-            <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>{hint}</span>
+            <span key={hint} className="turnchip__copy turnchip__copy--muted">
+              {hint}
+            </span>
           </>
         )}
       </div>

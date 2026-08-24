@@ -58,9 +58,7 @@ function ConspiracyDialog({
       title={`Тайный заговор · ${prompt.charges} из 4`}
       description={
         <div style={{ display: 'flex', gap: 6 }}>
-          <Tag tone={prompt.isImmediateReaction ? 'truth' : 'arcane'}>
-            {prompt.isImmediateReaction ? 'мгновенная реакция · 0 ⚡' : 'активация в ход · 1 ⚡'}
-          </Tag>
+          <Tag tone="arcane">активация в ход · 1 ⚡</Tag>
           {unvetoable && <Tag tone="danger">вето невозможно</Tag>}
         </div>
       }
@@ -108,7 +106,7 @@ function ConspiracyDialog({
             <Button
               tone={effect === 'gold' ? 'gold' : 'plain'}
               block
-              sub={target ? `Отнимет ${Math.min(3, target.gold)} 🪙` : undefined}
+              sub={target ? `Отнимет ${Math.min(prompt.charges, target.gold)} 🪙` : undefined}
               onClick={() => setEffect('gold')}
             >
               Сбить казну
@@ -215,10 +213,8 @@ export const Modals: React.FC<ModalsProps> = ({
   const {
     players,
     pendingAction,
-    spyPeekData,
     informantPeekData,
     conspiracyPrompt,
-    completeSpyAction,
     closeInformantPeek,
     closeConspiracyDialog,
     activateConspiracy,
@@ -253,29 +249,6 @@ export const Modals: React.FC<ModalsProps> = ({
           activateConspiracy(human.id, targetId, effect, isImmediate)
         }
       />
-    );
-  }
-
-  if (turnPhase === 'SPY_PEEK' && spyPeekData) {
-    const target = players.find(p => p.id === spyPeekData.targetId);
-    const cards = spyPeekData.targetCards ?? [];
-    return (
-      <Dialog
-        open
-        onClose={() => completeSpyAction()}
-        width={500}
-        title="Тайный надзор"
-        description={`Вы заглянули в руку игрока ${target?.name}`}
-      >
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 18, marginBottom: 18 }}>
-          {cards.map((card, idx) => (
-            <CardPlate key={idx} card={card} caption={`Карта ${idx + 1}`} />
-          ))}
-        </div>
-        <Button tone="gold" block onClick={() => completeSpyAction()}>
-          Запомнить
-        </Button>
-      </Dialog>
     );
   }
 

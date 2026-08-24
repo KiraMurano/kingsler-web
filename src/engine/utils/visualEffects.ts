@@ -15,7 +15,7 @@ export function triggerResourceFloat(
     floatingResourceEvents: [...state.floatingResourceEvents, { id, playerId, text, isGain }]
   }));
 
-  window.setTimeout(() => {
+  globalThis.setTimeout(() => {
     set(state => ({
       floatingResourceEvents: state.floatingResourceEvents.filter(e => e.id !== id)
     }));
@@ -44,7 +44,7 @@ export function triggerSingleCardFlight(
     }
   });
 
-  window.setTimeout(() => {
+  globalThis.setTimeout(() => {
     set({
       cardFlightEvent: null
     });
@@ -79,7 +79,7 @@ export function triggerDuelCardFlight(
     }
   });
 
-  window.setTimeout(() => {
+  globalThis.setTimeout(() => {
     set({
       cardFlightEvent: null
     });

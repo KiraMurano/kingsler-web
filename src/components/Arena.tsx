@@ -16,8 +16,8 @@ export const Arena: React.FC<ArenaProps> = ({
   onCancelTarget,
   onInspectCard
 }) => {
-  const { pendingAction, cardFlightEvent } = useGameStore();
-  const showIdle = !pendingAction && !cardFlightEvent;
+  const { pendingAction, cardFlightEvent, overlayInstant } = useGameStore();
+  const showIdle = !pendingAction && !cardFlightEvent && !overlayInstant;
 
   return (
     <section className="arena">

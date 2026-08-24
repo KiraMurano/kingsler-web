@@ -1,12 +1,55 @@
-import type { GameState } from '../types';
+import type { Action, GameState, Player } from '../types';
 import { drawCardsFromDeck } from '../cards';
 import { timerManager } from '../utils/timerManager';
 import { resolveMorningPlots } from './plotResolver';
+import {
+  beginCoronationIfNeeded,
+  NO_CORONATION,
+  resolveCoronationAtTurnStart
+} from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
   partial: Partial<GameState> | ((state: GameState) => Partial<GameState>)
 ) => void;
+
+function applyCoronationTurnStart(
+  get: StateGetter,
+  set: StateSetter,
+  nextPlayerId: string,
+  players: Player[],
+  extra: Partial<GameState>
+): boolean {
+  const { coronationCandidateId, coronationOriginId } = get();
+  const verdict = resolveCoronationAtTurnStart(
+    nextPlayerId,
+    players,
+    coronationCandidateId,
+    coronationOriginId
+  );
+  switch (verdict.kind) {
+    case 'win':
+      set(state => ({
+        ...extra,
+        winnerId: verdict.winnerId,
+        turnPhase: 'GAME_OVER',
+        history: [
+          `👑 КОРОНАЦИЯ СОСТОЯЛАСЬ! ${verdict.winnerName} удержал(а) ${verdict.favor} 👑 целый круг и становится полноправным Королём Kinglier!`,
+          ...state.history
+        ].slice(0, 50)
+      }));
+      return true;
+    case 'abort':
+      set({ ...NO_CORONATION });
+      return false;
+    case 'continue':
+      return false;
+    default: {
+      const _exhaustive: never = verdict;
+      return _exhaustive;
+    }
+  }
+}
 
 export function checkEndgameAndAdvanceTurn(
   get: StateGetter,
@@ -15,11 +58,9 @@ export function checkEndgameAndAdvanceTurn(
   const { players, coronationCandidateId, activePlayerId, hasPlayedRoleThisTurn, hasPlayedPlotThisTurn } = get();
   const actor = players.find(p => p.id === activePlayerId);
 
-  if (actor && actor.favor >= 6 && !coronationCandidateId) {
-    set(state => ({
-      coronationCandidateId: actor.id,
-      history: [`👑 КРУГ КОРОНАЦИИ! ${actor.name} набрал ${actor.favor} 👑! Если никто не собьёт его короны за полный круг, он победит!`, ...state.history].slice(0, 50)
-    }));
+  if (!coronationCandidateId) {
+    const favorite = players.find(p => p.favor >= 6);
+    if (favorite) beginCoronationIfNeeded(get, set, favorite.id);
   }
 
   // Check if actor has tokens left and can still make plays
@@ -31,8 +72,10 @@ export function checkEndgameAndAdvanceTurn(
       turnPhase: 'IDLE',
       turnSubPhase: 'CARD_PLAY_PHASE',
       pendingAction: null,
+      overlayInstant: null,
       isVaBanqueActive: false,
-      isVetoed: false
+      isVetoed: false,
+      isPendingActionAfterTruthChallenge: false
     });
   }
 }
@@ -42,7 +85,7 @@ export function endTurn(
   set: StateSetter
 ): void {
   timerManager.clearAll();
-  const { players, activePlayerId, coronationCandidateId, deck, discardPile } = get();
+  const { players, activePlayerId, deck, discardPile } = get();
 
   // 1. Refill any players who have < 2 cards in hand (deferred card draw)
   let curDeck = deck;
@@ -70,32 +113,70 @@ export function endTurn(
     return p;
   });
 
-  // 3. Phase 1 Morning Triggers: Check Royal Reception / Informant Network expiry at start of nextPlayer's turn
+  const boardPatch = {
+    players: updatedPlayers,
+    deck: curDeck,
+    discardPile: curDiscard
+  };
+
+  // Win is checked at the start of the origin player's next turn, before morning plots.
+  if (applyCoronationTurnStart(get, set, nextPlayer.id, updatedPlayers, boardPatch)) {
+    return;
+  }
+
+  // 3. Phase 1 Morning Triggers
+  const nextFromUpdated = updatedPlayers[nextIndex];
+  const morningType = nextFromUpdated.activePlot?.type;
+  const morningNeedsVeto =
+    (morningType === 'Королевский приём' || morningType === 'Золотая булла') &&
+    updatedPlayers.some(p => p.id !== nextFromUpdated.id && p.hand.includes('Право вето'));
+
+  if (morningNeedsVeto && morningType) {
+    const morningAction: Action = {
+      id: Math.random().toString(36).slice(2, 9),
+      type: 'plot',
+      name: morningType,
+      plotType: morningType,
+      actorId: nextPlayer.id,
+      costGold: 0,
+      costTokens: 0,
+      isMorningTrigger: true,
+      description: ''
+    };
+
+    set({
+      players: updatedPlayers,
+      deck: curDeck,
+      discardPile: curDiscard,
+      activePlayerId: nextPlayer.id,
+      turnPhase: 'IDLE',
+      turnSubPhase: 'NORMAL_ACTION_PHASE',
+      hasUsedNormalActionThisTurn: false,
+      hasPlayedRoleThisTurn: false,
+      hasPlayedPlotThisTurn: false,
+      pendingAction: morningAction,
+      overlayInstant: null,
+      isVaBanqueActive: false,
+      isVetoed: false,
+      isPendingActionAfterTruthChallenge: false,
+      pendingDuelDefenderCardIndex: null,
+      pendingDuelDefenderRoleClaim: null,
+      duelOutcome: null,
+      activeSpeechReactions: {},
+      timerSeconds: 0,
+      revealOutcome: null,
+      informantPeekData: null
+    });
+    get()._triggerVetoWindowOrResolveEffect(morningAction, false);
+    return;
+  }
+
   const {
     updatedPlayers: morningPlayers,
     curDiscard: morningDiscard,
     coronationTriggeredByReception,
     nextPlayerUpdated
-  } = resolveMorningPlots(updatedPlayers, nextIndex, curDiscard, coronationCandidateId, set);
-
-  // 4. Check Coronation victory if candidate held >= 6 crowns for entire round
-  if (coronationCandidateId && nextPlayer.id === coronationCandidateId) {
-    if (nextPlayerUpdated.favor >= 6) {
-      set(state => ({
-        players: morningPlayers,
-        deck: curDeck,
-        discardPile: morningDiscard,
-        winnerId: nextPlayer.id,
-        turnPhase: 'GAME_OVER',
-        history: [`👑 КОРОНАЦИЯ СОСТОЯЛАСЬ! ${nextPlayer.name} удержал(а) ${nextPlayerUpdated.favor} 👑 целый круг и становится полноправным Королём Kinglier!`, ...state.history].slice(0, 50)
-      }));
-      return;
-    } else {
-      set({ coronationCandidateId: null });
-    }
-  }
-
-  const newCandidateId = coronationTriggeredByReception ? nextPlayerUpdated.id : coronationCandidateId;
+  } = resolveMorningPlots(updatedPlayers, nextIndex, curDiscard, get().coronationCandidateId, set);
 
   set({
     players: morningPlayers,
@@ -107,17 +188,21 @@ export function endTurn(
     hasUsedNormalActionThisTurn: false,
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
-    coronationCandidateId: newCandidateId,
     pendingAction: null,
+    overlayInstant: null,
     isVaBanqueActive: false,
     isVetoed: false,
+    isPendingActionAfterTruthChallenge: false,
     pendingDuelDefenderCardIndex: null,
     pendingDuelDefenderRoleClaim: null,
     duelOutcome: null,
     activeSpeechReactions: {},
     timerSeconds: 0,
     revealOutcome: null,
-    spyPeekData: null,
     informantPeekData: null
   });
+
+  if (coronationTriggeredByReception) {
+    beginCoronationIfNeeded(get, set, nextPlayerUpdated.id, nextPlayer.id);
+  }
 }

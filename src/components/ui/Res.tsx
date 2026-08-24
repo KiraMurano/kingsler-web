@@ -41,8 +41,10 @@ export const Res: React.FC<ResProps> = ({ kind, value, suffix, size = 'sm', mute
       {RESOURCE_GLYPH[kind]}
     </span>
     <span>
-      {value}
-      {suffix ? ` ${suffix}` : ''}
+      <span key={String(value)} className="res__n">
+        {value}
+        {suffix ? ` ${suffix}` : ''}
+      </span>
     </span>
   </span>
 );
