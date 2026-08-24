@@ -21,13 +21,19 @@ function sendAction(room: Room, method: string) {
 /** Turns a redacted network payload back into the shape the shared store (and
  *  every existing component) already expects. `deck`/`discardPile` are only
  *  ever used for their `.length` client-side (see Codex.tsx), so filled
- *  placeholder arrays of the right size stand in for the real, hidden cards. */
-function toStorePatch(data: PublicGameState): Partial<GameState> {
-  const { deckSize, discardPileSize, ...rest } = data;
+ *  placeholder arrays of the right size stand in for the real, hidden cards.
+ *  Opponents' hidden hand cards arrive as `null` (redaction hides identity);
+ *  the same placeholder keeps them truthy so hand-slot occupancy (and the
+ *  card-back count shown in each seat) still renders instead of reading as
+ *  an empty hand. Nothing displays an opponent's hand card by name, so the
+ *  placeholder never leaks real information. */
+export function toStorePatch(data: PublicGameState): Partial<GameState> {
+  const { deckSize, discardPileSize, players, ...rest } = data;
   return {
     ...rest,
     deck: new Array(deckSize).fill('Наследник'),
-    discardPile: new Array(discardPileSize).fill('Наследник')
+    discardPile: new Array(discardPileSize).fill('Наследник'),
+    players: players.map(p => ({ ...p, hand: p.hand.map(card => card ?? 'Наследник') }))
   } as unknown as Partial<GameState>;
 }
 
