@@ -25,6 +25,8 @@ interface ActionMessage {
   args: unknown[];
 }
 
+const RECONNECTION_GRACE_SECONDS = Number(process.env.KINGLIER_RECONNECT_GRACE_SECONDS ?? 60);
+
 type Phase = 'WAITING' | 'PLAYING' | 'GAME_OVER';
 
 interface Seat {
@@ -71,7 +73,26 @@ export class KinglierRoom extends Room {
     this.broadcastLobby();
   }
 
-  onLeave(client: Client) {
+  async onDrop(client: Client): Promise<void> {
+    const seat = this.seats.find(s => s.sessionId === client.sessionId);
+    if (!seat) return;
+
+    seat.connected = false;
+    this.broadcastLobby();
+
+    try {
+      const rejoined = await this.allowReconnection(client, RECONNECTION_GRACE_SECONDS);
+      seat.sessionId = rejoined.sessionId;
+      seat.connected = true;
+      rejoined.userData = { playerId: seat.playerId };
+      this.broadcastLobby();
+      this.sendState(rejoined, seat.playerId);
+    } catch {
+      this.worker?.setSeatBotControlled(seat.playerId);
+    }
+  }
+
+  onLeave(client: Client): void {
     this.seats = this.seats.filter(s => s.sessionId !== client.sessionId);
     this.broadcastLobby();
   }
