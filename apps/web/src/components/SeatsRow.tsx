@@ -1,7 +1,8 @@
 import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { OpponentSeat } from './OpponentSeat';
-import { pickViewer, seatOpponents } from '../lib/seats';
+import { seatOpponents } from '../lib/seats';
+import { pickViewer } from '../lib/viewer';
 import type { GameCard, Player } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
 

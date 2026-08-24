@@ -11,14 +11,6 @@ const SIDE_BY_RELATIVE_SEAT: Record<number, SeatSide> = {
   3: 'right'
 };
 
-/** Finds the local player. Online: the server-assigned `viewerId` says which
- *  seat is ours. Offline: there's always exactly one human, so the old
- *  `!isBot` lookup still holds — this only takes the online branch once a
- *  `viewerId` is present. */
-export function pickViewer(players: Player[], viewerId?: string): Player | undefined {
-  return viewerId ? players.find(p => p.id === viewerId) : players.find(p => !p.isBot);
-}
-
 /** Everyone but the viewer, in clockwise seating order starting from the
  *  viewer's left, each tagged with the side it renders on.
  *

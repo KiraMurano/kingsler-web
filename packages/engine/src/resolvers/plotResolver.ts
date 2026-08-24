@@ -167,14 +167,20 @@ export function openConspiracyDialog(
   set: StateSetter,
   isImmediateReaction = false
 ): void {
-  const human = get().players.find(p => !p.isBot);
-  if (!human || human.activePlot?.type !== 'Тайный заговор') return;
-  const charges = human.activePlot.charges ?? 0;
+  // This is dispatched as an active-player-only action (the server already
+  // confirms the sender is `activePlayerId` before this ever runs), so the
+  // caller is always whoever's turn it is — not "the human" (that assumed a
+  // single non-bot player and opened the wrong player's conspiracy once a
+  // second real player was in the seat).
+  const { activePlayerId, players } = get();
+  const actor = players.find(p => p.id === activePlayerId);
+  if (!actor || actor.activePlot?.type !== 'Тайный заговор') return;
+  const charges = actor.activePlot.charges ?? 0;
   if (charges < 1) return;
 
   set({
     conspiracyPrompt: {
-      playerId: human.id,
+      playerId: actor.id,
       charges,
       isImmediateReaction
     }

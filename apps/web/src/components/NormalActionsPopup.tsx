@@ -5,12 +5,13 @@ import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';
 import { startTargeting } from './targeting';
+import { pickViewer } from '../lib/viewer';
 
 const FEAST_CROWN_CAP = 5;
 
 export const NormalActionsPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { players, performAction } = useGameStore();
-  const human = players.find(p => !p.isBot);
+  const { players, viewerId, performAction } = useGameStore();
+  const human = pickViewer(players, viewerId);
   if (!human) return null;
 
   const hasTokens = human.actionTokens >= 1;

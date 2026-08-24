@@ -32,13 +32,35 @@ guest.send('action', {
 await new Promise(resolve => setTimeout(resolve, 300));
 assert.equal(hostState!.players.find(p => p.id === 'p1')!.gold, goldBefore, "p2's out-of-turn action must be rejected");
 
-// The host acting on p1's own turn must succeed.
+// The host acting on p1's own turn must succeed. A normal action resolves
+// its effect and then advances the turn after two back-to-back
+// ACTION_HOLD_MS holds, so wait past both.
 host.send('action', {
   method: 'performAction',
   args: [{ type: 'normal', name: 'Просить содержание', actorId: 'p1', costGold: 0, costTokens: 1, description: 'x' }]
 });
-await new Promise(resolve => setTimeout(resolve, 3000));
+await new Promise(resolve => setTimeout(resolve, 5000));
 assert.equal(hostState!.players.find(p => p.id === 'p1')!.gold, goldBefore + 1, "p1's own-turn action must apply");
+
+// Bug repro: a buggy client can embed the *wrong* actorId in the payload
+// (this happened for real — a UI bug sent the other player's id here). The
+// server must stamp the real seat id over it, not trust the payload, or
+// the resulting gold/effects land on the wrong player.
+host.send('action', { method: 'endTurnManually', args: [] });
+await new Promise(resolve => setTimeout(resolve, 500));
+assert.equal(hostState!.activePlayerId, 'p2', "p1 ending their turn must hand it to p2");
+
+const goldBeforeSpoof = hostState!.players.find(p => p.id === 'p2')!.gold;
+guest.send('action', {
+  method: 'performAction',
+  args: [{ type: 'normal', name: 'Просить содержание', actorId: 'p1', costGold: 0, costTokens: 1, description: 'x' }]
+});
+await new Promise(resolve => setTimeout(resolve, 3000));
+assert.equal(
+  hostState!.players.find(p => p.id === 'p2')!.gold,
+  goldBeforeSpoof + 1,
+  "p2's action must be credited to p2 (the real sender) even if the payload spoofs actorId: 'p1'"
+);
 
 host.leave();
 guest.leave();

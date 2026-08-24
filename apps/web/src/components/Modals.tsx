@@ -9,6 +9,7 @@ import {
 } from '@kinglier/engine/cards';
 import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
 import { courtly } from '../lib/text';
+import { pickViewer } from '../lib/viewer';
 import { Dialog } from './ui/Overlay';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
@@ -35,15 +36,17 @@ const CardPlate: React.FC<{ card: GameCard; caption?: string; width?: number }> 
 function ConspiracyDialog({
   prompt,
   players,
+  selfId,
   onClose,
   onActivate
 }: {
   prompt: ConspiracyPromptData;
   players: Player[];
+  selfId: string;
   onClose: () => void;
   onActivate: (targetId: string, effect: 'gold' | 'crown', isImmediate: boolean) => void;
 }) {
-  const opponents = players.filter(p => p.isBot);
+  const opponents = players.filter(p => p.id !== selfId);
   const [targetId, setTargetId] = useState(opponents[0]?.id ?? '');
   const [effect, setEffect] = useState<'gold' | 'crown'>(prompt.charges >= 3 ? 'crown' : 'gold');
 
@@ -212,6 +215,7 @@ export const Modals: React.FC<ModalsProps> = ({
 }) => {
   const {
     players,
+    viewerId,
     pendingAction,
     informantPeekData,
     conspiracyPrompt,
@@ -223,7 +227,7 @@ export const Modals: React.FC<ModalsProps> = ({
     restartGame
   } = useGameStore();
 
-  const human = players.find(p => !p.isBot);
+  const human = pickViewer(players, viewerId);
   if (!human) return null;
 
   if (redirectCardIndex !== null && pendingAction) {
@@ -239,11 +243,16 @@ export const Modals: React.FC<ModalsProps> = ({
     );
   }
 
-  if (conspiracyPrompt) {
+  // conspiracyPrompt isn't redacted per-viewer (unlike informantPeekData) — it's
+  // broadcast to everyone, so only render it for the player it actually
+  // belongs to, or every online client would pop up the same "whose conspiracy
+  // is this" dialog on someone else's turn.
+  if (conspiracyPrompt && conspiracyPrompt.playerId === human.id) {
     return (
       <ConspiracyDialog
         prompt={conspiracyPrompt}
         players={players}
+        selfId={human.id}
         onClose={closeConspiracyDialog}
         onActivate={(targetId, effect, isImmediate) =>
           activateConspiracy(human.id, targetId, effect, isImmediate)

@@ -54,8 +54,13 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
     }
   }
 
-  // If no bot doubts and the actor is the human player (all observers are bots who passed), proceed after delay
-  if (!botWillDoubt && !actor.isBot) {
+  // Auto-proceed only when every other seat is a bot (offline: the sole
+  // human just claimed something and all bots passed, so nobody is left to
+  // click "Верю"). With a second real human observer online, they must get
+  // to explicitly pass/doubt via the UI — auto-continuing here used to race
+  // ahead of their click, resolving the claim before they could react.
+  const hasOtherHumanObserver = players.some(p => !p.isBot && p.id !== pendingAction.actorId);
+  if (!botWillDoubt && !hasOtherHumanObserver) {
     schedule('doubt', () => {
       const curState = useGameStore.getState();
       if (curState.turnPhase === 'DOUBT_WINDOW' && !curState.pendingDoubtDoubterId && curState.pendingAction) {

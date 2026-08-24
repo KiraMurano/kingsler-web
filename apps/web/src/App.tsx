@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePresence } from './lib/presence';
+import { pickViewer } from './lib/viewer';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { startBotEngine } from '@kinglier/engine/Bot';
 import { TopBar } from './components/TopBar';
@@ -70,7 +71,7 @@ export default function App({ mode }: { mode: 'offline' | 'online' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const human = mode === 'online' ? players.find(p => p.id === viewerId) : players.find(p => !p.isBot);
+  const human = pickViewer(players, mode === 'online' ? viewerId : undefined);
   const activePlayer = players.find(p => p.id === activePlayerId);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
 

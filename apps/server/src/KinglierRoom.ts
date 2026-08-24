@@ -159,6 +159,16 @@ export class KinglierRoom extends Room {
       return; // unknown method: reject
     }
 
+    // `performAction`'s single argument carries its own `actorId` field
+    // (unlike the SELF_ONLY_ACTIONS above, which pass the id as a bare
+    // `args[0]`). The active-player check above only proves *this seat* may
+    // act right now — it never touches that embedded field, so a buggy or
+    // malicious client could still claim to act as someone else. Stamp the
+    // server-known seat id over whatever the client sent.
+    if (method === 'performAction' && args[0] && typeof args[0] === 'object') {
+      (args[0] as { actorId?: string }).actorId = seat.playerId;
+    }
+
     this.worker.call(method, args);
   }
 }

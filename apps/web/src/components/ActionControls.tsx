@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import type { Role } from '@kinglier/engine/types';
+import { pickViewer } from '../lib/viewer';
 import { Button } from './ui/Button';
 
 interface ActionControlsProps {
@@ -39,6 +40,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     isVetoed,
     pendingAction,
     pendingDoubtDoubterId,
+    viewerId,
     doubtAction,
     passDoubt,
     targetAcceptAttack,
@@ -57,7 +59,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   const [busy, setBusy] = useState<string | null>(null);
   const [vetoDismissed, setVetoDismissed] = useState(false);
 
-  const human = players.find(p => !p.isBot);
+  const human = pickViewer(players, viewerId);
 
   // Any real change to the reaction window means the click landed and the
   // game moved on — drop the "waiting" indicator so it never gets stuck.

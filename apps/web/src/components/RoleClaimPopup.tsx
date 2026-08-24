@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';
 import { startTargeting } from './targeting';
+import { pickViewer } from '../lib/viewer';
 
 /** Instants that need a victim before they resolve. */
 const TARGETED_INSTANTS: InstantType[] = [
@@ -42,9 +43,16 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
   initialWithVaBanque = false,
   onClose
 }) => {
-  const { players, performAction, playPlotAction, playInstant, hasPlayedPlotThisTurn, hasPlayedRoleThisTurn } =
-    useGameStore();
-  const human = players.find(p => !p.isBot);
+  const {
+    players,
+    viewerId,
+    performAction,
+    playPlotAction,
+    playInstant,
+    hasPlayedPlotThisTurn,
+    hasPlayedRoleThisTurn
+  } = useGameStore();
+  const human = pickViewer(players, viewerId);
 
   const hasVaBanque = !!human?.hand.includes('Ва-банк');
   const canUseVaBanque = hasVaBanque && (human?.actionTokens ?? 0) >= 1 && !hasPlayedRoleThisTurn;

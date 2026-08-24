@@ -6,6 +6,7 @@ import type { GameCard } from '@kinglier/engine/types';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';
 import { Tag } from './ui/Tag';
+import { pickViewer } from '../lib/viewer';
 
 type CodexTab = 'all' | 'roles' | 'plots' | 'instants';
 
@@ -18,11 +19,11 @@ interface CodexProps {
 const ALL_CARDS: GameCard[] = [...ALL_ROLES, ...ALL_PLOTS, ...ALL_INSTANTS];
 
 export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => {
-  const { deck, discardPile, players } = useGameStore();
+  const { deck, discardPile, players, viewerId } = useGameStore();
   const [tab, setTab] = useState<CodexTab>('all');
   const [query, setQuery] = useState('');
 
-  const human = players.find(p => !p.isBot);
+  const human = pickViewer(players, viewerId);
 
   const visible = ALL_CARDS.filter(card => {
     if (tab === 'roles' && !ALL_ROLES.includes(card as never)) return false;

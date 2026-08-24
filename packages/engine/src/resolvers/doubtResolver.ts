@@ -395,9 +395,11 @@ export function triggerVetoWindowOrResolveEffect(
     return;
   }
 
-  // Check if any opponent holds Royal Veto (free instant, 0 ⚡)
-  const human = players.find(p => !p.isBot);
-  const humanHoldsVeto = human && human.id !== action.actorId && human.hand.includes('Право вето');
+  // Check if any opponent holds Royal Veto (free instant, 0 ⚡). Any connected
+  // human needs the manual VETO_WINDOW to react in — not just "the first
+  // non-bot player" (with 2+ humans, that used to skip straight to the
+  // bot-timer path whenever the *other* human, not the first one, held it).
+  const humanHoldsVeto = players.some(p => !p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
   const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
 
   if (humanHoldsVeto) {

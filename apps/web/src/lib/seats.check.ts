@@ -6,7 +6,8 @@
  * Run: npx tsx apps/web/src/lib/seats.check.ts
  */
 import assert from 'node:assert/strict';
-import { pickViewer, seatOpponents } from './seats.ts';
+import { seatOpponents } from './seats.ts';
+import { pickViewer } from './viewer.ts';
 import type { Player } from '@kinglier/engine/types';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name' | 'seatNumber'>): Player {
