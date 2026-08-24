@@ -10,7 +10,7 @@ import {
   drawCardsFromDeck,
   TOTAL_DECK_SIZE
 } from './cards';
-import { botMemory } from './Bot';
+import { botMemory, clearBotTimer } from './Bot';
 import { ALL_BOT_CANDIDATES, BOT_ARCHETYPES, getBotArchetype, type BotCandidate } from './botsConfig';
 import { declineAcc, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
@@ -419,10 +419,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --------------------------------------------------------------------------
 
   doubtAction: (doubterId) => {
+    clearBotTimer('doubt');
     doubtAction(get, set, doubterId);
   },
 
   passDoubt: (playerId) => {
+    clearBotTimer('doubt');
     passDoubt(get, set, playerId);
   },
 

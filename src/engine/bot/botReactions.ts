@@ -46,7 +46,7 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
       const delay = BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS;
       schedule('doubt', () => {
         const curState = useGameStore.getState();
-        if (curState.turnPhase === 'DOUBT_WINDOW') {
+        if (curState.turnPhase === 'DOUBT_WINDOW' && !curState.pendingDoubtDoubterId) {
           curState.doubtAction(bot.id);
         }
       }, delay);
@@ -58,7 +58,7 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
   if (!botWillDoubt && !actor.isBot) {
     schedule('doubt', () => {
       const curState = useGameStore.getState();
-      if (curState.turnPhase === 'DOUBT_WINDOW' && curState.pendingAction) {
+      if (curState.turnPhase === 'DOUBT_WINDOW' && !curState.pendingDoubtDoubterId && curState.pendingAction) {
         curState._proceedAfterDoubtPassed(curState.pendingAction);
       }
     }, ACTION_HOLD_MS);

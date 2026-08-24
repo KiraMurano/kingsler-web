@@ -31,6 +31,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     hasUsedNormalActionThisTurn,
     isVetoed,
     pendingAction,
+    pendingDoubtDoubterId,
     doubtAction,
     passDoubt,
     targetAcceptAttack,
@@ -55,6 +56,24 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   const isTarget = pendingAction?.targetId === human.id;
   const hasTokens = human.actionTokens >= 1;
   const redirectIndex = human.hand.indexOf('Перенаправление');
+  const pendingDoubter = pendingDoubtDoubterId
+    ? players.find(p => p.id === pendingDoubtDoubterId)
+    : null;
+
+  if (pendingDoubter) {
+    const mine = pendingDoubter.id === human.id;
+    return (
+      <Panel
+        title="Проверка"
+        note={mine ? 'Вы вскрываете карту.' : `${pendingDoubter.name} вскрывает карту.`}
+        alert
+      >
+        <Button tone="danger" block disabled sub="карта сейчас откроется">
+          Не верю
+        </Button>
+      </Panel>
+    );
+  }
 
   /* 1. The victim of a targeted attack decides how to answer. */
   if (turnPhase === 'TARGET_REACTION_WINDOW' && isTarget) {

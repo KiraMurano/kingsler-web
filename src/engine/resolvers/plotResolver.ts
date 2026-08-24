@@ -101,10 +101,10 @@ export function landPlot(get: StateGetter, set: StateSetter, action: Action): vo
   const oldPlot = actor.activePlot;
   const updatedDiscard = oldPlot ? [...discardPile, oldPlot.type] : discardPile;
   const newPlotData = {
-    id: Math.random().toString(36).substring(7),
+    id: action.id,
     type: plotType,
     targetPlayerId: action.targetId,
-    charges: plotType === 'Сеть информаторов' ? 2 : plotType === 'Тайный заговор' ? 0 : undefined
+    charges: plotType === 'Тайный заговор' ? 0 : undefined
   };
 
   set(state => ({

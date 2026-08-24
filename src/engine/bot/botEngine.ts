@@ -156,3 +156,7 @@ export function stopBotEngine(): void {
   isExecutingBotMove = false;
   isEngineStarted = false;
 }
+
+export function clearBotTimer(timerKey: string): void {
+  botTimers.clear(timerKey);
+}

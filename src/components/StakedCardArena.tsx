@@ -172,13 +172,15 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
     );
   }
 
-  /* 1c. Plot laid on the table. */
+  /* 1c. Laying a plot goes to the seat slot, not the table. Keep the table
+     only for veto overlay or for resolving an already-slotted plot. */
   if (pendingAction?.type === 'plot') {
     const plot = (pendingAction.plotType || pendingAction.name) as GameCard;
+    const laying = !pendingAction.conspiracyEffect && !pendingAction.isMorningTrigger;
+    if (laying && !overlayEl) return null;
     return (
       <div className="staked">
         <div className="staked__pile">
-          <FaceCard card={plot} onClick={() => inspect(plot)} />
           {overlayEl}
           <span className="claimbadge">{claimBadge(plot, target?.name)}</span>
         </div>
@@ -297,10 +299,10 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
                 : ''
             }
             flightLabel={isSingleFlight ? flightLabel(cardFlightEvent?.flightType) : null}
+            badge={badge}
             onClick={() => inspect(revealed || claimed)}
           />
           {overlayEl}
-          <span className="claimbadge">{badge}</span>
         </div>
       )}
     </div>

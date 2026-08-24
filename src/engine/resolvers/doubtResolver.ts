@@ -71,7 +71,7 @@ export function doubtAction(
 
 export function passDoubt(
   get: StateGetter,
-  _set: StateSetter,
+  set: StateSetter,
   playerId: string
 ): void {
   timerManager.clearAll();
@@ -80,6 +80,16 @@ export function passDoubt(
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
+
+  const passer = players.find(p => p.id === playerId);
+  if (passer) {
+    set(state => ({
+      activeSpeechReactions: {
+        ...state.activeSpeechReactions,
+        [passer.id]: '«Верю.»'
+      }
+    }));
+  }
 
   // Check observing bots who have >= 1 Action Token
   const bots = players.filter(p => p.isBot && p.id !== pendingAction.actorId && p.id !== playerId && p.actionTokens >= 1);
@@ -390,6 +400,10 @@ export function triggerVetoWindowOrResolveEffect(
       }
     }, 2200);
   } else {
+    set({
+      hasCardDeparted: false,
+      turnPhase: 'IDLE'
+    });
     timerManager.scheduleDelay(() => {
       get()._resolvePendingActionEffect(action, isAfterTruthChallenge);
     }, 800);

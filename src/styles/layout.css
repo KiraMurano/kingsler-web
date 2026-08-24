@@ -640,21 +640,6 @@
   justify-content: center;
 }
 
-.stage__slot {
-  height: clamp(152px, 27vh, 216px);
-  aspect-ratio: 2 / 3;
-  display: grid;
-  place-items: center;
-  border-radius: 9px;
-  border: 1px dashed rgba(232, 200, 119, 0.28);
-  background: radial-gradient(ellipse at center, rgba(200, 160, 74, 0.08), transparent 70%);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(244, 232, 200, 0.55);
-}
-
 .feltplot {
   position: relative;
   width: 72px;
@@ -720,7 +705,7 @@
   left: 50%;
   bottom: 28%;
   transform: translateX(-50%);
-  z-index: 5;
+  z-index: calc(var(--z-tabled) + 1);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -850,21 +835,25 @@
 .flip__face--front {
   transform: rotateY(180deg);
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  padding-bottom: 6px;
+  padding-top: 8px;
 }
 
-.flip__face--truth {
-  box-shadow: 0 0 22px rgba(91, 154, 134, 0.45);
+.flip.is-flipped .flip__face--truth {
+  --frame: var(--sage);
+  --frame-bright: var(--sage-soft);
+  --frame-glow: rgba(91, 154, 134, 0.55);
 }
 
-.flip__face--bluff {
-  box-shadow: 0 0 22px rgba(180, 64, 90, 0.45);
+.flip.is-flipped .flip__face--bluff {
+  --frame: var(--crimson);
+  --frame-bright: var(--crimson-soft);
+  --frame-glow: rgba(180, 64, 90, 0.55);
 }
 
 .verdict {
-  padding: 2px 9px;
+  padding: 3px 9px;
   border-radius: 4px;
   font-size: 0.62rem;
   font-weight: 800;
@@ -886,8 +875,8 @@
 .claimbadge {
   position: absolute;
   left: 50%;
-  bottom: 8px;
-  translate: -50% 0;
+  top: 100%;
+  translate: -50% 8px;
   z-index: 6;
   max-width: calc(100% + 28px);
   padding: 3px 9px;
@@ -908,7 +897,7 @@
 .claimbadge--solo {
   position: relative;
   left: auto;
-  bottom: auto;
+  top: auto;
   transform: none;
   translate: none;
   font-size: 0.82rem;
@@ -1085,7 +1074,7 @@
   left: 16px;
   right: 16px;
   bottom: 8px;
-  z-index: 6;
+  z-index: calc(var(--z-tabled) + 2);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1453,7 +1442,7 @@
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: scale(0.97);
 }
 
 .btn:disabled {

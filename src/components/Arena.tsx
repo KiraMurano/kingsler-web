@@ -1,5 +1,4 @@
 import React from 'react';
-import { useGameStore } from '../engine/GameStore';
 import { StakedCardArena } from './StakedCardArena';
 import { Button } from './ui/Button';
 import type { GameCard } from '../engine/types';
@@ -16,13 +15,9 @@ export const Arena: React.FC<ArenaProps> = ({
   onCancelTarget,
   onInspectCard
 }) => {
-  const { pendingAction, cardFlightEvent, overlayInstant } = useGameStore();
-  const showIdle = !pendingAction && !cardFlightEvent && !overlayInstant;
-
   return (
     <section className="arena">
       <div className="stage">
-        {showIdle && <div className="stage__slot">На кону</div>}
         <StakedCardArena onInspectCard={onInspectCard} />
       </div>
 

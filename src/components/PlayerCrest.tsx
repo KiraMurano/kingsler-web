@@ -43,7 +43,12 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
       <Deltas events={deltas} kind="other" />
 
       <div className="crest__plot">
-        <PlotSlot plot={player.activePlot} ownerName={player.name} onInspect={onInspectCard} />
+        <PlotSlot
+          plot={player.activePlot}
+          ownerId={player.id}
+          ownerName={player.name}
+          onInspect={onInspectCard}
+        />
       </div>
 
       <div className="crest__head">

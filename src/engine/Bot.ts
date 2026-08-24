@@ -43,4 +43,4 @@ export {
 } from './bot/botReactions';
 
 // 7. Реактивный слушатель стора и жизненный цикл движка
-export { startBotEngine, stopBotEngine } from './bot/botEngine';
+export { startBotEngine, stopBotEngine, clearBotTimer } from './bot/botEngine';

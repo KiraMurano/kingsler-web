@@ -18,7 +18,7 @@ export interface ActivePlotData {
   id: string;
   type: PlotType;
   targetPlayerId?: string;
-  charges?: number; // For Informant Network (starts at 2)
+  charges?: number; // Тайный заговор: 0–4
 }
 
 export interface Player {

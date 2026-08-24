@@ -83,7 +83,12 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         .join(' ')}
     >
       <div className="seat__plot">
-        <PlotSlot plot={player.activePlot} ownerName={player.name} onInspect={onInspectCard} />
+        <PlotSlot
+          plot={player.activePlot}
+          ownerId={player.id}
+          ownerName={player.name}
+          onInspect={onInspectCard}
+        />
       </div>
 
       <div
