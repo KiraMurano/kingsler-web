@@ -1,0 +1,214 @@
+/* ==========================================================================
+   КИНГСЛЕР — main menu & online lobby (full-screen frontend views)
+   ========================================================================== */
+.screen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden auto;
+  padding: 32px 20px;
+  background:
+    radial-gradient(ellipse 90% 75% at 50% 38%, rgba(6, 8, 13, 0.4) 0%, rgba(4, 5, 9, 0.82) 100%),
+    url('/bg/palace.jpg') center / cover no-repeat;
+}
+
+.screen__panel {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  animation: rise-in 0.32s var(--ease-out);
+}
+
+/* Hero wordmark — bigger cousin of the in-game TopBar brand */
+.brand--hero .brand__title {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  gap: 18px;
+}
+
+.brand--hero .brand__rule {
+  width: 64px;
+}
+
+.brand--hero .brand__sub {
+  margin-top: 8px;
+  font-size: 0.72rem;
+}
+
+/* ==========================================================================
+   MENU actions
+   ========================================================================== */
+.menu__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ==========================================================================
+   LOBBY card
+   ========================================================================== */
+.lobbycard {
+  width: 100%;
+  min-width: 0;
+  padding: 24px 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lobbycard .field {
+  text-align: center;
+}
+
+.lobby__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.lobby__divider::before,
+.lobby__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-cold);
+}
+
+.lobby__joinrow {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
+
+.lobby__joinrow .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.lobby__hint {
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.lobby__roomhead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.roomcode {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-mid);
+  background: rgba(200, 160, 74, 0.1);
+  color: var(--gold-pale);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.12s ease;
+}
+
+.roomcode:hover {
+  border-color: var(--gold);
+  background: rgba(200, 160, 74, 0.16);
+}
+
+.roomcode:active {
+  transform: scale(0.97);
+}
+
+.roomcode__code {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+/* Seat list */
+.seatlist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.seatrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--line-cold);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.seatrow--empty {
+  border-style: dashed;
+  background: transparent;
+  opacity: 0.7;
+}
+
+.seatrow__avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line-mid);
+  background: var(--ink-700);
+  color: var(--gold-pale);
+}
+
+.seatrow__avatar--empty {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+
+.seatrow__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lobby__waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 4px 0 2px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.lobby__waiting-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold-bright);
+  box-shadow: 0 0 0 3px rgba(232, 200, 119, 0.16);
+  animation: beacon 2.4s ease-in-out infinite;
+}

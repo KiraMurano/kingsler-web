@@ -1,12 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Room } from '@colyseus/sdk';
+import { Check, Copy, Crown, LogIn, CirclePlus, Users } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { Tag } from '../components/ui/Tag';
 import { OnlineGameClient, type LobbyMessage } from './OnlineGameClient';
 import { bindOnlineStore } from './bindOnlineStore';
-import './lobby.css';
+import '../styles/screen.css';
 
 interface LobbyProps {
   onGameStarted: () => void;
+}
+
+const MAX_SEATS = 4;
+
+function Brand({ subtitle }: { subtitle: string }) {
+  return (
+    <div className="brand brand--hero">
+      <div className="brand__title">
+        <span className="brand__rule" />
+        <span className="gilded">КИНГСЛЕР</span>
+        <span className="brand__rule brand__rule--r" />
+      </div>
+      <div className="brand__sub">{subtitle}</div>
+    </div>
+  );
 }
 
 export function Lobby({ onGameStarted }: LobbyProps) {
@@ -16,6 +33,7 @@ export function Lobby({ onGameStarted }: LobbyProps) {
   const [lobby, setLobby] = useState<LobbyMessage | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     if (!room) return;
@@ -50,53 +68,118 @@ export function Lobby({ onGameStarted }: LobbyProps) {
     }
   };
 
+  const copyInviteLink = () => {
+    if (!room) return;
+    const link = `${location.origin}${location.pathname}?room=${room.roomId}`;
+    navigator.clipboard.writeText(link).catch(() => {});
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1600);
+  };
+
   if (!room || !lobby) {
     return (
-      <div className="lobby">
-        <h1 className="lobby__title">👑 KINGLIER ONLINE</h1>
-        <input
-          className="lobby__input"
-          placeholder="Ваше имя"
-          value={nickname}
-          onChange={e => setNickname(e.target.value)}
-          maxLength={24}
-        />
-        <div className="lobby__row">
-          <Button tone="gold" block onClick={handleCreate}>Создать комнату</Button>
+      <div className="screen">
+        <div className="screen__panel">
+          <Brand subtitle="Игра онлайн" />
+
+          <div className="dialog__panel lobbycard">
+            <input
+              className="field"
+              placeholder="Ваше имя"
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              maxLength={24}
+            />
+
+            <Button tone="gold" size="lg" block onClick={handleCreate}>
+              <CirclePlus size={18} /> Создать комнату
+            </Button>
+
+            <div className="lobby__divider">
+              <span>или</span>
+            </div>
+
+            <div className="lobby__joinrow">
+              <input
+                className="field"
+                placeholder="Код комнаты"
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value)}
+              />
+              <Button tone="calm" onClick={handleJoin}>
+                <LogIn size={16} /> Войти
+              </Button>
+            </div>
+
+            {error && <div className="notice notice--danger">{error}</div>}
+          </div>
         </div>
-        <div className="lobby__row">
-          <input
-            className="lobby__input"
-            placeholder="Код комнаты"
-            value={joinCode}
-            onChange={e => setJoinCode(e.target.value)}
-          />
-          <Button tone="calm" onClick={handleJoin}>Войти</Button>
-        </div>
-        {error && <p className="lobby__error">{error}</p>}
       </div>
     );
   }
 
   const isHost = room.sessionId === lobby.hostSessionId;
+  const hostPlayerId = lobby.seats[0]?.playerId;
+  const emptySeatCount = Math.max(0, MAX_SEATS - lobby.seats.length);
 
   return (
-    <div className="lobby">
-      <h1 className="lobby__title">Комната {room.roomId}</h1>
-      <p className="lobby__hint">
-        Ссылка для друзей: {location.origin}{location.pathname}?room={room.roomId}
-      </p>
-      <ul className="lobby__seats">
-        {lobby.seats.map(seat => (
-          <li key={seat.playerId}>{seat.nickname}{seat.connected ? '' : ' (отключился)'}</li>
-        ))}
-        {Array.from({ length: 4 - lobby.seats.length }).map((_, i) => (
-          <li key={`empty-${i}`} className="lobby__seat--empty">Свободно (займёт бот)</li>
-        ))}
-      </ul>
-      {isHost
-        ? <Button tone="gold" onClick={() => clientRef.current.startGame()}>Начать игру</Button>
-        : <p>Ожидаем, пока хост начнёт игру…</p>}
+    <div className="screen">
+      <div className="screen__panel">
+        <Brand subtitle="Комната ожидания" />
+
+        <div className="dialog__panel lobbycard">
+          <div className="lobby__roomhead">
+            <span className="eyebrow">Код комнаты</span>
+            <button
+              type="button"
+              className="roomcode"
+              onClick={copyInviteLink}
+              title="Скопировать ссылку для друзей"
+            >
+              <span className="roomcode__code">{room.roomId}</span>
+              {linkCopied ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+            <p className="lobby__hint">
+              {linkCopied ? 'Ссылка скопирована!' : 'Отправьте ссылку друзьям, чтобы они присоединились'}
+            </p>
+          </div>
+
+          <ul className="seatlist">
+            {lobby.seats.map(seat => (
+              <li key={seat.playerId} className="seatrow">
+                <span className="seatrow__avatar">
+                  <Users size={16} />
+                </span>
+                <span className="seatrow__name">{seat.nickname}</span>
+                {seat.playerId === hostPlayerId && (
+                  <Tag tone="gold">
+                    <Crown size={11} /> Хост
+                  </Tag>
+                )}
+                {!seat.connected && <Tag tone="danger">Отключился</Tag>}
+              </li>
+            ))}
+            {Array.from({ length: emptySeatCount }).map((_, i) => (
+              <li key={`empty-${i}`} className="seatrow seatrow--empty">
+                <span className="seatrow__avatar seatrow__avatar--empty">?</span>
+                <span className="seatrow__name">Свободно</span>
+                <Tag>Займёт бот</Tag>
+              </li>
+            ))}
+          </ul>
+
+          {isHost ? (
+            <Button tone="gold" size="lg" block onClick={() => clientRef.current.startGame()}>
+              Начать игру
+            </Button>
+          ) : (
+            <div className="lobby__waiting">
+              <span className="lobby__waiting-dot" />
+              Ожидаем, пока хост начнёт игру…
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
