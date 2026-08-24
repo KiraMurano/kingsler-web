@@ -17,15 +17,13 @@ import { NormalActionsPopup } from './components/NormalActionsPopup';
 import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
 
-startBotEngine();
-
 interface Status {
   text: string;
   tone: 'idle' | 'mine' | 'alarm';
   hint?: string;
 }
 
-export default function App() {
+export default function App({ mode }: { mode: 'offline' | 'online' }) {
   const {
     players,
     activePlayerId,
@@ -33,6 +31,7 @@ export default function App() {
     pendingAction,
     coronationCandidateId,
     coronationOriginId,
+    viewerId,
     startGame,
     restartGame,
     performAction,
@@ -62,13 +61,16 @@ export default function App() {
   const toastPresence = usePresence(toast);
 
   useEffect(() => {
-    startGame();
+    if (mode === 'offline') {
+      startBotEngine();
+      startGame();
+    }
     (window as unknown as { __startTargeting: (a: PendingTargetAction) => void }).__startTargeting =
       setPendingTarget;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const human = players.find(p => !p.isBot);
+  const human = mode === 'online' ? players.find(p => p.id === viewerId) : players.find(p => !p.isBot);
   const activePlayer = players.find(p => p.id === activePlayerId);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
 

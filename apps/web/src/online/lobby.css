@@ -1,0 +1,49 @@
+.lobby {
+  max-width: 420px;
+  margin: 10vh auto;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: center;
+}
+
+.lobby__title {
+  font-size: 1.5rem;
+}
+
+.lobby__input {
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #5554;
+  background: transparent;
+  color: inherit;
+  flex: 1;
+}
+
+.lobby__row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lobby__error {
+  color: #e08a8a;
+}
+
+.lobby__hint {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  word-break: break-all;
+}
+
+.lobby__seats {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lobby__seat--empty {
+  opacity: 0.6;
+}
