@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Room } from '@colyseus/sdk';
 import { Check, Copy, Crown, LogIn, CirclePlus, Users } from 'lucide-react';
 import { Button } from '../components/ui/Button';
@@ -35,23 +35,24 @@ export function Lobby({ onGameStarted }: LobbyProps) {
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  useEffect(() => {
-    if (!room) return;
-    room.onMessage('lobby', (data: LobbyMessage) => {
+  const attachRoom = (newRoom: Room) => {
+    newRoom.onMessage('lobby', (data: LobbyMessage) => {
       setLobby(data);
       if (data.phase === 'PLAYING') {
-        bindOnlineStore(room);
+        bindOnlineStore(newRoom);
         onGameStarted();
       }
     });
-  }, [room, onGameStarted]);
+    setRoom(newRoom);
+    newRoom.send('lobby');
+  };
 
   const handleCreate = async () => {
     setError(null);
     try {
       const created = await clientRef.current.createRoom(nickname || 'Игрок');
       history.replaceState(null, '', `?room=${created.roomId}`);
-      setRoom(created);
+      attachRoom(created);
     } catch {
       setError('Не удалось создать комнату. Проверьте соединение с сервером.');
     }
@@ -62,7 +63,7 @@ export function Lobby({ onGameStarted }: LobbyProps) {
     if (!joinCode.trim()) return;
     try {
       const joined = await clientRef.current.joinRoom(joinCode.trim(), nickname || 'Игрок');
-      setRoom(joined);
+      attachRoom(joined);
     } catch {
       setError('Комната не найдена или игра уже началась.');
     }

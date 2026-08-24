@@ -57,7 +57,12 @@ export class KinglierRoom extends Room {
 
   messages = {
     start: (client: Client) => this.handleStart(client),
-    action: (client: Client, payload: ActionMessage) => this.handleAction(client, payload)
+    action: (client: Client, payload: ActionMessage) => this.handleAction(client, payload),
+    // The joining client's own onMessage handler isn't registered yet when its
+    // join handshake completes, so it explicitly asks for a fresh snapshot
+    // instead of relying on the broadcast sent below (which only reaches
+    // clients that were already in the room).
+    lobby: (client: Client) => client.send('lobby', this.lobbySnapshot())
   };
 
   onJoin(client: Client, options: JoinOptions) {
@@ -70,7 +75,7 @@ export class KinglierRoom extends Room {
     const nickname = (options.nickname ?? '').trim().slice(0, 24) || playerId;
     this.seats.push({ playerId, sessionId: client.sessionId, nickname, connected: true });
     client.userData = { playerId };
-    this.broadcastLobby();
+    this.broadcast('lobby', this.lobbySnapshot(), { except: client });
   }
 
   async onDrop(client: Client): Promise<void> {
@@ -101,13 +106,16 @@ export class KinglierRoom extends Room {
     this.worker?.terminate();
   }
 
-  protected broadcastLobby(): void {
-    const lobby: LobbyMessage = {
+  protected lobbySnapshot(): LobbyMessage {
+    return {
       seats: this.seats.map(s => ({ playerId: s.playerId, nickname: s.nickname, connected: s.connected })),
       hostSessionId: this.hostSessionId,
       phase: this.phase
     };
-    this.broadcast('lobby', lobby);
+  }
+
+  protected broadcastLobby(): void {
+    this.broadcast('lobby', this.lobbySnapshot());
   }
 
   protected handleStart(client: Client): void {
