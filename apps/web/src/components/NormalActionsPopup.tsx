@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
-import { useGameStore } from '../engine/GameStore';
+import { useGameStore } from '@kinglier/engine/GameStore';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';

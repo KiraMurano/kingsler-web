@@ -1,9 +1,9 @@
 import React from 'react';
-import { useGameStore } from '../engine/GameStore';
-import { CARD_INFO } from '../engine/cards';
-import { CARD_DESCRIPTIONS, type CardCategory, type GameCard, type InstantType } from '../data/cardDescriptions';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import { CARD_INFO } from '@kinglier/engine/cards';
+import { CARD_DESCRIPTIONS, type CardCategory, type GameCard, type InstantType } from '@kinglier/engine/data/cardDescriptions';
 import { courtly } from '../lib/text';
-import { declineGen } from '../engine/utils/russianText';
+import { declineGen } from '@kinglier/engine/utils/russianText';
 
 const CARD_BACK = '/assets/cards/back-dual-face.png';
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useGameStore } from '../engine/GameStore';
-import type { Role } from '../engine/types';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import type { Role } from '@kinglier/engine/types';
 import { Button } from './ui/Button';
 
 interface ActionControlsProps {

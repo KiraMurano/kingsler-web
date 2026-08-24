@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useGameStore } from '../engine/GameStore';
+import { useGameStore } from '@kinglier/engine/GameStore';
 import { courtly } from '../lib/text';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';

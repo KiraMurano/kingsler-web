@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePresence } from './lib/presence';
-import { useGameStore } from './engine/GameStore';
-import { startBotEngine } from './engine/Bot';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import { startBotEngine } from '@kinglier/engine/Bot';
 import { TopBar } from './components/TopBar';
 import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
@@ -14,7 +14,7 @@ import { Modals } from './components/Modals';
 import { CardDetailModal } from './components/CardDetailModal';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
-import type { GameCard } from './engine/types';
+import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
 
 startBotEngine();

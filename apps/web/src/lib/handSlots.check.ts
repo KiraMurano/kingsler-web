@@ -4,9 +4,9 @@
  */
 import assert from 'node:assert/strict';
 import { compactIndex, isCardStaked, reconcileHandSlots, type HandSlots } from './handSlots.ts';
-import type { Action, GameState, Player } from '../engine/types.ts';
-import { triggerVetoWindowOrResolveEffect } from '../engine/resolvers/doubtResolver.ts';
-import { timerManager } from '../engine/utils/timerManager.ts';
+import type { Action, GameState, Player } from '@kinglier/engine/types';
+import { triggerVetoWindowOrResolveEffect } from '@kinglier/engine/resolvers/doubtResolver';
+import { timerManager } from '@kinglier/engine/utils/timerManager';
 
 const empty: HandSlots = [null, null];
 

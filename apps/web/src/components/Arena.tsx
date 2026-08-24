@@ -1,7 +1,7 @@
 import React from 'react';
 import { StakedCardArena } from './StakedCardArena';
 import { Button } from './ui/Button';
-import type { GameCard } from '../engine/types';
+import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
 
 interface ArenaProps {

@@ -1,6 +1,6 @@
 import React from 'react';
-import type { GameCard, Player } from '../engine/types';
-import { useGameStore } from '../engine/GameStore';
+import type { GameCard, Player } from '@kinglier/engine/types';
+import { useGameStore } from '@kinglier/engine/GameStore';
 import { courtly } from '../lib/text';
 import { useHandSlots } from '../lib/handSlots';
 import { usePresence } from '../lib/presence';

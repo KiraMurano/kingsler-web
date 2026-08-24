@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { CARD_DESCRIPTIONS } from '../data/cardDescriptions';
-import { useGameStore } from '../engine/GameStore';
-import type { Action, ActivePlotData, GameCard } from '../engine/types';
+import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import type { Action, ActivePlotData, GameCard } from '@kinglier/engine/types';
 import { usePresence } from '../lib/presence';
 
 interface PlotSlotProps {

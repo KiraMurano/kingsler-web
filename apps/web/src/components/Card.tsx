@@ -1,6 +1,6 @@
 import React from 'react';
-import type { GameCard } from '../engine/types';
-import { CARD_DESCRIPTIONS } from '../data/cardDescriptions';
+import type { GameCard } from '@kinglier/engine/types';
+import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 
 export interface CardProps {
   card: GameCard;

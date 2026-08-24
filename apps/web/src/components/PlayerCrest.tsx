@@ -1,6 +1,6 @@
 import React from 'react';
-import type { GameCard, Player } from '../engine/types';
-import { useGameStore } from '../engine/GameStore';
+import type { GameCard, Player } from '@kinglier/engine/types';
+import { useGameStore } from '@kinglier/engine/GameStore';
 import { Bolts, Deltas, Res, Seals, type DeltaEvent } from './ui/Res';
 import { Portrait } from './Portrait';
 import { PlotSlot } from './PlotSlot';

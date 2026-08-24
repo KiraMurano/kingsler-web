@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Action, GameCard, Player } from '../engine/types';
+import type { Action, GameCard, Player } from '@kinglier/engine/types';
 import { compactIndex, isCardStaked, useHandSlots } from '../lib/handSlots';
 import { Card } from './Card';
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useGameStore } from '../engine/GameStore';
-import { ALL_ROLES, CARD_DESCRIPTIONS, isPlot, isInstant } from '../data/cardDescriptions';
-import type { PlotType, InstantType } from '../engine/types';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import { ALL_ROLES, CARD_DESCRIPTIONS, isPlot, isInstant } from '@kinglier/engine/data/cardDescriptions';
+import type { PlotType, InstantType } from '@kinglier/engine/types';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';

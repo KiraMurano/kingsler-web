@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useGameStore } from '../engine/GameStore';
-import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '../data/cardDescriptions';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import {
   TOTAL_ROLES_COUNT,
   TOTAL_PLOTS_COUNT,
   TOTAL_INSTANTS_COUNT,
   TOTAL_DECK_SIZE
-} from '../engine/cards';
-import type { ConspiracyPromptData, Player, GameCard } from '../engine/types';
+} from '@kinglier/engine/cards';
+import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
 import { courtly } from '../lib/text';
 import { Dialog } from './ui/Overlay';
 import { Button } from './ui/Button';

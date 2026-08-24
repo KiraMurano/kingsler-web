@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useGameStore } from '../engine/GameStore';
-import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '../data/cardDescriptions';
-import { getCardMaxCopies, TOTAL_DECK_SIZE } from '../engine/cards';
-import type { GameCard } from '../engine/types';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
+import { getCardMaxCopies, TOTAL_DECK_SIZE } from '@kinglier/engine/cards';
+import type { GameCard } from '@kinglier/engine/types';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';
 import { Tag } from './ui/Tag';

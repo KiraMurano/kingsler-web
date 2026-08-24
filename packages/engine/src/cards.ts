@@ -9,7 +9,7 @@ import {
   ALL_PLOTS, 
   ALL_INSTANTS, 
   CARD_DESCRIPTIONS 
-} from '../data/cardDescriptions';
+} from './data/cardDescriptions';
 
 export type { Role, PlotType, InstantType, GameCard, CardCategory, CardDescription };
 export type CardInfo = CardDescription;

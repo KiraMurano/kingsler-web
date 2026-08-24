@@ -1,5 +1,5 @@
 import React from 'react';
-import { CARD_DESCRIPTIONS, type GameCard } from '../data/cardDescriptions';
+import { CARD_DESCRIPTIONS, type GameCard } from '@kinglier/engine/data/cardDescriptions';
 import { Dialog } from './ui/Overlay';
 import { Tag } from './ui/Tag';
 import { Res } from './ui/Res';

@@ -1,4 +1,4 @@
-import type { Role, PlotType, InstantType } from '../engine/types';
+import type { Role, PlotType, InstantType } from '@kinglier/engine/types';
 
 /** An action that has been chosen but still needs a victim picked at the table. */
 export interface PendingTargetAction {

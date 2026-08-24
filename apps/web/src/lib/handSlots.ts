@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Action, GameCard } from '../engine/types';
+import type { Action, GameCard } from '@kinglier/engine/types';
 
 export type HandSlots = [GameCard | null, GameCard | null];
 

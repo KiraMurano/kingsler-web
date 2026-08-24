@@ -1,0 +1,15 @@
+{
+  "name": "@kinglier/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12"
+  }
+}

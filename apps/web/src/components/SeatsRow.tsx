@@ -1,7 +1,7 @@
 import React from 'react';
-import { useGameStore } from '../engine/GameStore';
+import { useGameStore } from '@kinglier/engine/GameStore';
 import { OpponentSeat, type SeatSide } from './OpponentSeat';
-import type { GameCard, Player } from '../engine/types';
+import type { GameCard, Player } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
 
 interface SeatsRowProps {
