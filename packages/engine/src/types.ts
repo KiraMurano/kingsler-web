@@ -194,7 +194,7 @@ export interface GameState {
   history: string[];
 
   // Action methods
-  startGame: () => void;
+  startGame: (seats?: { id: string; name: string; avatar?: string }[]) => void;
   performAction: (action: Omit<Action, 'id'>) => void;
   skipNormalActionPhase: () => void;
   endTurnManually: () => void;

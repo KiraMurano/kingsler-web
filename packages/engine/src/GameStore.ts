@@ -97,38 +97,37 @@ export const useGameStore = create<GameState>((set, get) => ({
   // GAME LIFECYCLE
   // --------------------------------------------------------------------------
 
-  startGame: () => {
+  startGame: (seats) => {
     timerManager.clearAll();
     botMemory.clear();
     const deck = createInitialDeck(); // 44 unified cards
 
-    // Draw 2 cards for human player
-    const c1 = deck.pop()!;
-    const c2 = deck.pop()!;
+    const humanSeats = seats && seats.length > 0
+      ? seats.slice(0, 4)
+      : [{ id: 'p1', name: 'Вы', avatar: '/avatars/anton.jpg' }];
 
-    // Pick 3 random distinct bots from the candidate pool
-    const selectedBots = shuffleArray([...ALL_BOT_CANDIDATES]).slice(0, 3);
+    const botsNeeded = 4 - humanSeats.length;
+    const selectedBots = shuffleArray([...ALL_BOT_CANDIDATES]).slice(0, botsNeeded);
 
-    // 4 Players: 1 Human + 3 Bots (2 Gold, 0 Favor, 0 Seals, 2 Action Tokens)
     const players: Player[] = [
-      {
-        id: 'p1',
-        name: 'Вы',
-        avatar: '/avatars/anton.jpg',
-        seatNumber: 1,
+      ...humanSeats.map((seat, idx) => ({
+        id: seat.id,
+        name: seat.name,
+        avatar: seat.avatar ?? '/avatars/anton.jpg',
+        seatNumber: idx + 1,
         isBot: false,
         gold: 2,
         favor: 0,
         seals: 0,
         actionTokens: 2,
-        hand: [c1, c2],
+        hand: [deck.pop()!, deck.pop()!],
         activePlot: null
-      },
+      })),
       ...selectedBots.map((b, idx) => ({
         id: `b${idx + 1}`,
         name: b.name,
         avatar: b.avatar,
-        seatNumber: idx + 2,
+        seatNumber: humanSeats.length + idx + 1,
         isBot: true,
         archetype: b.archetype,
         gold: 2,
@@ -144,7 +143,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       players,
       deck,
       discardPile: [],
-      activePlayerId: 'p1',
+      activePlayerId: players[0].id,
       turnPhase: 'IDLE',
       turnSubPhase: 'NORMAL_ACTION_PHASE',
       hasUsedNormalActionThisTurn: false,
