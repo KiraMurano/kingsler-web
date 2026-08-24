@@ -151,6 +151,8 @@ export type TurnSubPhase = 'NORMAL_ACTION_PHASE' | 'CARD_PLAY_PHASE';
 export interface GameState {
   players: Player[];
   activePlayerId: string;
+  /** Only set in online mode: which seat this browser's connection is. Undefined offline. */
+  viewerId?: string;
   deck: GameCard[];
   discardPile: GameCard[];
   turnPhase: TurnPhase;
