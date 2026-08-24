@@ -1,6 +1,9 @@
 FROM node:22-slim AS build
 WORKDIR /repo
-COPY package.json package-lock.json ./
+# package-lock.json intentionally not copied here: it pins platform-specific
+# optional deps (e.g. rolldown's native binding) to whatever OS generated it,
+# so a lockfile from macOS breaks `npm install` on this linux image (npm/cli#4828).
+COPY package.json ./
 COPY packages/engine/package.json packages/engine/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/server/package.json apps/server/package.json
