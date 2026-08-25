@@ -75,24 +75,34 @@ export function passDoubt(
   playerId: string
 ): void {
   timerManager.clearAll();
-  const { turnPhase, pendingAction, players, discardPile, coronationCandidateId } = get();
+  const { turnPhase, pendingAction, players, discardPile, coronationCandidateId, pendingDoubtPassedIds } = get();
   if (turnPhase !== 'DOUBT_WINDOW' || !pendingAction || !pendingAction.roleClaim) return;
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
 
   const passer = players.find(p => p.id === playerId);
-  if (passer) {
-    set(state => ({
-      activeSpeechReactions: {
-        ...state.activeSpeechReactions,
-        [passer.id]: '«Верю.»'
-      }
-    }));
-  }
+  if (!passer || pendingDoubtPassedIds.includes(playerId)) return;
+
+  const passedIds = [...pendingDoubtPassedIds, playerId];
+  set(state => ({
+    pendingDoubtPassedIds: passedIds,
+    activeSpeechReactions: {
+      ...state.activeSpeechReactions,
+      [passer.id]: '«Верю.»'
+    }
+  }));
+
+  // In online games with several real players, every non-actor human must
+  // pass before the court is considered settled — one "Верю" used to
+  // resolve the whole window for everyone else too.
+  const stillAwaitingHuman = players.some(
+    p => !p.isBot && p.id !== actor.id && !passedIds.includes(p.id)
+  );
+  if (stillAwaitingHuman) return;
 
   // Check observing bots who have >= 1 Action Token
-  const bots = players.filter(p => p.isBot && p.id !== pendingAction.actorId && p.id !== playerId && p.actionTokens >= 1);
+  const bots = players.filter(p => p.isBot && p.id !== pendingAction.actorId && p.actionTokens >= 1);
   const botDoubter = bots.find(b => {
     const decision = evaluateBotDoubt(
       b,

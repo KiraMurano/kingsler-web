@@ -67,6 +67,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   coronationOriginId: null,
   pendingAction: null,
   pendingDoubtDoubterId: null,
+  pendingDoubtPassedIds: [],
 
   isVaBanqueActive: false,
   isVetoed: false,
@@ -153,6 +154,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       coronationCandidateId: null,
       coronationOriginId: null,
       pendingAction: null,
+      pendingDoubtPassedIds: [],
       overlayInstant: null,
       isVaBanqueActive: false,
       isVetoed: false,
@@ -348,6 +350,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       pendingAction: action,
       turnPhase: 'DOUBT_WINDOW',
+      pendingDoubtPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0
     });
@@ -401,6 +404,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // After target accepts, court gets a chance to doubt in DOUBT_WINDOW
     set({
       turnPhase: 'DOUBT_WINDOW',
+      pendingDoubtPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0
     });

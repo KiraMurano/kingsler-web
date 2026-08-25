@@ -168,6 +168,8 @@ export interface GameState {
   // Pending Action state
   pendingAction: Action | null;
   pendingDoubtDoubterId: string | null;
+  /** Ids of non-actor players who already clicked "Верю" in the current DOUBT_WINDOW — resolving requires every one of them, not just the first. */
+  pendingDoubtPassedIds: string[];
   hasUsedNormalActionThisTurn: boolean;
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;
