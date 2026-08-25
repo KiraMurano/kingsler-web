@@ -26,7 +26,10 @@ authRouter.post('/request-link', async (req, res) => {
     try {
       await sendMagicLinkEmail(email, verifyUrl);
     } catch (err) {
+      // No RESEND_API_KEY (e.g. local dev) or a delivery failure: print the
+      // link so the flow is still testable without a real mailbox.
       console.error('Failed to send magic link email:', err);
+      console.log(`Magic link for ${email}: ${verifyUrl}`);
     }
   }
 
