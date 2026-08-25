@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Room } from '@colyseus/sdk';
-import { Check, Copy, Crown, LogIn, CirclePlus, Users, ArrowLeft, LogOut } from 'lucide-react';
+import { Check, Copy, Crown, LogIn, CirclePlus, Users, ArrowLeft, LogOut, Pencil } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
 import { onlineClient, type LobbyMessage } from './OnlineGameClient';
@@ -11,6 +11,9 @@ import '../styles/screen.css';
 interface LobbyProps {
   onGameStarted: () => void;
   onExit: () => void;
+  nickname: string;
+  onNicknameChange: (nickname: string) => void;
+  autoJoinRoomId: string | null;
 }
 
 const MAX_SEATS = 4;
@@ -36,14 +39,56 @@ function Brand({ subtitle }: { subtitle: string }) {
   );
 }
 
-export function Lobby({ onGameStarted, onExit }: LobbyProps) {
-  const [nickname, setNickname] = useState('');
+function NicknameEditor({ nickname, onChange }: { nickname: string; onChange: (n: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(nickname);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="lobby__nickname"
+        onClick={() => {
+          setValue(nickname);
+          setEditing(true);
+        }}
+      >
+        Вы: <strong>{nickname}</strong> <Pencil size={12} />
+      </button>
+    );
+  }
+
+  const save = () => {
+    const trimmed = value.trim().slice(0, 24);
+    if (trimmed) onChange(trimmed);
+    setEditing(false);
+  };
+
+  return (
+    <div className="lobby__nickname-edit">
+      <input
+        className="field"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && save()}
+        maxLength={24}
+        autoFocus
+      />
+      <Button tone="gold" size="sm" onClick={save}>
+        Сохранить
+      </Button>
+    </div>
+  );
+}
+
+export function Lobby({ onGameStarted, onExit, nickname, onNicknameChange, autoJoinRoomId }: LobbyProps) {
   const [joinCode, setJoinCode] = useState(() =>
     sanitizeRoomCode(new URLSearchParams(location.search).get('room') ?? '')
   );
   const [lobby, setLobby] = useState<LobbyMessage | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [restoring, setRestoring] = useState(!!autoJoinRoomId);
   const showToast = useToast();
 
   const attachRoom = (newRoom: Room) => {
@@ -58,9 +103,29 @@ export function Lobby({ onGameStarted, onExit }: LobbyProps) {
     newRoom.send('lobby');
   };
 
+  useEffect(() => {
+    if (!autoJoinRoomId) return;
+    let cancelled = false;
+    onlineClient
+      .joinRoom(autoJoinRoomId)
+      .then(joined => {
+        if (!cancelled) attachRoom(joined);
+      })
+      .catch(() => {
+        if (!cancelled) showToast('Не удалось восстановить прошлую партию.');
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCreate = async () => {
     try {
-      const created = await onlineClient.createRoom(nickname || 'Игрок');
+      const created = await onlineClient.createRoom();
       history.replaceState(null, '', `?room=${created.roomId}`);
       attachRoom(created);
     } catch {
@@ -72,7 +137,7 @@ export function Lobby({ onGameStarted, onExit }: LobbyProps) {
     const code = sanitizeRoomCode(joinCode);
     if (code.length !== ROOM_CODE_LENGTH) return;
     try {
-      const joined = await onlineClient.joinRoom(code, nickname || 'Игрок');
+      const joined = await onlineClient.joinRoom(code);
       attachRoom(joined);
     } catch {
       showToast('Комната не найдена или игра уже началась.');
@@ -91,6 +156,10 @@ export function Lobby({ onGameStarted, onExit }: LobbyProps) {
     );
   };
 
+  if (restoring) {
+    return <div className="booting">СОЗЫВ ДВОРА</div>;
+  }
+
   if (!room || !lobby) {
     return (
       <div className="screen">
@@ -100,15 +169,9 @@ export function Lobby({ onGameStarted, onExit }: LobbyProps) {
         <div className="screen__panel">
           <Brand subtitle="Игра онлайн" />
 
-          <div className="dialog__panel lobbycard">
-            <input
-              className="field"
-              placeholder="Ваше имя"
-              value={nickname}
-              onChange={e => setNickname(e.target.value)}
-              maxLength={24}
-            />
+          <NicknameEditor nickname={nickname} onChange={onNicknameChange} />
 
+          <div className="dialog__panel lobbycard">
             <Button tone="gold" size="lg" block onClick={handleCreate}>
               <CirclePlus size={18} /> Создать комнату
             </Button>
