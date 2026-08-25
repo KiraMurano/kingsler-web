@@ -16,6 +16,8 @@ import { Modals } from './components/Modals';
 import { CardDetailModal } from './components/CardDetailModal';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
+import { Button } from './components/ui/Button';
+import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
 import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
 
@@ -59,6 +61,7 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
   const [stakedCardIndex, setStakedCardIndex] = useState(0);
   const [redirectCardIndex, setRedirectCardIndex] = useState<number | null>(null);
   const showToast = useToast();
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   useEffect(() => {
     (window as unknown as { __startTargeting: (a: PendingTargetAction) => void }).__startTargeting =
@@ -72,6 +75,11 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'online') return;
+    return onlineClient.onStatusChange(setConnectionStatus);
+  }, [mode]);
 
   const human = pickViewer(players, mode === 'online' ? viewerId : undefined);
   const activePlayer = players.find(p => p.id === activePlayerId);
@@ -342,6 +350,26 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
           targetDeclareDuel(human.id, cardIndex);
         }}
       />
+
+      {mode === 'online' && connectionStatus !== 'connected' && (
+        <div className="reconnect-overlay">
+          <div className="reconnect-overlay__panel">
+            {connectionStatus === 'reconnecting' ? (
+              <div className="lobby__waiting">
+                <span className="lobby__waiting-dot" />
+                Переподключение…
+              </div>
+            ) : (
+              <>
+                <p>Соединение потеряно.</p>
+                <Button tone="gold" onClick={onExit}>
+                  В главное меню
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
