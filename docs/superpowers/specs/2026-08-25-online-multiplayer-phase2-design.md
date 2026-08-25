@@ -99,10 +99,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS magic_link_tokens (
   token_hash TEXT PRIMARY KEY,
   email TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   used_at INTEGER
 );
 ```
+
+(`created_at` is what the 60-second rate limit in the request route below actually
+queries against — `expires_at` alone would need error-prone arithmetic to recover it.)
 
 `token_hash` stores a SHA-256 hash of a random 32-byte token (`node:crypto`,
 the same style already used for room codes in `KinglierRoom.ts`) — not the

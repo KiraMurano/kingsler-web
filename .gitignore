@@ -13,6 +13,10 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
+# Runtime SQLite database (accounts) — persisted via a Docker volume in
+# production, never committed.
+/data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
