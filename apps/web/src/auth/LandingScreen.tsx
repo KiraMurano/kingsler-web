@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Crown, KeyRound, LogIn, Mail, Swords, Users } from 'lucide-react';
-import { CardBackdrop } from '../components/CardBackdrop';
 import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Overlay';
 import {
@@ -63,8 +62,6 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
 
   return (
     <div className="screen landing">
-      <CardBackdrop />
-
       <main className="landing__content">
         <div className="brand brand--hero">
           <div className="brand__title">

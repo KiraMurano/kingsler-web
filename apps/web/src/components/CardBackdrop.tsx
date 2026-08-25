@@ -10,9 +10,9 @@ const CARDS = [
   ['/assets/cards/back-dual-face.webp', '93%', '-5%', '20deg']
 ] as const;
 
-export function CardBackdrop() {
+export function CardBackdrop({ hidden = false }: { hidden?: boolean } = {}) {
   return (
-    <div className="card-backdrop" aria-hidden="true">
+    <div className={`card-backdrop${hidden ? ' card-backdrop--hidden' : ''}`} aria-hidden="true">
       {CARDS.map(([src, left, top, rotate], index) => (
         <img
           key={`${src}-${index}`}

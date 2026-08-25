@@ -3,7 +3,6 @@ import type { Room } from '@colyseus/sdk';
 import { Check, Copy, Crown, LogIn, CirclePlus, ArrowLeft, LogOut } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
-import { CardBackdrop } from '../components/CardBackdrop';
 import { onlineClient, type LobbyMessage } from './OnlineGameClient';
 import { ROOM_CODE_LENGTH, sanitizeRoomCode } from './roomCode';
 import { useToast } from '../lib/toast';
@@ -120,7 +119,6 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
   if (!room || !lobby) {
     return (
       <div className="screen">
-        <CardBackdrop />
         <ScreenBack onClick={onExit}>
           <ArrowLeft size={15} /> Назад
         </ScreenBack>
@@ -165,7 +163,6 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
 
   return (
     <div className="screen">
-      <CardBackdrop />
       <ScreenBack onClick={onExit}>
         <LogOut size={15} /> Выйти
       </ScreenBack>

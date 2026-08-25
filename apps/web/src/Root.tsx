@@ -44,87 +44,82 @@ export default function Root() {
     setAccount(null);
   };
 
-  if (account === 'loading') {
-    return <div className="booting">СОЗЫВ ДВОРА</div>;
-  }
+  const isGame =
+    (mode === 'offline' || mode === 'online-game') && account !== null && account !== 'loading';
 
-  if (!account) {
-    return <LandingScreen onLoggedIn={setAccount} />;
-  }
-
-  if (mode === 'menu') {
-    return (
-      <div className="screen">
-        <CardBackdrop />
-        <div className="screen__panel">
-          <div className="brand brand--hero">
-            <div className="brand__title">
-              <span className="brand__rule" />
-              <span className="gilded">КИНГСЛЕР</span>
-              <span className="brand__rule brand__rule--r" />
+  return (
+    <>
+      <CardBackdrop hidden={isGame} />
+      {account === 'loading' ? (
+        <div className="booting">СОЗЫВ ДВОРА</div>
+      ) : !account ? (
+        <LandingScreen onLoggedIn={setAccount} />
+      ) : mode === 'menu' ? (
+        <div className="screen">
+          <div className="screen__panel">
+            <div className="brand brand--hero">
+              <div className="brand__title">
+                <span className="brand__rule" />
+                <span className="gilded">КИНГСЛЕР</span>
+                <span className="brand__rule brand__rule--r" />
+              </div>
+              <div className="brand__sub">Битва за престол</div>
             </div>
-            <div className="brand__sub">Битва за престол</div>
+
+            <button type="button" className="account-button" onClick={() => setProfileOpen(true)}>
+              <span className="account-button__avatar">
+                <img src={account.avatar} alt="" />
+              </span>
+              <span className="account-button__identity">
+                <span className="account-button__title">{account.title}</span>
+                <span className="account-button__name">{account.nickname}</span>
+              </span>
+              <UserRoundPen size={16} />
+            </button>
+
+            <div className="dialog__panel lobbycard">
+              <Button
+                tone="gold"
+                size="lg"
+                block
+                sub="Быстрая партия против королевского двора ботов"
+                onClick={() => setMode('offline')}
+              >
+                <Swords size={18} /> Играть с ботами
+              </Button>
+              <Button
+                tone="calm"
+                size="lg"
+                block
+                sub="Соберите комнату и позовите друзей"
+                onClick={() => setMode('online-lobby')}
+              >
+                <Globe size={18} /> Играть онлайн
+              </Button>
+            </div>
           </div>
 
-          <button type="button" className="account-button" onClick={() => setProfileOpen(true)}>
-            <span className="account-button__avatar">
-              <img src={account.avatar} alt="" />
-            </span>
-            <span className="account-button__identity">
-              <span className="account-button__title">{account.title}</span>
-              <span className="account-button__name">{account.nickname}</span>
-            </span>
-            <UserRoundPen size={16} />
-          </button>
-
-          <div className="dialog__panel lobbycard">
-            <Button
-              tone="gold"
-              size="lg"
-              block
-              sub="Быстрая партия против королевского двора ботов"
-              onClick={() => setMode('offline')}
-            >
-              <Swords size={18} /> Играть с ботами
-            </Button>
-            <Button
-              tone="calm"
-              size="lg"
-              block
-              sub="Соберите комнату и позовите друзей"
-              onClick={() => setMode('online-lobby')}
-            >
-              <Globe size={18} /> Играть онлайн
-            </Button>
-          </div>
+          {profileOpen && (
+            <ProfileDialog
+              open
+              account={account}
+              onClose={() => setProfileOpen(false)}
+              onSaved={setAccount}
+              onLogout={handleLogout}
+            />
+          )}
         </div>
-
-        {profileOpen && (
-          <ProfileDialog
-            open
-            account={account}
-            onClose={() => setProfileOpen(false)}
-            onSaved={setAccount}
-            onLogout={handleLogout}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (mode === 'offline') {
-    return <App mode="offline" account={account} onExit={exitToMenu} />;
-  }
-
-  if (mode === 'online-lobby') {
-    return (
-      <Lobby
-        onGameStarted={() => setMode('online-game')}
-        onExit={exitToMenu}
-        autoJoinRoomId={autoJoinRoomId}
-      />
-    );
-  }
-
-  return <App mode="online" account={account} onExit={exitToMenu} />;
+      ) : mode === 'offline' ? (
+        <App mode="offline" account={account} onExit={exitToMenu} />
+      ) : mode === 'online-lobby' ? (
+        <Lobby
+          onGameStarted={() => setMode('online-game')}
+          onExit={exitToMenu}
+          autoJoinRoomId={autoJoinRoomId}
+        />
+      ) : (
+        <App mode="online" account={account} onExit={exitToMenu} />
+      )}
+    </>
+  );
 }
