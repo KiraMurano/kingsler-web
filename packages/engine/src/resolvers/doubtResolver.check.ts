@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import type { Player } from '../types.ts';
 import { useGameStore } from '../GameStore.ts';
+import { ACTION_HOLD_MS } from '../timing.ts';
 
 function human(id: string, hand: Player['hand']): Player {
   return {
@@ -80,6 +81,50 @@ assert.equal(
   useGameStore.getState().turnPhase,
   'IDLE',
   'every non-actor human has now passed (bot has 0 tokens) — the action resolves'
+);
+
+// --- Same fairness fix for VETO_WINDOW's "Продолжить" (passVetoWindow). ---
+useGameStore.getState().startGame();
+useGameStore.setState({
+  players: [
+    human('p1', ['Наследник', 'Шут']),
+    human('p2', ['Казначей', 'Рыцарь']),
+    human('p3', ['Право вето', 'Шпион'])
+  ],
+  activePlayerId: 'p1'
+});
+
+const vetoTestAction = {
+  id: 'a-veto',
+  type: 'role' as const,
+  name: 'Наследник',
+  roleClaim: 'Наследник' as const,
+  actorId: 'p1',
+  stakedCardIndex: 0,
+  costGold: 0,
+  costTokens: 1,
+  description: ''
+};
+useGameStore.setState({ pendingAction: vetoTestAction });
+useGameStore.getState()._triggerVetoWindowOrResolveEffect(vetoTestAction, false);
+assert.equal(useGameStore.getState().turnPhase, 'VETO_WINDOW');
+
+useGameStore.getState().passVetoWindow('p2');
+assert.equal(
+  useGameStore.getState().turnPhase,
+  'VETO_WINDOW',
+  'p3 (who actually holds "Право вето") has not reacted yet — must not resolve on p2 alone'
+);
+
+useGameStore.getState().passVetoWindow('p2'); // repeated click must not double-count
+assert.equal(useGameStore.getState().turnPhase, 'VETO_WINDOW', 'a repeated pass from the same player must not count twice');
+
+useGameStore.getState().passVetoWindow('p3');
+await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS + 200));
+assert.equal(
+  useGameStore.getState().turnPhase,
+  'IDLE',
+  'every non-actor human has passed — the action proceeds'
 );
 
 console.log('doubtResolver.check.ts passed.');

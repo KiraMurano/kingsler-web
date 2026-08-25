@@ -416,6 +416,7 @@ export function triggerVetoWindowOrResolveEffect(
     set({
       turnPhase: 'VETO_WINDOW',
       hasCardDeparted: false,
+      pendingVetoPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0,
       isPendingActionAfterTruthChallenge: isAfterTruthChallenge
@@ -424,6 +425,7 @@ export function triggerVetoWindowOrResolveEffect(
     set({
       turnPhase: 'VETO_WINDOW',
       hasCardDeparted: false,
+      pendingVetoPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0,
       isPendingActionAfterTruthChallenge: isAfterTruthChallenge
@@ -467,6 +469,35 @@ export function resolvePendingActionEffect(
     return;
   }
   get()._resolveRoleActionEffect(action, isAfterTruthChallenge);
+}
+
+/**
+ * UI-facing "Продолжить" click. Online games can seat several real humans
+ * in the same VETO_WINDOW, so — same fix as passDoubt — one player's click
+ * must not let the effect through on behalf of everyone else who hasn't
+ * reacted yet. `proceedAfterVetoWindow` below stays the low-level resolver
+ * (also called directly by the bot-only auto-continue timer).
+ */
+export function passVetoWindow(
+  get: StateGetter,
+  set: StateSetter,
+  playerId: string
+): void {
+  const { turnPhase, pendingAction, players, pendingVetoPassedIds } = get();
+  if (turnPhase !== 'VETO_WINDOW' || !pendingAction) return;
+
+  const passer = players.find(p => p.id === playerId);
+  if (!passer || pendingVetoPassedIds.includes(playerId)) return;
+
+  const passedIds = [...pendingVetoPassedIds, playerId];
+  set({ pendingVetoPassedIds: passedIds });
+
+  const stillAwaitingHuman = players.some(
+    p => !p.isBot && p.id !== pendingAction.actorId && !passedIds.includes(p.id)
+  );
+  if (stillAwaitingHuman) return;
+
+  proceedAfterVetoWindow(get, set);
 }
 
 export function proceedAfterVetoWindow(

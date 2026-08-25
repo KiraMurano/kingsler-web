@@ -41,6 +41,7 @@ import {
   closeRevealOutcome,
   proceedAfterDoubtPassed,
   triggerVetoWindowOrResolveEffect,
+  passVetoWindow,
   proceedAfterVetoWindow,
   resolvePendingActionEffect
 } from './resolvers/doubtResolver';
@@ -68,6 +69,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   pendingAction: null,
   pendingDoubtDoubterId: null,
   pendingDoubtPassedIds: [],
+  pendingVetoPassedIds: [],
 
   isVaBanqueActive: false,
   isVetoed: false,
@@ -155,6 +157,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       coronationOriginId: null,
       pendingAction: null,
       pendingDoubtPassedIds: [],
+      pendingVetoPassedIds: [],
       overlayInstant: null,
       isVaBanqueActive: false,
       isVetoed: false,
@@ -469,6 +472,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   _resolvePendingActionEffect: (action, isAfterTruthChallenge = false) => {
     resolvePendingActionEffect(get, set, action, isAfterTruthChallenge);
+  },
+
+  passVetoWindow: (playerId: string) => {
+    passVetoWindow(get, set, playerId);
   },
 
   proceedAfterVetoWindow: () => {

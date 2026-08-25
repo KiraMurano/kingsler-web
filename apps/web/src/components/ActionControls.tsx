@@ -49,7 +49,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     attackerRetreatDuel,
     attackerAcceptDuel,
     playInstant,
-    proceedAfterVetoWindow,
+    passVetoWindow,
     openConspiracyDialog,
     endTurnManually
   } = useGameStore();
@@ -312,7 +312,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           sub="Позволить эффект"
           onClick={() => {
             setVetoDismissed(true);
-            proceedAfterVetoWindow();
+            passVetoWindow(human.id);
           }}
         >
           Продолжить

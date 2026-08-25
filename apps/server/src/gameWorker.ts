@@ -13,7 +13,7 @@ const port = parentPort;
 // here even if a malicious message claims that method name.
 const ALLOWED_METHODS = new Set([
   'performAction', 'skipNormalActionPhase', 'endTurnManually', 'playPlotAction',
-  'playInstant', 'doubtAction', 'passDoubt', 'proceedAfterVetoWindow',
+  'playInstant', 'doubtAction', 'passDoubt', 'passVetoWindow', 'proceedAfterVetoWindow',
   'targetAcceptAttack', 'targetDoubtAttack', 'targetDeclareDuel',
   'attackerRetreatDuel', 'attackerAcceptDuel', 'closeDuelOutcome',
   'closeInformantPeek', 'closeRevealOutcome', 'openConspiracyDialog',
