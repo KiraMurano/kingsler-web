@@ -2,20 +2,34 @@
  * Run: npx tsx apps/server/src/KinglierRoom.actions.check.ts
  */
 import assert from 'node:assert/strict';
-import { Client } from '@colyseus/sdk';
-import { createServer } from './app.ts';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+process.env.DB_PATH = path.join(mkdtempSync(path.join(tmpdir(), 'kinglier-actions-')), 'test.db');
+process.env.JWT_SECRET = 'test-secret';
+
+const { Client } = await import('@colyseus/sdk');
+const { createServer } = await import('./app.ts');
+const { findOrCreateUserByEmail } = await import('./db.ts');
+const { JWT } = await import('colyseus');
 
 const PORT = 27892;
 createServer().listen(PORT);
-const client = new Client(`ws://localhost:${PORT}`);
 
-const host = await client.create('kinglier', { nickname: 'Аня' }); // becomes p1
+const anya = findOrCreateUserByEmail('anya@example.com');
+const borya = findOrCreateUserByEmail('borya@example.com');
+
+const client = new Client(`ws://localhost:${PORT}`);
+client.auth.token = await JWT.sign({ userId: anya.id });
+const host = await client.create('kinglier'); // becomes p1
 
 type State = { players: { id: string; gold: number }[]; activePlayerId: string };
 let hostState: State | null = null;
 host.onMessage('state', (data: State) => { hostState = data; });
 
-const guest = await client.joinById(host.roomId, { nickname: 'Боря' }); // becomes p2
+client.auth.token = await JWT.sign({ userId: borya.id });
+const guest = await client.joinById(host.roomId); // becomes p2
 guest.onMessage('state', () => {});
 
 host.send('start');

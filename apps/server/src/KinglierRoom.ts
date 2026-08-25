@@ -1,9 +1,11 @@
 import { randomInt } from 'node:crypto';
-import { Room } from 'colyseus';
-import type { Client } from 'colyseus';
+import { Room, JWT } from 'colyseus';
+import type { Client, AuthContext } from 'colyseus';
 import { GameWorkerClient, type SeatInput } from './GameWorkerClient.ts';
 import { redactStateForPlayer } from '@kinglier/engine/net/redaction';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
+import { findUserById } from './db.ts';
+import { setActiveSeat, clearActiveSeat } from './activeSeats.ts';
 
 const ACTIVE_PLAYER_ONLY_ACTIONS = new Set([
   'performAction', 'skipNormalActionPhase', 'endTurnManually',
@@ -28,6 +30,11 @@ interface ActionMessage {
 
 const RECONNECTION_GRACE_SECONDS = Number(process.env.KINGLIER_RECONNECT_GRACE_SECONDS ?? 60);
 const ROOM_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+// Sent when a second connection for the same account takes over a seat
+// (e.g. the player opened the room in a new tab/device). Kept out of the
+// 1000-4999 "consented leave" range so the client's drop-watcher treats it
+// as a terminal state, not something to retry.
+const CLOSE_CODE_ANOTHER_DEVICE = 4002;
 
 function generateRoomCode(): string {
   return Array.from({ length: 6 }, () => ROOM_CODE_CHARS[randomInt(ROOM_CODE_CHARS.length)]).join('');
@@ -37,13 +44,16 @@ type Phase = 'WAITING' | 'PLAYING' | 'GAME_OVER';
 
 interface Seat {
   playerId: string;
+  userId: string;
   sessionId: string;
   nickname: string;
   connected: boolean;
+  botControlled: boolean;
 }
 
-interface JoinOptions {
-  nickname?: string;
+interface AuthPayload {
+  userId: string;
+  nickname: string;
 }
 
 interface LobbyMessage {
@@ -75,16 +85,56 @@ export class KinglierRoom extends Room {
     lobby: (client: Client) => client.send('lobby', this.lobbySnapshot())
   };
 
-  onJoin(client: Client, options: JoinOptions) {
+  async onAuth(_client: Client, _options: unknown, context: AuthContext): Promise<AuthPayload> {
+    if (!context.token) throw new Error('unauthorized');
+
+    const payload = await JWT.verify<{ userId: string }>(context.token);
+    const user = payload?.userId ? findUserById(payload.userId) : undefined;
+    if (!user) throw new Error('unauthorized');
+
+    return { userId: user.id, nickname: user.nickname };
+  }
+
+  onJoin(client: Client) {
+    const auth = client.auth as AuthPayload;
+    const existing = this.seats.find(s => s.userId === auth.userId);
+
+    if (existing) {
+      if (existing.botControlled) {
+        // Thrown (not `client.leave()`) so the join attempt itself is
+        // rejected — the client's `joinById(...)` promise rejects instead
+        // of resolving and then immediately being kicked.
+        throw new Error('seat already handed to a bot for this match');
+      }
+      if (existing.connected) {
+        this.clients.getById(existing.sessionId)?.leave(CLOSE_CODE_ANOTHER_DEVICE, 'Вы вошли с другого устройства.');
+      }
+      existing.sessionId = client.sessionId;
+      existing.connected = true;
+      client.userData = { playerId: existing.playerId };
+      setActiveSeat(auth.userId, { roomId: this.roomId, playerId: existing.playerId });
+      this.broadcastLobby();
+      if (this.latestState) this.sendState(client, existing.playerId);
+      return;
+    }
+
     if (this.phase !== 'WAITING') {
       throw new Error('game already in progress');
     }
+
     if (!this.hostSessionId) this.hostSessionId = client.sessionId;
 
     const playerId = `p${this.seats.length + 1}`;
-    const nickname = (options.nickname ?? '').trim().slice(0, 24) || playerId;
-    this.seats.push({ playerId, sessionId: client.sessionId, nickname, connected: true });
+    this.seats.push({
+      playerId,
+      userId: auth.userId,
+      sessionId: client.sessionId,
+      nickname: auth.nickname,
+      connected: true,
+      botControlled: false
+    });
     client.userData = { playerId };
+    setActiveSeat(auth.userId, { roomId: this.roomId, playerId });
     this.broadcast('lobby', this.lobbySnapshot(), { except: client });
   }
 
@@ -95,24 +145,37 @@ export class KinglierRoom extends Room {
     seat.connected = false;
     this.broadcastLobby();
 
+    // Colyseus finalizes an unconsented disconnect as a full `onLeave` right
+    // after `onDrop` returns, unless `allowReconnection` is called to hold
+    // it open. The reconnect-token this normally hands out is unused here
+    // (the client SDK's own auto-reconnect is disabled) — this call only
+    // buys the grace window; the actual comeback is `onJoin`'s userId match
+    // above, which can happen from any device/session.
     try {
-      const rejoined = await this.allowReconnection(client, RECONNECTION_GRACE_SECONDS);
-      seat.sessionId = rejoined.sessionId;
-      seat.connected = true;
-      rejoined.userData = { playerId: seat.playerId };
-      this.broadcastLobby();
-      this.sendState(rejoined, seat.playerId);
+      await this.allowReconnection(client, RECONNECTION_GRACE_SECONDS);
     } catch {
+      // grace period expired without a matching reconnect
+    }
+
+    if (seat.connected) return; // already reconnected via onJoin above
+
+    if (this.phase === 'PLAYING') {
+      seat.botControlled = true;
+      clearActiveSeat(seat.userId);
       this.worker?.setSeatBotControlled(seat.playerId);
     }
+    this.broadcastLobby();
   }
 
   onLeave(client: Client): void {
     const seat = this.seats.find(s => s.sessionId === client.sessionId);
     if (!seat) return;
 
+    clearActiveSeat(seat.userId);
+
     if (this.phase === 'PLAYING') {
       seat.connected = false;
+      seat.botControlled = true;
       this.worker?.setSeatBotControlled(seat.playerId);
     } else {
       this.seats = this.seats.filter(s => s !== seat);
@@ -123,8 +186,11 @@ export class KinglierRoom extends Room {
     this.broadcastLobby();
   }
 
-  onDispose() {
+  onDispose(): void {
     this.worker?.terminate();
+    for (const seat of this.seats) {
+      clearActiveSeat(seat.userId);
+    }
   }
 
   protected lobbySnapshot(): LobbyMessage {

@@ -2,16 +2,32 @@
  * Run: npx tsx apps/server/src/KinglierRoom.lobby.check.ts
  */
 import assert from 'node:assert/strict';
-import { Client } from '@colyseus/sdk';
-import { createServer } from './app.ts';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+// Static imports are hoisted and evaluate before any other top-level code in
+// this file, so setting these env vars here would run too late — db.ts (and
+// app.ts, which loads it) would already have opened its database. Dynamic
+// imports defer loading until after the env vars are actually set.
+process.env.DB_PATH = path.join(mkdtempSync(path.join(tmpdir(), 'kinglier-lobby-')), 'test.db');
+process.env.JWT_SECRET = 'test-secret';
+
+const { Client } = await import('@colyseus/sdk');
+const { createServer } = await import('./app.ts');
+const { findOrCreateUserByEmail } = await import('./db.ts');
+const { JWT } = await import('colyseus');
 
 const PORT = 27891;
 const server = createServer();
 server.listen(PORT);
 
-const client = new Client(`ws://localhost:${PORT}`);
+const anya = findOrCreateUserByEmail('anya@example.com');
+const borya = findOrCreateUserByEmail('borya@example.com');
 
-const host = await client.create('kinglier', { nickname: 'Аня' });
+const client = new Client(`ws://localhost:${PORT}`);
+client.auth.token = await JWT.sign({ userId: anya.id });
+const host = await client.create('kinglier');
 assert.match(host.roomId, /^[A-Z0-9]{6}$/, 'room code must be 6 uppercase Latin letters or digits');
 
 let lastLobby: unknown = null;
@@ -22,7 +38,8 @@ let hostState: State | null = null;
 let guestState: State | null = null;
 host.onMessage('state', (data: State) => { hostState = data; });
 
-const guest = await client.joinById(host.roomId, { nickname: 'Боря' });
+client.auth.token = await JWT.sign({ userId: borya.id });
+const guest = await client.joinById(host.roomId);
 guest.onMessage('state', (data: State) => { guestState = data; });
 
 await new Promise(resolve => setTimeout(resolve, 200));
@@ -45,4 +62,5 @@ assert.equal(
 );
 
 host.leave();
+console.log('KinglierRoom.lobby.check.ts passed.');
 process.exit(0);
