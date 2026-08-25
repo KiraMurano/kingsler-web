@@ -1,5 +1,6 @@
 import { Client, type Room } from '@colyseus/sdk';
 import { bindOnlineStore } from './bindOnlineStore';
+import { sanitizeRoomCode } from './roomCode';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_WS_URL
   ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
@@ -28,7 +29,7 @@ export class OnlineGameClient {
   }
 
   async joinRoom(roomId: string, nickname: string): Promise<Room> {
-    this.room = await this.client.joinById(roomId, { nickname });
+    this.room = await this.client.joinById(sanitizeRoomCode(roomId), { nickname });
     this.persistReconnectionToken();
     return this.room;
   }

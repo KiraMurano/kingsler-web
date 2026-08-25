@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { Room } from 'colyseus';
 import type { Client } from 'colyseus';
 import { GameWorkerClient, type SeatInput } from './GameWorkerClient.ts';
@@ -26,6 +27,11 @@ interface ActionMessage {
 }
 
 const RECONNECTION_GRACE_SECONDS = Number(process.env.KINGLIER_RECONNECT_GRACE_SECONDS ?? 60);
+const ROOM_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function generateRoomCode(): string {
+  return Array.from({ length: 6 }, () => ROOM_CODE_CHARS[randomInt(ROOM_CODE_CHARS.length)]).join('');
+}
 
 type Phase = 'WAITING' | 'PLAYING' | 'GAME_OVER';
 
@@ -54,6 +60,10 @@ export class KinglierRoom extends Room {
   private phase: Phase = 'WAITING';
   protected worker: GameWorkerClient | null = null;
   protected latestState: GameStateData | null = null;
+
+  onCreate() {
+    this.roomId = generateRoomCode();
+  }
 
   messages = {
     start: (client: Client) => this.handleStart(client),

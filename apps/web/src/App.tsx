@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { usePresence } from './lib/presence';
+import { useEffect, useState } from 'react';
 import { pickViewer } from './lib/viewer';
+import { useToast } from './lib/toast';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
 import { timerManager } from '@kinglier/engine/utils/timerManager';
@@ -54,12 +54,11 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
   const [codexOpen, setCodexOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [vaBanqueCombo, setVaBanqueCombo] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
   const [stakedCardIndex, setStakedCardIndex] = useState(0);
   const [redirectCardIndex, setRedirectCardIndex] = useState<number | null>(null);
-  const toastPresence = usePresence(toast);
+  const showToast = useToast();
 
   useEffect(() => {
     (window as unknown as { __startTargeting: (a: PendingTargetAction) => void }).__startTargeting =
@@ -77,11 +76,6 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
   const human = pickViewer(players, mode === 'online' ? viewerId : undefined);
   const activePlayer = players.find(p => p.id === activePlayerId);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 2400);
-  }, []);
 
   const confirmTarget = (targetId: string) => {
     if (!pendingTarget || !human) return;
@@ -348,12 +342,6 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
           targetDeclareDuel(human.id, cardIndex);
         }}
       />
-
-      {toastPresence.shown && (
-        <div key={toastPresence.shown} className={`toast${toastPresence.exiting ? ' toast--out' : ''}`}>
-          {toastPresence.shown}
-        </div>
-      )}
     </div>
   );
 }

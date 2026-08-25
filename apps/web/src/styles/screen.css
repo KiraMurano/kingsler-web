@@ -108,6 +108,16 @@
   min-width: 0;
 }
 
+.field--roomcode {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.field--roomcode::placeholder {
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
 .lobby__joinrow .btn {
   flex: 0 0 auto;
 }

@@ -4,6 +4,8 @@ import { Check, Copy, Crown, LogIn, CirclePlus, Users, ArrowLeft, LogOut } from 
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
 import { onlineClient, type LobbyMessage } from './OnlineGameClient';
+import { ROOM_CODE_LENGTH, sanitizeRoomCode } from './roomCode';
+import { useToast } from '../lib/toast';
 import '../styles/screen.css';
 
 interface LobbyProps {
@@ -36,11 +38,13 @@ function Brand({ subtitle }: { subtitle: string }) {
 
 export function Lobby({ onGameStarted, onExit }: LobbyProps) {
   const [nickname, setNickname] = useState('');
-  const [joinCode, setJoinCode] = useState(() => new URLSearchParams(location.search).get('room') ?? '');
+  const [joinCode, setJoinCode] = useState(() =>
+    sanitizeRoomCode(new URLSearchParams(location.search).get('room') ?? '')
+  );
   const [lobby, setLobby] = useState<LobbyMessage | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const showToast = useToast();
 
   const attachRoom = (newRoom: Room) => {
     newRoom.onMessage('lobby', (data: LobbyMessage) => {
@@ -55,33 +59,36 @@ export function Lobby({ onGameStarted, onExit }: LobbyProps) {
   };
 
   const handleCreate = async () => {
-    setError(null);
     try {
       const created = await onlineClient.createRoom(nickname || 'Игрок');
       history.replaceState(null, '', `?room=${created.roomId}`);
       attachRoom(created);
     } catch {
-      setError('Не удалось создать комнату. Проверьте соединение с сервером.');
+      showToast('Не удалось создать комнату. Проверьте соединение с сервером.');
     }
   };
 
   const handleJoin = async () => {
-    setError(null);
-    if (!joinCode.trim()) return;
+    const code = sanitizeRoomCode(joinCode);
+    if (code.length !== ROOM_CODE_LENGTH) return;
     try {
-      const joined = await onlineClient.joinRoom(joinCode.trim(), nickname || 'Игрок');
+      const joined = await onlineClient.joinRoom(code, nickname || 'Игрок');
       attachRoom(joined);
     } catch {
-      setError('Комната не найдена или игра уже началась.');
+      showToast('Комната не найдена или игра уже началась.');
     }
   };
 
   const copyInviteLink = () => {
     if (!room) return;
     const link = `${location.origin}${location.pathname}?room=${room.roomId}`;
-    navigator.clipboard.writeText(link).catch(() => {});
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 1600);
+    navigator.clipboard.writeText(link).then(
+      () => {
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 1600);
+      },
+      () => showToast('Не удалось скопировать ссылку')
+    );
   };
 
   if (!room || !lobby) {
@@ -112,17 +119,21 @@ export function Lobby({ onGameStarted, onExit }: LobbyProps) {
 
             <div className="lobby__joinrow">
               <input
-                className="field"
+                className="field field--roomcode"
                 placeholder="Код комнаты"
                 value={joinCode}
-                onChange={e => setJoinCode(e.target.value)}
+                onChange={e => setJoinCode(sanitizeRoomCode(e.target.value))}
+                maxLength={ROOM_CODE_LENGTH}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+                inputMode="text"
               />
-              <Button tone="gold" size="lg" onClick={handleJoin}>
+              <Button tone="gold" size="lg" onClick={handleJoin} disabled={joinCode.length !== ROOM_CODE_LENGTH}>
                 <LogIn size={18} /> Войти
               </Button>
             </div>
-
-            {error && <div className="notice notice--danger">{error}</div>}
           </div>
         </div>
       </div>

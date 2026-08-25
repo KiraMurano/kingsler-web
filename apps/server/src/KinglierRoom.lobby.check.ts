@@ -12,6 +12,7 @@ server.listen(PORT);
 const client = new Client(`ws://localhost:${PORT}`);
 
 const host = await client.create('kinglier', { nickname: 'Аня' });
+assert.match(host.roomId, /^[A-Z0-9]{6}$/, 'room code must be 6 uppercase Latin letters or digits');
 
 let lastLobby: unknown = null;
 host.onMessage('lobby', data => { lastLobby = data; });
