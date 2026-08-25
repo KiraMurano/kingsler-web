@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { JWT } from 'colyseus';
-import { issueMagicLinkToken, consumeMagicLinkToken } from './magicLink.ts';
+import {
+  issueMagicLinkCredentials,
+  consumeMagicLinkCode,
+  consumeMagicLinkToken
+} from './magicLink.ts';
 import { sendMagicLinkEmail } from './email.ts';
 import { isProfileAvatar, isProfileTitle } from '@kinglier/engine/profile';
 import { findOrCreateUserByEmail, findUserById, updateProfile } from '../db.ts';
@@ -14,6 +18,11 @@ interface AuthedRequest {
 
 export const authRouter = Router();
 
+async function createSession(email: string): Promise<string> {
+  const user = findOrCreateUserByEmail(email);
+  return JWT.sign({ userId: user.id }, { expiresIn: '30d' });
+}
+
 authRouter.post('/request-link', async (req, res) => {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   if (!email || !email.includes('@')) {
@@ -26,17 +35,15 @@ authRouter.post('/request-link', async (req, res) => {
   // and skip straight to a signed session, via the same JWT.sign() call
   // /verify uses, so the rest of the app can't tell the difference.
   if (!process.env.RESEND_API_KEY) {
-    const user = findOrCreateUserByEmail(email);
-    const devToken = await JWT.sign({ userId: user.id }, { expiresIn: '30d' });
-    res.json({ ok: true, devToken });
+    res.json({ ok: true, devToken: await createSession(email) });
     return;
   }
 
-  const token = issueMagicLinkToken(email);
-  if (token) {
-    const verifyUrl = `${PUBLIC_URL}/api/auth/verify?token=${token}`;
+  const credentials = issueMagicLinkCredentials(email);
+  if (credentials) {
+    const verifyUrl = `${PUBLIC_URL}/api/auth/verify?token=${credentials.token}`;
     try {
-      await sendMagicLinkEmail(email, verifyUrl);
+      await sendMagicLinkEmail(email, verifyUrl, credentials.code);
     } catch (err) {
       console.error('Failed to send magic link email:', err);
     }
@@ -48,7 +55,7 @@ authRouter.post('/request-link', async (req, res) => {
   res.json({ ok: true });
 });
 
-authRouter.get('/verify', (req, res) => {
+authRouter.get('/verify', async (req, res) => {
   const token = typeof req.query.token === 'string' ? req.query.token : '';
   const email = token ? consumeMagicLinkToken(token) : null;
 
@@ -57,10 +64,18 @@ authRouter.get('/verify', (req, res) => {
     return;
   }
 
-  const user = findOrCreateUserByEmail(email);
-  JWT.sign({ userId: user.id }, { expiresIn: '30d' }).then(sessionToken => {
-    res.redirect(`${PUBLIC_URL}/#token=${sessionToken}`);
-  });
+  res.redirect(`${PUBLIC_URL}/#token=${await createSession(email)}`);
+});
+
+authRouter.post('/verify-code', async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  const verifiedEmail = /^\d{6}$/.test(code) ? consumeMagicLinkCode(email, code) : null;
+  if (!verifiedEmail) {
+    res.status(400).json({ error: 'invalid or expired code' });
+    return;
+  }
+  res.json({ token: await createSession(verifiedEmail) });
 });
 
 export const meRouter = Router();

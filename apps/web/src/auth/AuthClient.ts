@@ -51,6 +51,13 @@ export async function requestMagicLink(email: string): Promise<{ devToken?: stri
   return (response.data ?? {}) as { devToken?: string };
 }
 
+export async function verifyMagicCode(email: string, code: string): Promise<string> {
+  const response = await colyseusClient.http.post('/api/auth/verify-code', {
+    body: { email, code }
+  });
+  return (response.data as { token: string }).token;
+}
+
 export async function fetchMe(): Promise<MeResponse | null> {
   if (!colyseusClient.auth.token) return null;
   try {

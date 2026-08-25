@@ -12,9 +12,11 @@ process.env.PUBLIC_URL = 'http://localhost:27900';
 process.env.RESEND_API_KEY = 'test-key';
 
 let capturedHtml = '';
+let resendCallCount = 0;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
   if (String(url) === 'https://api.resend.com/emails') {
+    resendCallCount += 1;
     capturedHtml = JSON.parse(init!.body as string).html;
     return new Response('{}', { status: 200 });
   }
@@ -96,6 +98,55 @@ await fetch(`http://localhost:${PORT}/api/auth/request-link`, {
   body: JSON.stringify({ email: 'ivan@example.com' })
 });
 assert.equal(capturedHtml, '', 'a request within the cooldown must not trigger a new email');
+
+const callsBeforeCooldownCheck = resendCallCount;
+for (let attempt = 0; attempt < 2; attempt += 1) {
+  await fetch(`http://localhost:${PORT}/api/auth/request-link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'cooldown@example.com' })
+  });
+}
+assert.equal(
+  resendCallCount,
+  callsBeforeCooldownCheck + 1,
+  'server cooldown must prevent the second email'
+);
+
+capturedHtml = '';
+await fetch(`http://localhost:${PORT}/api/auth/request-link`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'code@example.com' })
+});
+const code = capturedHtml.match(/>(\d{6})</)?.[1];
+assert.ok(code, 'the email must contain a six-digit code');
+
+const wrongCodeResponse = await fetch(`http://localhost:${PORT}/api/auth/verify-code`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'code@example.com', code: code === '999999' ? '000000' : '999999' })
+});
+assert.equal(wrongCodeResponse.status, 400);
+
+const codeResponse = await fetch(`http://localhost:${PORT}/api/auth/verify-code`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'code@example.com', code })
+});
+assert.equal(codeResponse.status, 200);
+const { token: codeSession } = await codeResponse.json();
+const codeMe = await (await fetch(`http://localhost:${PORT}/api/me`, {
+  headers: { Authorization: `Bearer ${codeSession}` }
+})).json();
+assert.equal(codeMe.user.email, 'code@example.com');
+
+const reusedCode = await fetch(`http://localhost:${PORT}/api/auth/verify-code`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'code@example.com', code })
+});
+assert.equal(reusedCode.status, 400);
 
 globalThis.fetch = originalFetch;
 

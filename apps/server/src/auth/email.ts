@@ -1,6 +1,6 @@
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
-export async function sendMagicLinkEmail(email: string, verifyUrl: string): Promise<void> {
+export async function sendMagicLinkEmail(email: string, verifyUrl: string, code: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('RESEND_API_KEY is not set');
 
@@ -16,7 +16,7 @@ export async function sendMagicLinkEmail(email: string, verifyUrl: string): Prom
       from,
       to: email,
       subject: 'Вход в Kinglier',
-      html: `<p>Нажмите, чтобы войти в Kinglier:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>Ссылка действует 15 минут. Если вы не запрашивали вход — просто игнорируйте письмо.</p>`
+      html: `<div style="font-family:Georgia,serif;color:#17130b"><p>Код для входа в Kinglier:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</div><p>Или войдите одним нажатием: <a href="${verifyUrl}">${verifyUrl}</a></p><p>Код и ссылка действуют 15 минут. Если вы не запрашивали вход — просто игнорируйте письмо.</p></div>`
     })
   });
 

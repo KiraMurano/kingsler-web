@@ -15,7 +15,11 @@ globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
 
 const { sendMagicLinkEmail } = await import('./email.ts');
 
-await sendMagicLinkEmail('ivan@example.com', 'https://kingsler.ru/api/auth/verify?token=abc');
+await sendMagicLinkEmail(
+  'ivan@example.com',
+  'https://kingsler.ru/api/auth/verify?token=abc',
+  '042731'
+);
 
 assert.ok(capturedRequest, 'sendMagicLinkEmail must call fetch');
 assert.equal(capturedRequest!.url, 'https://api.resend.com/emails');
@@ -26,10 +30,11 @@ const body = JSON.parse(capturedRequest!.init.body as string);
 assert.equal(body.from, 'Kinglier <auth@send.kingsler.ru>');
 assert.equal(body.to, 'ivan@example.com');
 assert.match(body.html, /https:\/\/kingsler\.ru\/api\/auth\/verify\?token=abc/);
+assert.match(body.html, />042731</);
 
 // Failure path: a non-OK response must throw, not swallow the error.
 globalThis.fetch = (async () => new Response('nope', { status: 500 })) as typeof fetch;
-await assert.rejects(() => sendMagicLinkEmail('ivan@example.com', 'https://x/y'));
+await assert.rejects(() => sendMagicLinkEmail('ivan@example.com', 'https://x/y', '123456'));
 
 globalThis.fetch = originalFetch;
 console.log('email.check.ts passed.');

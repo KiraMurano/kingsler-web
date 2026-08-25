@@ -33,10 +33,13 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS magic_link_tokens (
     token_hash TEXT PRIMARY KEY,
+    code_hash TEXT NOT NULL,
+    code_salt TEXT NOT NULL,
     email TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL,
-    used_at INTEGER
+    used_at INTEGER,
+    failed_attempts INTEGER NOT NULL DEFAULT 0
   );
 `);
 
