@@ -15,7 +15,7 @@ process.env.JWT_SECRET = 'test-secret';
 
 const { Client } = await import('@colyseus/sdk');
 const { createServer } = await import('./app.ts');
-const { findOrCreateUserByEmail } = await import('./db.ts');
+const { findOrCreateUserByEmail, updateProfile } = await import('./db.ts');
 const { JWT } = await import('colyseus');
 
 const PORT = 27891;
@@ -24,6 +24,11 @@ server.listen(PORT);
 
 const anya = findOrCreateUserByEmail('anya@example.com');
 const borya = findOrCreateUserByEmail('borya@example.com');
+updateProfile(anya.id, {
+  nickname: 'Аня',
+  avatar: '/avatars/yulia.webp',
+  title: 'Оппортунист'
+});
 
 const client = new Client(`ws://localhost:${PORT}`);
 client.auth.token = await JWT.sign({ userId: anya.id });
@@ -33,7 +38,19 @@ assert.match(host.roomId, /^[A-Z0-9]{6}$/, 'room code must be 6 uppercase Latin 
 let lastLobby: unknown = null;
 host.onMessage('lobby', data => { lastLobby = data; });
 
-type State = { players: { id: string; hand: (string | null)[]; isBot: boolean }[]; activePlayerId: string };
+type State = {
+  players: {
+    id: string;
+    hand: (string | null)[];
+    isBot: boolean;
+    avatar: string;
+    title?: string;
+  }[];
+  activePlayerId: string;
+};
+type Lobby = {
+  seats: { playerId: string; nickname: string; avatar: string; title: string }[];
+};
 let hostState: State | null = null;
 let guestState: State | null = null;
 host.onMessage('state', (data: State) => { hostState = data; });
@@ -44,6 +61,8 @@ guest.onMessage('state', (data: State) => { guestState = data; });
 
 await new Promise(resolve => setTimeout(resolve, 200));
 assert.ok(lastLobby, 'host must receive a lobby update after the guest joins');
+assert.equal((lastLobby as Lobby).seats[0].avatar, '/avatars/yulia.webp');
+assert.equal((lastLobby as Lobby).seats[0].title, 'Оппортунист');
 
 host.send('start');
 await new Promise(resolve => setTimeout(resolve, 500));
@@ -52,6 +71,8 @@ assert.ok(hostState, 'host must receive a state message once the game starts');
 assert.ok(guestState, 'guest must receive a state message once the game starts');
 assert.equal(hostState!.players.length, 4);
 assert.equal(hostState!.players.filter(p => !p.isBot).length, 2, 'exactly the 2 joined humans, rest are bots');
+assert.equal(hostState!.players[0].avatar, '/avatars/yulia.webp');
+assert.equal(hostState!.players[0].title, 'Оппортунист');
 
 guest.leave();
 await new Promise(resolve => setTimeout(resolve, 300));

@@ -6,6 +6,8 @@ import { sanitizeRoomCode } from './roomCode';
 export interface LobbySeat {
   playerId: string;
   nickname: string;
+  avatar: string;
+  title: string;
   connected: boolean;
 }
 

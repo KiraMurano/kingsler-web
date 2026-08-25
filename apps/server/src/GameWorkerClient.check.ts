@@ -10,7 +10,7 @@ const states: GameStateData[] = [];
 worker.onState(data => states.push(data));
 
 worker.startGame([
-  { id: 'p1', name: 'Аня' },
+  { id: 'p1', name: 'Аня', avatar: '/avatars/yulia.webp', title: 'Провокатор' },
   { id: 'p2', name: 'Боря' }
 ]);
 
@@ -21,6 +21,8 @@ const afterStart = states[states.length - 1];
 assert.equal(afterStart.players.length, 4);
 assert.equal(afterStart.players.filter(p => !p.isBot).length, 2);
 assert.equal(afterStart.activePlayerId, 'p1');
+assert.equal(afterStart.players[0].avatar, '/avatars/yulia.webp');
+assert.equal(afterStart.players[0].title, 'Провокатор');
 
 const countBeforeAction = states.length;
 worker.call('performAction', [{

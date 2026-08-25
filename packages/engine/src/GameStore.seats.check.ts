@@ -7,7 +7,7 @@ import { useGameStore } from './GameStore.ts';
 import { TOTAL_DECK_SIZE } from './cards.ts';
 
 useGameStore.getState().startGame([
-  { id: 'p1', name: 'Аня' },
+  { id: 'p1', name: 'Аня', avatar: '/avatars/yulia.webp', title: 'Прагматик' },
   { id: 'p2', name: 'Боря' }
 ]);
 
@@ -17,6 +17,8 @@ assert.equal(state.players.length, 4, 'must always seat exactly 4 players');
 const [seat1, seat2, seat3, seat4] = state.players;
 assert.equal(seat1.id, 'p1');
 assert.equal(seat1.name, 'Аня');
+assert.equal(seat1.avatar, '/avatars/yulia.webp');
+assert.equal(seat1.title, 'Прагматик');
 assert.equal(seat1.isBot, false);
 assert.equal(seat1.seatNumber, 1);
 
@@ -37,6 +39,12 @@ for (const p of state.players) {
 }
 assert.equal(state.deck.length, TOTAL_DECK_SIZE - 8, 'deck must be down by 4 players x 2 cards');
 assert.equal(state.activePlayerId, 'p1', 'the first seated human goes first');
+
+useGameStore.getState().restartGame();
+const restarted = useGameStore.getState();
+assert.equal(restarted.players[0].name, 'Аня');
+assert.equal(restarted.players[0].avatar, '/avatars/yulia.webp');
+assert.equal(restarted.players[0].title, 'Прагматик');
 
 // Backward compatibility: calling with no seats keeps today's solo-vs-3-bots behavior.
 useGameStore.getState().startGame();

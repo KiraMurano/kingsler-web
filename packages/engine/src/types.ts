@@ -25,6 +25,7 @@ export interface Player {
   id: string;
   name: string;
   avatar: string;
+  title?: string;
   seatNumber: number;
   isBot: boolean;
   archetype?: BotArchetype;
@@ -196,7 +197,7 @@ export interface GameState {
   history: string[];
 
   // Action methods
-  startGame: (seats?: { id: string; name: string; avatar?: string }[]) => void;
+  startGame: (seats?: { id: string; name: string; avatar?: string; title?: string }[]) => void;
   performAction: (action: Omit<Action, 'id'>) => void;
   skipNormalActionPhase: () => void;
   endTurnManually: () => void;

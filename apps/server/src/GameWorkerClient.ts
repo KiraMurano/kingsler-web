@@ -9,6 +9,7 @@ export interface SeatInput {
   id: string;
   name: string;
   avatar?: string;
+  title?: string;
 }
 
 interface WorkerOutMessage {

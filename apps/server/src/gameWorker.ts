@@ -22,7 +22,7 @@ const ALLOWED_METHODS = new Set([
 
 interface WorkerMessage {
   type: 'startGame' | 'call' | 'setBotSeat';
-  seats?: { id: string; name: string; avatar?: string }[];
+  seats?: { id: string; name: string; avatar?: string; title?: string }[];
   method?: string;
   args?: unknown[];
   playerId?: string;

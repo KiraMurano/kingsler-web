@@ -114,6 +114,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         id: seat.id,
         name: seat.name,
         avatar: seat.avatar ?? '/avatars/anton.webp',
+        title: seat.title,
         seatNumber: idx + 1,
         isBot: false,
         gold: 2,
@@ -172,7 +173,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   restartGame: () => {
-    get().startGame();
+    const seats = get().players
+      .filter(player => !player.isBot)
+      .map(player => ({
+        id: player.id,
+        name: player.name,
+        avatar: player.avatar,
+        title: player.title
+      }));
+    get().startGame(seats);
   },
 
   // --------------------------------------------------------------------------

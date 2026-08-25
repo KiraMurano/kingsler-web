@@ -47,6 +47,8 @@ interface Seat {
   userId: string;
   sessionId: string;
   nickname: string;
+  avatar: string;
+  title: string;
   connected: boolean;
   botControlled: boolean;
 }
@@ -54,10 +56,18 @@ interface Seat {
 interface AuthPayload {
   userId: string;
   nickname: string;
+  avatar: string;
+  title: string;
 }
 
 interface LobbyMessage {
-  seats: { playerId: string; nickname: string; connected: boolean }[];
+  seats: {
+    playerId: string;
+    nickname: string;
+    avatar: string;
+    title: string;
+    connected: boolean;
+  }[];
   hostSessionId: string | null;
   phase: Phase;
 }
@@ -92,7 +102,12 @@ export class KinglierRoom extends Room {
     const user = payload?.userId ? findUserById(payload.userId) : undefined;
     if (!user) throw new Error('unauthorized');
 
-    return { userId: user.id, nickname: user.nickname };
+    return {
+      userId: user.id,
+      nickname: user.nickname,
+      avatar: user.avatar,
+      title: user.title
+    };
   }
 
   onJoin(client: Client) {
@@ -130,6 +145,8 @@ export class KinglierRoom extends Room {
       userId: auth.userId,
       sessionId: client.sessionId,
       nickname: auth.nickname,
+      avatar: auth.avatar,
+      title: auth.title,
       connected: true,
       botControlled: false
     });
@@ -195,7 +212,13 @@ export class KinglierRoom extends Room {
 
   protected lobbySnapshot(): LobbyMessage {
     return {
-      seats: this.seats.map(s => ({ playerId: s.playerId, nickname: s.nickname, connected: s.connected })),
+      seats: this.seats.map(seat => ({
+        playerId: seat.playerId,
+        nickname: seat.nickname,
+        avatar: seat.avatar,
+        title: seat.title,
+        connected: seat.connected
+      })),
       hostSessionId: this.hostSessionId,
       phase: this.phase
     };
@@ -221,7 +244,12 @@ export class KinglierRoom extends Room {
       }
     });
 
-    const seatInputs: SeatInput[] = this.seats.map(s => ({ id: s.playerId, name: s.nickname }));
+    const seatInputs: SeatInput[] = this.seats.map(seat => ({
+      id: seat.playerId,
+      name: seat.nickname,
+      avatar: seat.avatar,
+      title: seat.title
+    }));
     this.worker.startGame(seatInputs);
     this.broadcastLobby();
   }
