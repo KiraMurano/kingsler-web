@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Crown, KeyRound, LogIn, Mail, Swords, Users } from 'lucide-react';
+import { Crown, KeyRound, LogIn, Mail, ChevronDown, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Overlay';
+import { CardFanShowcase } from '../components/CardFanShowcase';
 import {
   requestMagicLink,
   verifyMagicCode,
@@ -13,6 +14,24 @@ import { useToast } from '../lib/toast';
 import '../styles/screen.css';
 
 type LoginStatus = 'idle' | 'sending' | 'sent' | 'verifying';
+
+const GAME_HIGHLIGHTS = [
+  {
+    art: '/assets/cards/joker.webp',
+    title: 'Абсолютный блеф',
+    text: 'Кладите на стол любую карту рубашкой вверх и называйте её любой ролью. Поверят — действие сработает.'
+  },
+  {
+    art: '/assets/cards/knight.webp',
+    title: 'Дуэли и проверки',
+    text: 'Усомнитесь в чужих словах или бросьте вызов на дуэль со скрытыми ставками, чтобы сбить фаворита.'
+  },
+  {
+    art: '/assets/cards/heir.webp',
+    title: 'Битва за корону',
+    text: 'Накопите шесть корон Благосклонности и удержите их целый круг, отражая атаки соперников.'
+  }
+] as const;
 
 export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) => void }) {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -60,49 +79,90 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
     }
   };
 
+  const scrollToCards = () => {
+    const el = document.getElementById('cards-showcase');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="screen landing">
-      <main className="landing__content">
-        <div className="brand brand--hero">
-          <div className="brand__title">
-            <span className="brand__rule" />
-            <span className="gilded">КИНГСЛЕР</span>
-            <span className="brand__rule brand__rule--r" />
+    <div className="landing-page">
+      {/* Top Floating Nav Bar */}
+      <header className="landing-nav">
+        <div className="landing-nav__brand">
+          <Crown className="landing-nav__crown" size={20} />
+          <span className="landing-nav__logo gilded">КИНГСЛЕР</span>
+        </div>
+        <Button tone="bare" size="sm" onClick={() => setLoginOpen(true)}>
+          <LogIn size={15} /> Войти
+        </Button>
+      </header>
+
+      {/* BLOCK 1: HERO / STARTER SECTION */}
+      <section className="landing-hero-block">
+        <div className="landing-hero-block__backdrop-glow" />
+
+        <div className="landing-hero-block__inner">
+          <div className="landing-badge">
+            <Sparkles size={14} className="landing-badge__icon" />
+            <span>Карточная игра о дворцовых интригах и блефе</span>
           </div>
-          <div className="brand__sub">Битва за престол</div>
-        </div>
 
-        <section className="landing__hero">
-          <span className="eyebrow">Карточная игра для 2–4 претендентов</span>
-          <h1>Интриги, блеф и борьба за корону</h1>
-          <p>
-            Разыгрывайте роли, плетите заговоры и заставляйте соперников сомневаться.
-            Побеждает тот, кто первым превратит влияние при дворе в законное право на престол.
+          <div className="brand brand--hero">
+            <div className="brand__title">
+              <span className="brand__rule" />
+              <span className="gilded">КИНГСЛЕР</span>
+              <span className="brand__rule brand__rule--r" />
+            </div>
+            <div className="brand__sub">Битва за престол</div>
+          </div>
+
+          <h1 className="landing-hero-block__headline">
+            Правда — лишь то, <br />
+            во что поверят остальные
+          </h1>
+
+          <p className="landing-hero-block__story">
+            Каждый ход вы разыгрываете карты в закрытую и можете назвать себя кем угодно — коварным
+            шантажистом, благородным рыцарем или королевским казначеем. Если вам поверят, действие
+            сработает. Если поймают на лжи — придётся платить за дерзость. Плетите интриги, проверяйте
+            блеф соперников и удержите шесть корон, чтобы короновать себя королём.
           </p>
-          <Button tone="gold" size="lg" onClick={() => setLoginOpen(true)}>
-            <LogIn size={19} /> Войти и играть
-          </Button>
-        </section>
 
-        <div className="landing__features">
-          <article>
-            <Swords size={18} />
-            <strong>Блефуйте</strong>
-            <span>Заявляйте любую роль — если вам поверят.</span>
-          </article>
-          <article>
-            <Crown size={18} />
-            <strong>Боритесь за влияние</strong>
-            <span>Копите короны и удержите преимущество до своего хода.</span>
-          </article>
-          <article>
-            <Users size={18} />
-            <strong>Играйте как удобно</strong>
-            <span>С друзьями онлайн или против королевского двора ботов.</span>
-          </article>
+          <div className="landing-hero-block__actions">
+            <Button tone="gold" size="lg" onClick={() => setLoginOpen(true)}>
+              <LogIn size={18} /> Начать схватку за корону
+            </Button>
+            <Button tone="bare" size="lg" onClick={scrollToCards}>
+              Колода двора <ChevronDown size={17} />
+            </Button>
+          </div>
+
+          {/* 3 Core Highlights — illustrated chapters, not icon-in-a-box */}
+          <div className="landing-highlights">
+            {GAME_HIGHLIGHTS.map(({ title, text, art }) => (
+              <article
+                className="landing-highlight"
+                key={title}
+                style={{ '--highlight-art': `url(${art})` } as React.CSSProperties}
+              >
+                <div className="landing-highlight__body">
+                  <strong>{title}</strong>
+                  <span>{text}</span>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
-      </main>
+      </section>
 
+      <div className="section-seam" aria-hidden="true" />
+
+      {/* BLOCK 2: INTERACTIVE FAN OF CARDS & SHOWCASE */}
+      <CardFanShowcase onOpenLogin={() => setLoginOpen(true)} />
+
+      {/* Auth Dialog */}
       <Dialog
         open={loginOpen}
         onClose={() => {
