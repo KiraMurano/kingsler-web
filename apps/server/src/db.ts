@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_PROFILE_AVATAR,
   DEFAULT_PROFILE_TITLE,
+  isValidNickname,
+  sanitizeNicknameInput,
   type ProfileAvatar,
   type ProfileTitle
 } from '@kinglier/engine/profile';
@@ -27,7 +29,7 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     nickname TEXT NOT NULL,
     avatar TEXT NOT NULL DEFAULT '/avatars/anton.webp',
-    title TEXT NOT NULL DEFAULT 'Претендент',
+    title TEXT NOT NULL DEFAULT 'Азартный игрок',
     created_at INTEGER NOT NULL
   );
 
@@ -71,7 +73,9 @@ export function findOrCreateUserByEmail(email: string): UserRow {
   if (existing) return existing;
 
   const id = randomUUID();
-  const nickname = (email.split('@')[0] ?? 'Игрок').slice(0, 24);
+  const rawNickname = email.split('@')[0] ?? 'Player';
+  const sanitized = sanitizeNicknameInput(rawNickname).trim();
+  const nickname = (isValidNickname(sanitized) ? sanitized : 'Player').slice(0, 12);
   db.prepare(
     'INSERT INTO users (id, email, nickname, avatar, title, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(id, email, nickname, DEFAULT_PROFILE_AVATAR, DEFAULT_PROFILE_TITLE, Date.now());

@@ -6,7 +6,7 @@ import {
   consumeMagicLinkToken
 } from './magicLink.ts';
 import { sendMagicLinkEmail } from './email.ts';
-import { isProfileAvatar, isProfileTitle } from '@kinglier/engine/profile';
+import { isProfileAvatar, isProfileTitle, isValidNickname } from '@kinglier/engine/profile';
 import { findOrCreateUserByEmail, findUserById, updateProfile } from '../db.ts';
 import { getActiveSeat } from '../activeSeats.ts';
 
@@ -104,8 +104,7 @@ meRouter.patch('/api/me', JWT.middleware(), (req, res) => {
   const body = req.body as unknown as { nickname?: unknown; avatar?: unknown; title?: unknown };
   const nickname = typeof body.nickname === 'string' ? body.nickname.trim() : '';
   if (
-    !nickname ||
-    nickname.length > 24 ||
+    !isValidNickname(nickname) ||
     !isProfileAvatar(body.avatar) ||
     !isProfileTitle(body.title)
   ) {

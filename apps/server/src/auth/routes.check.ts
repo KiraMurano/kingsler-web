@@ -53,11 +53,11 @@ assert.equal(meResponse.status, 200);
 const me = await meResponse.json();
 assert.equal(me.user.email, 'ivan@example.com', 'the email must be lowercased before lookup/storage');
 assert.equal(me.user.avatar, '/avatars/anton.webp');
-assert.equal(me.user.title, 'Претендент');
+assert.equal(me.user.title, 'Азартный игрок');
 assert.equal(me.activeRoom, null);
 
 const profile = {
-  nickname: 'Ваня',
+  nickname: 'Vanya',
   avatar: '/avatars/dima.webp',
   title: 'Провокатор'
 };
@@ -70,7 +70,7 @@ assert.equal(patchResponse.status, 200);
 const meAfter = await (await fetch(`http://localhost:${PORT}/api/me`, {
   headers: { Authorization: `Bearer ${sessionToken}` }
 })).json();
-assert.equal(meAfter.user.nickname, 'Ваня');
+assert.equal(meAfter.user.nickname, 'Vanya');
 assert.equal(meAfter.user.avatar, profile.avatar);
 assert.equal(meAfter.user.title, profile.title);
 
@@ -80,6 +80,41 @@ const invalidProfile = await fetch(`http://localhost:${PORT}/api/me`, {
   body: JSON.stringify({ ...profile, title: 'Король сервера' })
 });
 assert.equal(invalidProfile.status, 400);
+
+const cyrillicProfile = await fetch(`http://localhost:${PORT}/api/me`, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...profile, nickname: 'Ваня' })
+});
+assert.equal(cyrillicProfile.status, 400, 'must reject non-latin characters');
+
+const multiSpaceProfile = await fetch(`http://localhost:${PORT}/api/me`, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...profile, nickname: 'John  Doe' })
+});
+assert.equal(multiSpaceProfile.status, 400, 'must reject multiple spaces');
+
+const tooLongProfile = await fetch(`http://localhost:${PORT}/api/me`, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...profile, nickname: 'VeryLongNick123' })
+});
+assert.equal(tooLongProfile.status, 400, 'must reject nicknames longer than 12 characters');
+
+const tooShortProfile = await fetch(`http://localhost:${PORT}/api/me`, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...profile, nickname: 'ab' })
+});
+assert.equal(tooShortProfile.status, 400, 'must reject nicknames shorter than 3 characters');
+
+const validSpacedProfile = await fetch(`http://localhost:${PORT}/api/me`, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...profile, nickname: 'John Doe' })
+});
+assert.equal(validSpacedProfile.status, 200, 'must accept valid latin name with single space');
 
 const unauthed = await fetch(`http://localhost:${PORT}/api/me`);
 assert.equal(unauthed.status, 401);

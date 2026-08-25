@@ -1,5 +1,6 @@
 import React from 'react';
 import type { GameCard, Player } from '@kinglier/engine/types';
+import { DEFAULT_PROFILE_TITLE } from '@kinglier/engine/profile';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { Bolts, Deltas, Res, Seals, type DeltaEvent } from './ui/Res';
 import { Portrait } from './Portrait';
@@ -54,7 +55,7 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
       <div className="crest__head">
         <Portrait src={player.avatar} name={player.name} className="crest__portrait" />
         <div>
-          <div className="crest__title">{player.title ?? 'Претендент'}</div>
+          <div className="crest__title">{player.title ?? DEFAULT_PROFILE_TITLE}</div>
           <div className="crest__namerow">
             <div className="crest__name">{player.name}</div>
             <span className="delta-anchor">

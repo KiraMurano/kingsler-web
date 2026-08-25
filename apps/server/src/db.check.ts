@@ -18,21 +18,21 @@ const created = findOrCreateUserByEmail('ivan@example.com');
 assert.equal(created.email, 'ivan@example.com');
 assert.equal(created.nickname, 'ivan', 'nickname must default to the email local-part');
 assert.equal(created.avatar, '/avatars/anton.webp');
-assert.equal(created.title, 'Претендент');
+assert.equal(created.title, 'Азартный игрок');
 assert.ok(created.id, 'a new user must get a generated id');
 
 const again = findOrCreateUserByEmail('ivan@example.com');
 assert.equal(again.id, created.id, 'the same email must resolve to the same user, not a duplicate');
 
 updateProfile(created.id, {
-  nickname: 'Ваня',
+  nickname: 'Vanya',
   avatar: '/avatars/dima.webp',
   title: 'Провокатор'
 });
 const updated = findUserById(created.id)!;
 assert.deepEqual(
   { nickname: updated.nickname, avatar: updated.avatar, title: updated.title },
-  { nickname: 'Ваня', avatar: '/avatars/dima.webp', title: 'Провокатор' }
+  { nickname: 'Vanya', avatar: '/avatars/dima.webp', title: 'Провокатор' }
 );
 
 assert.equal(findUserByEmail('nobody@example.com'), undefined);

@@ -169,36 +169,58 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
           setLoginOpen(false);
           setError('');
         }}
-        width={430}
-        title="Вход в Kinglier"
-        description="Без пароля — по ссылке или коду из письма"
+        width={440}
+        title={
+          status === 'sent' || status === 'verifying' ? (
+            <div className="modal-hero-title">
+              <div className="modal-hero-title__badge">
+                <KeyRound size={20} />
+              </div>
+              <div className="modal-hero-title__meta">
+                <span className="modal-hero-title__eyebrow">Подтверждение</span>
+                <span className="modal-hero-title__text gilded">Введите код</span>
+              </div>
+            </div>
+          ) : (
+            <div className="modal-hero-title">
+              <div className="modal-hero-title__badge">
+                <Crown size={20} />
+              </div>
+              <div className="modal-hero-title__meta">
+                <span className="modal-hero-title__eyebrow">Кингслер</span>
+                <span className="modal-hero-title__text gilded">Вход в игру</span>
+              </div>
+            </div>
+          )
+        }
       >
         {status === 'sent' || status === 'verifying' ? (
-          <div className="login-form">
+          <form className="login-form" onSubmit={e => { e.preventDefault(); void verifyCode(); }}>
             <p className="login-form__copy">
-              Письмо отправлено на <strong>{email}</strong>. Откройте ссылку или введите код здесь.
+              Код отправлен на <strong>{email}</strong>
             </p>
-            <input
-              className="field login-code"
-              value={code}
-              onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-              onKeyDown={event => event.key === 'Enter' && void verifyCode()}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="000000"
-              aria-label="Шестизначный код"
-              autoFocus
-            />
+            <div className="login-code-wrapper">
+              <input
+                className="field login-code"
+                value={code}
+                onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                aria-label="Шестизначный код"
+                autoFocus
+              />
+            </div>
             {error && <p className="login-form__error">{error}</p>}
             <Button
               tone="gold"
               size="lg"
               block
+              type="submit"
               disabled={code.length !== 6 || status === 'verifying'}
-              onClick={verifyCode}
             >
-              <KeyRound size={18} /> {status === 'verifying' ? 'Проверяем…' : 'Войти по коду'}
+              <KeyRound size={18} /> {status === 'verifying' ? 'Проверяем…' : 'Войти'}
             </Button>
             <Button
               tone="bare"
@@ -211,31 +233,32 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
             >
               Изменить почту
             </Button>
-          </div>
+          </form>
         ) : (
-          <div className="login-form">
-            <label htmlFor="login-email">Электронная почта</label>
-            <input
-              id="login-email"
-              className="field"
-              type="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={event => setEmail(event.target.value)}
-              onKeyDown={event => event.key === 'Enter' && void requestLogin()}
-              autoComplete="email"
-              autoFocus
-            />
+          <form className="login-form" onSubmit={e => { e.preventDefault(); void requestLogin(); }}>
+            <div className="login-form__group">
+              <label htmlFor="login-email">Электронная почта</label>
+              <input
+                id="login-email"
+                className="field"
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={event => setEmail(event.target.value)}
+                autoComplete="email"
+                autoFocus
+              />
+            </div>
             <Button
               tone="gold"
               size="lg"
               block
+              type="submit"
               disabled={!email.includes('@') || status === 'sending'}
-              onClick={requestLogin}
             >
-              <Mail size={18} /> {status === 'sending' ? 'Отправляем…' : 'Получить код и ссылку'}
+              <Mail size={18} /> {status === 'sending' ? 'Отправляем…' : 'Получить код'}
             </Button>
-          </div>
+          </form>
         )}
       </Dialog>
     </div>

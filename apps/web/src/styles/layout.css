@@ -360,11 +360,6 @@
   gap: 1px;
 }
 
-.seat--left .seat__head,
-.seat--right .seat__head {
-  flex-direction: column-reverse;
-}
-
 .seat__main {
   display: flex;
   align-items: center;
@@ -441,9 +436,10 @@
 }
 
 .seat__head > .seat__role {
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--gold-bright);
 }
 
 .seat__res {
@@ -1161,11 +1157,10 @@
 .crest__title {
   max-width: 145px;
   overflow: hidden;
-  font-size: 0.61rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--gold-bright);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
