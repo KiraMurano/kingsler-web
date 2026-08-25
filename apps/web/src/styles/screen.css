@@ -15,6 +15,32 @@
     url('/assets/dark_rock.webp') center / cover no-repeat;
 }
 
+.card-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.card-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 58% 68% at 50% 43%, rgba(4, 5, 9, 0.62), transparent 100%);
+}
+
+.card-backdrop__card {
+  position: absolute;
+  width: clamp(70px, 9vw, 138px);
+  aspect-ratio: 63 / 88;
+  object-fit: cover;
+  border-radius: clamp(5px, 0.6vw, 9px);
+  opacity: 0.42;
+  filter: saturate(0.72) brightness(0.68) drop-shadow(12px 16px 18px rgba(0, 0, 0, 0.72));
+  user-select: none;
+}
+
 .screen__back {
   position: absolute;
   top: 20px;
@@ -24,6 +50,7 @@
 
 .screen__panel {
   position: relative;
+  z-index: 1;
   width: 100%;
   min-width: 0;
   max-width: 420px;
@@ -47,6 +74,180 @@
 .brand--hero .brand__sub {
   margin-top: 8px;
   font-size: 0.72rem;
+}
+
+/* ==========================================================================
+   PUBLIC LANDING
+   ========================================================================== */
+.landing {
+  padding: 42px clamp(20px, 5vw, 72px);
+}
+
+.landing__content {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1040px);
+  min-height: min(720px, calc(100vh - 84px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(28px, 5vh, 52px);
+  text-align: center;
+  animation: rise-in 0.42s var(--ease-out);
+}
+
+.landing__hero {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.landing__hero h1 {
+  max-width: 680px;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5.4vw, 4.5rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: 0.025em;
+  color: var(--gold-pale);
+  text-wrap: balance;
+  text-shadow: 0 10px 35px rgba(0, 0, 0, 0.8);
+}
+
+.landing__hero p {
+  max-width: 650px;
+  font-size: clamp(0.92rem, 1.5vw, 1.08rem);
+  line-height: 1.65;
+  color: var(--text-soft);
+  text-wrap: balance;
+}
+
+.landing__hero .btn {
+  min-width: 220px;
+}
+
+.landing__features {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.landing__features article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-cold);
+  border-radius: var(--radius);
+  background: rgba(8, 11, 18, 0.72);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.landing__features svg {
+  grid-row: span 2;
+  margin-top: 2px;
+  color: var(--gold);
+}
+
+.landing__features strong {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  color: var(--gold-pale);
+}
+
+.landing__features span {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.login-form label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.login-form .field {
+  padding: 12px 14px;
+}
+
+.login-form__copy {
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.login-form__copy strong {
+  color: var(--text-soft);
+}
+
+.login-code {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  text-align: center;
+  text-indent: 0.32em;
+  font-variant-numeric: tabular-nums;
+}
+
+.login-form__error {
+  font-size: 0.78rem;
+  color: var(--crimson-soft);
+  text-align: center;
+}
+
+.login-form > .btn--bare {
+  align-self: center;
+}
+
+@media (max-width: 720px) {
+  .card-backdrop__card {
+    width: clamp(64px, 22vw, 92px);
+    opacity: 0.3;
+  }
+
+  .card-backdrop__card:nth-child(3),
+  .card-backdrop__card:nth-child(5),
+  .card-backdrop__card:nth-child(8) {
+    display: none;
+  }
+
+  .landing {
+    padding: 28px 16px;
+  }
+
+  .landing__content {
+    min-height: calc(100vh - 56px);
+    gap: 26px;
+  }
+
+  .landing__features {
+    grid-template-columns: 1fr;
+  }
+
+  .landing__features article {
+    padding: 13px 15px;
+  }
+
+  .brand--hero .brand__rule {
+    width: 30px;
+  }
 }
 
 /* ==========================================================================
