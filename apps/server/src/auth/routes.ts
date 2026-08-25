@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { JWT } from 'colyseus';
 import { issueMagicLinkToken, consumeMagicLinkToken } from './magicLink.ts';
 import { sendMagicLinkEmail } from './email.ts';
-import { findOrCreateUserByEmail, findUserById, updateNickname } from '../db.ts';
+import { isProfileAvatar, isProfileTitle } from '@kinglier/engine/profile';
+import { findOrCreateUserByEmail, findUserById, updateProfile } from '../db.ts';
 import { getActiveSeat } from '../activeSeats.ts';
 
 const PUBLIC_URL = process.env.PUBLIC_URL ?? 'http://localhost:2567';
@@ -72,19 +73,30 @@ meRouter.get('/api/me', JWT.middleware(), (req, res) => {
     return;
   }
   res.json({
-    user: { id: user.id, email: user.email, nickname: user.nickname },
+    user: {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      avatar: user.avatar,
+      title: user.title
+    },
     activeRoom: getActiveSeat(userId) ?? null
   });
 });
 
 meRouter.patch('/api/me', JWT.middleware(), (req, res) => {
   const userId = (req as unknown as AuthedRequest).auth.userId;
-  const body = req.body as unknown as { nickname?: unknown };
+  const body = req.body as unknown as { nickname?: unknown; avatar?: unknown; title?: unknown };
   const nickname = typeof body.nickname === 'string' ? body.nickname.trim() : '';
-  if (!nickname) {
-    res.status(400).json({ error: 'invalid nickname' });
+  if (
+    !nickname ||
+    nickname.length > 24 ||
+    !isProfileAvatar(body.avatar) ||
+    !isProfileTitle(body.title)
+  ) {
+    res.status(400).json({ error: 'invalid profile' });
     return;
   }
-  updateNickname(userId, nickname);
+  updateProfile(userId, { nickname, avatar: body.avatar, title: body.title });
   res.json({ ok: true });
 });

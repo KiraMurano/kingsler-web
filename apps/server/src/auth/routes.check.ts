@@ -50,18 +50,34 @@ const meResponse = await fetch(`http://localhost:${PORT}/api/me`, {
 assert.equal(meResponse.status, 200);
 const me = await meResponse.json();
 assert.equal(me.user.email, 'ivan@example.com', 'the email must be lowercased before lookup/storage');
+assert.equal(me.user.avatar, '/avatars/anton.webp');
+assert.equal(me.user.title, 'Претендент');
 assert.equal(me.activeRoom, null);
 
+const profile = {
+  nickname: 'Ваня',
+  avatar: '/avatars/dima.webp',
+  title: 'Провокатор'
+};
 const patchResponse = await fetch(`http://localhost:${PORT}/api/me`, {
   method: 'PATCH',
   headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ nickname: 'Ваня' })
+  body: JSON.stringify(profile)
 });
 assert.equal(patchResponse.status, 200);
 const meAfter = await (await fetch(`http://localhost:${PORT}/api/me`, {
   headers: { Authorization: `Bearer ${sessionToken}` }
 })).json();
 assert.equal(meAfter.user.nickname, 'Ваня');
+assert.equal(meAfter.user.avatar, profile.avatar);
+assert.equal(meAfter.user.title, profile.title);
+
+const invalidProfile = await fetch(`http://localhost:${PORT}/api/me`, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ...profile, title: 'Король сервера' })
+});
+assert.equal(invalidProfile.status, 400);
 
 const unauthed = await fetch(`http://localhost:${PORT}/api/me`);
 assert.equal(unauthed.status, 401);

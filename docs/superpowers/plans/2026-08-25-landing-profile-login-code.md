@@ -19,7 +19,7 @@
 - Five incorrect code attempts invalidate the credential record.
 - Login request cooldown is one request per email per 60 seconds and is enforced from server-owned database timestamps only.
 - JWT payloads continue to contain only `userId`.
-- Existing databases must migrate in place without deleting users or outstanding magic links.
+- Old local databases may be recreated; no compatibility migration is required because no user data exists.
 - Achievement entitlements, custom avatar uploads, arbitrary titles, and a client router remain out of scope.
 
 ---
@@ -27,7 +27,7 @@
 ## File Map
 
 - `packages/engine/src/profile.ts`: fixed profile catalogs, defaults, and membership guards shared by server and web.
-- `apps/server/src/db.ts`: additive SQLite migration and profile persistence.
+- `apps/server/src/db.ts`: current SQLite schema and profile persistence.
 - `apps/server/src/auth/magicLink.ts`: paired link/code issuance, server cooldown, attempt limit, and shared consumption state.
 - `apps/server/src/auth/email.ts`: one email containing the link and six-digit code.
 - `apps/server/src/auth/routes.ts`: code verification, session creation, and profile API validation.
@@ -57,35 +57,23 @@
 - Produces: `UserRow.avatar`, `UserRow.title`, and `updateProfile(id, { nickname, avatar, title })`.
 - Produces: `GET /api/me` and `PATCH /api/me` account payload `{ id, email, nickname, avatar, title }`.
 
-- [ ] **Step 1: Add failing catalog and migration assertions**
+- [ ] **Step 1: Add failing profile default and persistence assertions**
 
-Create a legacy `users` table before importing `db.ts`, then assert that import-time migration preserves the row and supplies defaults:
+Create a user in the fresh throwaway database, then assert defaults and a full profile update:
 
 ```ts
-const legacy = new DatabaseSync(process.env.DB_PATH!);
-legacy.exec(`
-  CREATE TABLE users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    nickname TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-  );
-  INSERT INTO users VALUES ('legacy', 'legacy@example.com', 'Старый игрок', 1);
-`);
-legacy.close();
+const { findOrCreateUserByEmail, findUserById, updateProfile } = await import('./db.ts');
+const created = findOrCreateUserByEmail('anna@example.com');
+assert.equal(created.avatar, '/avatars/anton.webp');
+assert.equal(created.title, 'Претендент');
 
-const { findUserById, updateProfile } = await import('./db.ts');
-const migrated = findUserById('legacy')!;
-assert.equal(migrated.avatar, '/avatars/anton.webp');
-assert.equal(migrated.title, 'Претендент');
-
-updateProfile('legacy', {
+updateProfile(created.id, {
   nickname: 'Анна',
   avatar: '/avatars/yulia.webp',
   title: 'Прагматик'
 });
 assert.deepEqual(
-  (({ nickname, avatar, title }) => ({ nickname, avatar, title }))(findUserById('legacy')!),
+  (({ nickname, avatar, title }) => ({ nickname, avatar, title }))(findUserById(created.id)!),
   { nickname: 'Анна', avatar: '/avatars/yulia.webp', title: 'Прагматик' }
 );
 ```
@@ -94,7 +82,7 @@ assert.deepEqual(
 
 Run: `npx tsx apps/server/src/db.check.ts`
 
-Expected: FAIL because the legacy row has no `avatar`/`title` fields and `updateProfile` is not exported.
+Expected: FAIL because new users have no `avatar`/`title` fields and `updateProfile` is not exported.
 
 - [ ] **Step 3: Add the shared fixed catalog**
 
@@ -133,20 +121,13 @@ export const isProfileTitle = (value: unknown): value is ProfileTitle =>
   typeof value === 'string' && PROFILE_TITLES.includes(value as ProfileTitle);
 ```
 
-- [ ] **Step 4: Add the additive user migration and persistence function**
+- [ ] **Step 4: Add profile columns and the persistence function**
 
-After the existing `db.exec`, inspect `PRAGMA table_info(users)` and run each missing `ALTER TABLE` exactly once:
+Add both columns directly to the fresh `users` table definition:
 
 ```ts
-const userColumns = new Set(
-  (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(column => column.name)
-);
-if (!userColumns.has('avatar')) {
-  db.exec("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '/avatars/anton.webp'");
-}
-if (!userColumns.has('title')) {
-  db.exec("ALTER TABLE users ADD COLUMN title TEXT NOT NULL DEFAULT 'Претендент'");
-}
+avatar TEXT NOT NULL DEFAULT '/avatars/anton.webp',
+title TEXT NOT NULL DEFAULT 'Претендент',
 ```
 
 Extend `UserRow`, include the two defaults when inserting a user, replace `updateNickname` with:
@@ -294,17 +275,15 @@ Run: `npx tsx apps/server/src/auth/magicLink.check.ts`
 
 Expected: FAIL because paired credentials and code consumption do not exist.
 
-- [ ] **Step 3: Add additive magic-link columns**
+- [ ] **Step 3: Add code fields to the current magic-link schema**
 
-Use the same `PRAGMA table_info` pattern as Task 1 to add nullable code fields for legacy rows and a non-null attempt counter:
+Add required code fields directly to the fresh `magic_link_tokens` table:
 
 ```sql
-ALTER TABLE magic_link_tokens ADD COLUMN code_hash TEXT;
-ALTER TABLE magic_link_tokens ADD COLUMN code_salt TEXT;
-ALTER TABLE magic_link_tokens ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;
+code_hash TEXT NOT NULL,
+code_salt TEXT NOT NULL,
+failed_attempts INTEGER NOT NULL DEFAULT 0,
 ```
-
-Also include those columns in the fresh `CREATE TABLE IF NOT EXISTS` statement.
 
 - [ ] **Step 4: Implement paired issuance with the existing database cooldown**
 
@@ -332,7 +311,7 @@ export function issueMagicLinkCredentials(email: string): MagicLinkCredentials |
 }
 ```
 
-`hashCode` is SHA-256 over `${salt}:${code}`. `consumeMagicLinkCode` selects the newest unused row for the supplied email, rejects expired/missing legacy code data, compares equal-length hex hashes with `timingSafeEqual`, increments `failed_attempts` on mismatch, and sets `used_at` on the fifth mismatch or on success. Keep `consumeMagicLinkToken` checking the shared `used_at` field.
+`hashCode` is SHA-256 over `${salt}:${code}`. `consumeMagicLinkCode` selects the newest unused row for the supplied email, rejects expired records, compares equal-length hex hashes with `timingSafeEqual`, increments `failed_attempts` on mismatch, and sets `used_at` on the fifth mismatch or on success. Keep `consumeMagicLinkToken` checking the shared `used_at` field.
 
 - [ ] **Step 5: Run the credential check and confirm success**
 

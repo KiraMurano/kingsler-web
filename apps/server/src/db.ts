@@ -3,6 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  DEFAULT_PROFILE_AVATAR,
+  DEFAULT_PROFILE_TITLE,
+  type ProfileAvatar,
+  type ProfileTitle
+} from '@kinglier/engine/profile';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // apps/server/src -> apps/server -> apps -> <repo root>/data/kinglier.db.
@@ -20,6 +26,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     nickname TEXT NOT NULL,
+    avatar TEXT NOT NULL DEFAULT '/avatars/anton.webp',
+    title TEXT NOT NULL DEFAULT 'Претендент',
     created_at INTEGER NOT NULL
   );
 
@@ -36,7 +44,15 @@ export interface UserRow {
   id: string;
   email: string;
   nickname: string;
+  avatar: ProfileAvatar;
+  title: ProfileTitle;
   created_at: number;
+}
+
+export interface ProfileUpdate {
+  nickname: string;
+  avatar: ProfileAvatar;
+  title: ProfileTitle;
 }
 
 export function findUserByEmail(email: string): UserRow | undefined {
@@ -53,11 +69,13 @@ export function findOrCreateUserByEmail(email: string): UserRow {
 
   const id = randomUUID();
   const nickname = (email.split('@')[0] ?? 'Игрок').slice(0, 24);
-  db.prepare('INSERT INTO users (id, email, nickname, created_at) VALUES (?, ?, ?, ?)')
-    .run(id, email, nickname, Date.now());
+  db.prepare(
+    'INSERT INTO users (id, email, nickname, avatar, title, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, email, nickname, DEFAULT_PROFILE_AVATAR, DEFAULT_PROFILE_TITLE, Date.now());
   return findUserById(id)!;
 }
 
-export function updateNickname(id: string, nickname: string): void {
-  db.prepare('UPDATE users SET nickname = ? WHERE id = ?').run(nickname.slice(0, 24), id);
+export function updateProfile(id: string, profile: ProfileUpdate): void {
+  db.prepare('UPDATE users SET nickname = ?, avatar = ?, title = ? WHERE id = ?')
+    .run(profile.nickname, profile.avatar, profile.title, id);
 }

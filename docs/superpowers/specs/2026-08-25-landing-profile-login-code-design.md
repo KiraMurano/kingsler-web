@@ -80,9 +80,10 @@ cannot diverge.
 
 ## Profile Data and Validation
 
-The `users` table gains non-null `avatar` and `title` columns with defaults for
-existing rows. `/api/me` returns both fields, and `PATCH /api/me` accepts a
-trimmed nickname plus avatar and title.
+The new `users` schema contains non-null `avatar` and `title` columns with
+defaults. There is no compatibility migration because no user data exists;
+an old local development database must be recreated. `/api/me` returns both
+fields, and `PATCH /api/me` accepts a trimmed nickname plus avatar and title.
 
 Server validation remains authoritative:
 
@@ -161,8 +162,7 @@ Extend the existing runnable `*.check.ts` checks:
 - `email.check.ts`: email contains the same six-digit code and verify URL.
 - `routes.check.ts`: code login returns a usable session; cooldown sends no
   second email; profile fields round-trip and invalid choices are rejected.
-- `db.check.ts`: existing databases receive defaults and profile updates
-  persist.
+- `db.check.ts`: fresh users receive defaults and profile updates persist.
 - room/worker checks: avatar and title reach lobby snapshots and game players.
 - web lint and production build.
 
