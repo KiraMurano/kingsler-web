@@ -6,7 +6,9 @@
  * Run: npx tsx apps/web/src/online/bindOnlineStore.check.ts
  */
 import assert from 'node:assert/strict';
-import { toStorePatch } from './bindOnlineStore.ts';
+import { toStorePatch, bindOnlineStore } from './bindOnlineStore.ts';
+import { useGameStore } from '@kinglier/engine/GameStore';
+import type { Room } from '@colyseus/sdk';
 import type { PublicGameState } from '@kinglier/engine/net/redaction';
 
 const state = {
@@ -31,5 +33,11 @@ assert.ok(opponent.hand.every(card => card), 'hidden cards must be truthy placeh
 
 const oneCardOpponent = patch.players!.find(p => p.id === 'p3')!;
 assert.equal(oneCardOpponent.hand.length, 1, 'an opponent down to one card must still show exactly one');
+
+const originalPerform = useGameStore.getState().performAction;
+const unbind = bindOnlineStore({ onMessage() {} } as unknown as Room);
+assert.notEqual(useGameStore.getState().performAction, originalPerform, 'bind must swap in the network sender');
+unbind();
+assert.equal(useGameStore.getState().performAction, originalPerform, 'unbind must restore the local store methods');
 
 console.log('bindOnlineStore.check.ts passed.');

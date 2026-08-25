@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Scale, RotateCcw, ScrollText } from 'lucide-react';
+import { BookOpen, Scale, LogOut, ScrollText } from 'lucide-react';
 
 interface TopBarProps {
   statusText: string;
@@ -8,7 +8,7 @@ interface TopBarProps {
   onOpenCodex: () => void;
   onOpenChronicle: () => void;
   onOpenRules: () => void;
-  onRestart: () => void;
+  onExit: () => void;
   codexOpen: boolean;
   chronicleOpen: boolean;
 }
@@ -20,7 +20,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenCodex,
   onOpenChronicle,
   onOpenRules,
-  onRestart,
+  onExit,
   codexOpen,
   chronicleOpen
 }) => (
@@ -78,9 +78,9 @@ export const TopBar: React.FC<TopBarProps> = ({
         <Scale size={15} />
         Правила
       </button>
-      <button type="button" className="iconbtn" onClick={onRestart} title="Начать новую партию">
-        <RotateCcw size={15} />
-        Заново
+      <button type="button" className="iconbtn" onClick={onExit} title="Выйти в меню">
+        <LogOut size={15} />
+        Выйти
       </button>
     </div>
   </header>

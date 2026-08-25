@@ -9,7 +9,7 @@ export interface BotCandidate {
 export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   {
     name: 'Барон Дима',
-    avatar: '/avatars/sasha.jpg',
+    avatar: '/avatars/sasha.webp',
     archetype: {
       type: 'gambler',
       title: 'Азартный игрок',
@@ -23,7 +23,7 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Графиня Елена',
-    avatar: '/avatars/bot2.jpg',
+    avatar: '/avatars/bot2.webp',
     archetype: {
       type: 'cautious',
       title: 'Осторожный стратег',
@@ -37,7 +37,7 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Герцог Виктор',
-    avatar: '/avatars/bot1.jpg',
+    avatar: '/avatars/bot1.webp',
     archetype: {
       type: 'pragmatic',
       title: 'Прагматик',
@@ -51,7 +51,7 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Маркиз Вадим',
-    avatar: '/avatars/bot3.jpg',
+    avatar: '/avatars/bot3.webp',
     archetype: {
       type: 'provocateur',
       title: 'Провокатор',
@@ -65,7 +65,7 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   },
   {
     name: 'Княгиня Анна',
-    avatar: '/avatars/masha.jpg',
+    avatar: '/avatars/masha.webp',
     archetype: {
       type: 'opportunist',
       title: 'Оппортунист',

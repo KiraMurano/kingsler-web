@@ -12,7 +12,14 @@
   padding: 32px 20px;
   background:
     radial-gradient(ellipse 90% 75% at 50% 38%, rgba(6, 8, 13, 0.4) 0%, rgba(4, 5, 9, 0.82) 100%),
-    url('/bg/palace.jpg') center / cover no-repeat;
+    url('/assets/dark_rock.webp') center / cover no-repeat;
+}
+
+.screen__back {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 2;
 }
 
 .screen__panel {
@@ -43,16 +50,6 @@
 }
 
 /* ==========================================================================
-   MENU actions
-   ========================================================================== */
-.menu__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-}
-
-/* ==========================================================================
    LOBBY card
    ========================================================================== */
 .lobbycard {
@@ -66,6 +63,18 @@
 
 .lobbycard .field {
   text-align: center;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 0.96rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+}
+
+.lobbycard .field::placeholder {
+  font-family: inherit;
+  font-weight: 600;
 }
 
 .lobby__divider {
@@ -89,6 +98,7 @@
 
 .lobby__joinrow {
   display: flex;
+  align-items: stretch;
   min-width: 0;
   gap: 8px;
 }
@@ -96,6 +106,10 @@
 .lobby__joinrow .field {
   flex: 1;
   min-width: 0;
+}
+
+.lobby__joinrow .btn {
+  flex: 0 0 auto;
 }
 
 .lobby__hint {

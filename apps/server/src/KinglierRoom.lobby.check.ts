@@ -35,6 +35,13 @@ assert.ok(guestState, 'guest must receive a state message once the game starts')
 assert.equal(hostState!.players.length, 4);
 assert.equal(hostState!.players.filter(p => !p.isBot).length, 2, 'exactly the 2 joined humans, rest are bots');
 
-host.leave();
 guest.leave();
+await new Promise(resolve => setTimeout(resolve, 300));
+assert.equal(
+  hostState!.players.find(p => p.id === 'p2')!.isBot,
+  true,
+  'consented leave mid-game must hand the seat to a bot immediately'
+);
+
+host.leave();
 process.exit(0);

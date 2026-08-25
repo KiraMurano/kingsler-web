@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePresence } from './lib/presence';
 import { pickViewer } from './lib/viewer';
 import { useGameStore } from '@kinglier/engine/GameStore';
-import { startBotEngine } from '@kinglier/engine/Bot';
+import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
+import { timerManager } from '@kinglier/engine/utils/timerManager';
 import { TopBar } from './components/TopBar';
 import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
@@ -24,7 +25,7 @@ interface Status {
   hint?: string;
 }
 
-export default function App({ mode }: { mode: 'offline' | 'online' }) {
+export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onExit: () => void }) {
   const {
     players,
     activePlayerId,
@@ -34,7 +35,6 @@ export default function App({ mode }: { mode: 'offline' | 'online' }) {
     coronationOriginId,
     viewerId,
     startGame,
-    restartGame,
     performAction,
     playPlotAction,
     playInstant,
@@ -62,12 +62,15 @@ export default function App({ mode }: { mode: 'offline' | 'online' }) {
   const toastPresence = usePresence(toast);
 
   useEffect(() => {
-    if (mode === 'offline') {
-      startBotEngine();
-      startGame();
-    }
     (window as unknown as { __startTargeting: (a: PendingTargetAction) => void }).__startTargeting =
       setPendingTarget;
+    if (mode !== 'offline') return;
+    startBotEngine();
+    startGame();
+    return () => {
+      stopBotEngine();
+      timerManager.clearAll();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -255,7 +258,7 @@ export default function App({ mode }: { mode: 'offline' | 'online' }) {
         onOpenCodex={() => setCodexOpen(true)}
         onOpenChronicle={() => setChronicleOpen(open => !open)}
         onOpenRules={() => setRulesOpen(true)}
-        onRestart={restartGame}
+        onExit={onExit}
       />
 
       <main className="app__stage">

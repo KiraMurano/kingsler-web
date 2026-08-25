@@ -104,7 +104,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const humanSeats = seats && seats.length > 0
       ? seats.slice(0, 4)
-      : [{ id: 'p1', name: 'Вы', avatar: '/avatars/anton.jpg' }];
+      : [{ id: 'p1', name: 'Вы', avatar: '/avatars/anton.webp' }];
 
     const botsNeeded = 4 - humanSeats.length;
     const selectedBots = shuffleArray([...ALL_BOT_CANDIDATES]).slice(0, botsNeeded);
@@ -113,7 +113,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...humanSeats.map((seat, idx) => ({
         id: seat.id,
         name: seat.name,
-        avatar: seat.avatar ?? '/avatars/anton.jpg',
+        avatar: seat.avatar ?? '/avatars/anton.webp',
         seatNumber: idx + 1,
         isBot: false,
         gold: 2,

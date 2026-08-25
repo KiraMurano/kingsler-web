@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Globe, Swords } from 'lucide-react';
 import App from './App';
 import { Lobby } from './online/Lobby';
+import { onlineClient } from './online/OnlineGameClient';
 import { Button } from './components/ui/Button';
 import './styles/screen.css';
 
@@ -11,6 +12,12 @@ export default function Root() {
   const [mode, setMode] = useState<Mode>(
     () => (new URLSearchParams(location.search).has('room') ? 'online-lobby' : 'menu')
   );
+
+  const exitToMenu = () => {
+    onlineClient.leave();
+    if (location.search) history.replaceState(null, '', location.pathname);
+    setMode('menu');
+  };
 
   if (mode === 'menu') {
     return (
@@ -25,7 +32,7 @@ export default function Root() {
             <div className="brand__sub">Битва за престол</div>
           </div>
 
-          <div className="menu__actions">
+          <div className="dialog__panel lobbycard">
             <Button
               tone="gold"
               size="lg"
@@ -51,12 +58,12 @@ export default function Root() {
   }
 
   if (mode === 'offline') {
-    return <App mode="offline" />;
+    return <App mode="offline" onExit={exitToMenu} />;
   }
 
   if (mode === 'online-lobby') {
-    return <Lobby onGameStarted={() => setMode('online-game')} />;
+    return <Lobby onGameStarted={() => setMode('online-game')} onExit={exitToMenu} />;
   }
 
-  return <App mode="online" />;
+  return <App mode="online" onExit={exitToMenu} />;
 }

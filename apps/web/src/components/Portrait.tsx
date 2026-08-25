@@ -1,6 +1,6 @@
 import React from 'react';
 
-const FALLBACK = '/avatars/bot1.jpg';
+const FALLBACK = '/avatars/bot1.webp';
 
 interface PortraitProps {
   src: string;

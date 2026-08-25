@@ -1,17 +1,25 @@
-import { useRef, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Room } from '@colyseus/sdk';
-import { Check, Copy, Crown, LogIn, CirclePlus, Users } from 'lucide-react';
+import { Check, Copy, Crown, LogIn, CirclePlus, Users, ArrowLeft, LogOut } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
-import { OnlineGameClient, type LobbyMessage } from './OnlineGameClient';
-import { bindOnlineStore } from './bindOnlineStore';
+import { onlineClient, type LobbyMessage } from './OnlineGameClient';
 import '../styles/screen.css';
 
 interface LobbyProps {
   onGameStarted: () => void;
+  onExit: () => void;
 }
 
 const MAX_SEATS = 4;
+
+function ScreenBack({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className="iconbtn screen__back" onClick={onClick}>
+      {children}
+    </button>
+  );
+}
 
 function Brand({ subtitle }: { subtitle: string }) {
   return (
@@ -26,8 +34,7 @@ function Brand({ subtitle }: { subtitle: string }) {
   );
 }
 
-export function Lobby({ onGameStarted }: LobbyProps) {
-  const clientRef = useRef<OnlineGameClient>(new OnlineGameClient());
+export function Lobby({ onGameStarted, onExit }: LobbyProps) {
   const [nickname, setNickname] = useState('');
   const [joinCode, setJoinCode] = useState(() => new URLSearchParams(location.search).get('room') ?? '');
   const [lobby, setLobby] = useState<LobbyMessage | null>(null);
@@ -39,7 +46,7 @@ export function Lobby({ onGameStarted }: LobbyProps) {
     newRoom.onMessage('lobby', (data: LobbyMessage) => {
       setLobby(data);
       if (data.phase === 'PLAYING') {
-        bindOnlineStore(newRoom);
+        onlineClient.bindStore();
         onGameStarted();
       }
     });
@@ -50,7 +57,7 @@ export function Lobby({ onGameStarted }: LobbyProps) {
   const handleCreate = async () => {
     setError(null);
     try {
-      const created = await clientRef.current.createRoom(nickname || 'Игрок');
+      const created = await onlineClient.createRoom(nickname || 'Игрок');
       history.replaceState(null, '', `?room=${created.roomId}`);
       attachRoom(created);
     } catch {
@@ -62,7 +69,7 @@ export function Lobby({ onGameStarted }: LobbyProps) {
     setError(null);
     if (!joinCode.trim()) return;
     try {
-      const joined = await clientRef.current.joinRoom(joinCode.trim(), nickname || 'Игрок');
+      const joined = await onlineClient.joinRoom(joinCode.trim(), nickname || 'Игрок');
       attachRoom(joined);
     } catch {
       setError('Комната не найдена или игра уже началась.');
@@ -80,6 +87,9 @@ export function Lobby({ onGameStarted }: LobbyProps) {
   if (!room || !lobby) {
     return (
       <div className="screen">
+        <ScreenBack onClick={onExit}>
+          <ArrowLeft size={15} /> Назад
+        </ScreenBack>
         <div className="screen__panel">
           <Brand subtitle="Игра онлайн" />
 
@@ -107,8 +117,8 @@ export function Lobby({ onGameStarted }: LobbyProps) {
                 value={joinCode}
                 onChange={e => setJoinCode(e.target.value)}
               />
-              <Button tone="calm" onClick={handleJoin}>
-                <LogIn size={16} /> Войти
+              <Button tone="gold" size="lg" onClick={handleJoin}>
+                <LogIn size={18} /> Войти
               </Button>
             </div>
 
@@ -125,6 +135,9 @@ export function Lobby({ onGameStarted }: LobbyProps) {
 
   return (
     <div className="screen">
+      <ScreenBack onClick={onExit}>
+        <LogOut size={15} /> Выйти
+      </ScreenBack>
       <div className="screen__panel">
         <Brand subtitle="Комната ожидания" />
 
@@ -170,7 +183,7 @@ export function Lobby({ onGameStarted }: LobbyProps) {
           </ul>
 
           {isHost ? (
-            <Button tone="gold" size="lg" block onClick={() => clientRef.current.startGame()}>
+            <Button tone="gold" size="lg" block onClick={() => onlineClient.startGame()}>
               Начать игру
             </Button>
           ) : (

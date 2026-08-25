@@ -8,7 +8,7 @@
   overflow: hidden;
   background:
     radial-gradient(ellipse 80% 70% at 50% 42%, rgba(8, 10, 14, 0.28) 0%, rgba(5, 7, 12, 0.5) 100%),
-    url('/assets/dark_rock.jpg') center / cover no-repeat;
+    url('/assets/dark_rock.webp') center / cover no-repeat;
 }
 
 .app {
@@ -210,7 +210,7 @@
       rgba(5, 46, 22, 0.5) 55%,
       rgba(2, 24, 12, 0.68) 100%
     ),
-    url('/assets/green_fabric.jpg') center / cover no-repeat;
+    url('/assets/green_fabric.webp') center / cover no-repeat;
   border: 5px solid #8a5a18;
   box-shadow:
     inset 0 0 70px rgba(0, 0, 0, 0.65),

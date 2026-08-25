@@ -98,7 +98,18 @@ export class KinglierRoom extends Room {
   }
 
   onLeave(client: Client): void {
-    this.seats = this.seats.filter(s => s.sessionId !== client.sessionId);
+    const seat = this.seats.find(s => s.sessionId === client.sessionId);
+    if (!seat) return;
+
+    if (this.phase === 'PLAYING') {
+      seat.connected = false;
+      this.worker?.setSeatBotControlled(seat.playerId);
+    } else {
+      this.seats = this.seats.filter(s => s !== seat);
+      if (this.hostSessionId === client.sessionId) {
+        this.hostSessionId = this.seats[0]?.sessionId ?? null;
+      }
+    }
     this.broadcastLobby();
   }
 

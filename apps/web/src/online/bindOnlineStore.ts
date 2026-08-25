@@ -12,8 +12,6 @@ const NETWORKED_METHODS = [
   'closeConspiracyDialog', 'activateConspiracy', 'endTurn'
 ] as const;
 
-function noop(): void {}
-
 function sendAction(room: Room, method: string) {
   return (...args: unknown[]) => room.send('action', { method, args });
 }
@@ -41,6 +39,9 @@ export function toStorePatch(data: PublicGameState): Partial<GameState> {
  *  starts applying every incoming `state` message. Existing components keep
  *  reading `useGameStore()` exactly as they do in offline mode. */
 export function bindOnlineStore(room: Room): () => void {
+  const originals = Object.fromEntries(
+    NETWORKED_METHODS.map(method => [method, useGameStore.getState()[method]])
+  );
   const networked = Object.fromEntries(NETWORKED_METHODS.map(method => [method, sendAction(room, method)]));
   useGameStore.setState(networked as unknown as Partial<GameState>);
 
@@ -49,7 +50,6 @@ export function bindOnlineStore(room: Room): () => void {
   });
 
   return () => {
-    const reset = Object.fromEntries(NETWORKED_METHODS.map(method => [method, noop]));
-    useGameStore.setState(reset as unknown as Partial<GameState>);
+    useGameStore.setState(originals as unknown as Partial<GameState>);
   };
 }

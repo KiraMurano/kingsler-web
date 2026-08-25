@@ -5,7 +5,7 @@ import { CARD_DESCRIPTIONS, type CardCategory, type GameCard, type InstantType }
 import { courtly } from '../lib/text';
 import { declineGen } from '@kinglier/engine/utils/russianText';
 
-const CARD_BACK = '/assets/cards/back-dual-face.png';
+const CARD_BACK = '/assets/cards/back-dual-face.webp';
 
 interface StakedCardArenaProps {
   onInspectCard?: (card: GameCard) => void;

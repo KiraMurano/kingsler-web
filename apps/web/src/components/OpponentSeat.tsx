@@ -147,12 +147,12 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             <span key={i} className="minislot">
               <span className="minicard minicard--empty" />
               {live && !gone && (
-                <img className="minicard" src="/assets/cards/back-dual-face.png" alt="" />
+                <img className="minicard" src="/assets/cards/back-dual-face.webp" alt="" />
               )}
               {gone && (
                 <img
                   className="minicard minicard--out"
-                  src="/assets/cards/back-dual-face.png"
+                  src="/assets/cards/back-dual-face.webp"
                   alt=""
                 />
               )}
