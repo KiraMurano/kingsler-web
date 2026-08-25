@@ -10,7 +10,7 @@ interface OverlayHeadProps {
 const OverlayHead: React.FC<OverlayHeadProps> = ({ title, description, onClose }) => (
   <div className="overlay__head">
     <div>
-      {title && <div className="overlay__title">{title}</div>}
+      {title && <div className="overlay__title" role="heading" aria-level={2}>{title}</div>}
       {description && <div className="overlay__desc">{description}</div>}
     </div>
     <button type="button" className="overlay__close" onClick={onClose} title="Закрыть (Esc)">
@@ -93,6 +93,8 @@ export const Dialog: React.FC<DialogProps> = ({
       <div
         className={['dialog__panel', className].filter(Boolean).join(' ')}
         style={{ maxWidth: width }}
+        role="dialog"
+        aria-modal="true"
         onClick={e => e.stopPropagation()}
       >
         <OverlayHead title={title} description={description} onClose={onClose} />

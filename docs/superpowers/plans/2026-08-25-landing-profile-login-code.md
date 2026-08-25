@@ -592,7 +592,7 @@ git commit -m "feat: carry profiles into rooms and games"
 
 **Files:**
 - Create: `apps/web/src/components/CardBackdrop.tsx`
-- Create: `apps/web/src/components/CardBackdrop.check.tsx`
+- Create: `apps/web/src/components/CardBackdrop.check.ts`
 - Modify: `apps/web/src/auth/LandingScreen.tsx:1-74`
 - Modify: `apps/web/src/styles/screen.css:1-50,240-292`
 
@@ -601,25 +601,23 @@ git commit -m "feat: carry profiles into rooms and games"
 - Keeps: `LandingScreen({ onLoggedIn })` public API.
 - Consumes: `requestMagicLink`, `verifyMagicCode`, `setToken`, `fetchMe`, and existing `Dialog`/`Button` primitives.
 
-- [ ] **Step 1: Write a failing static-render backdrop check**
+- [ ] **Step 1: Write a failing backdrop source check**
 
-```tsx
+```ts
 import assert from 'node:assert/strict';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { CardBackdrop } from './CardBackdrop.tsx';
+import { readFileSync } from 'node:fs';
 
-const html = renderToStaticMarkup(<CardBackdrop />);
-assert.match(html, /class="card-backdrop"/);
-assert.match(html, /aria-hidden="true"/);
-assert.equal((html.match(/card-backdrop__card/g) ?? []).length, 9);
-assert.match(html, /back-dual-face\.webp/);
-assert.match(html, /intrigue-plot\.webp/);
-console.log('CardBackdrop.check.tsx passed.');
+const source = readFileSync(new URL('./CardBackdrop.tsx', import.meta.url), 'utf8');
+assert.match(source, /aria-hidden="true"/);
+assert.equal((source.match(/^  \['/gm) ?? []).length, 9);
+assert.match(source, /back-dual-face\.webp/);
+assert.match(source, /intrigue-plot\.webp/);
+console.log('CardBackdrop.check.ts passed.');
 ```
 
 - [ ] **Step 2: Run the backdrop check and confirm failure**
 
-Run: `npx tsx apps/web/src/components/CardBackdrop.check.tsx`
+Run: `node --import tsx apps/web/src/components/CardBackdrop.check.ts`
 
 Expected: FAIL because `CardBackdrop.tsx` does not exist.
 
@@ -659,9 +657,9 @@ export function CardBackdrop() {
 
 - [ ] **Step 4: Run the backdrop check and confirm success**
 
-Run: `npx tsx apps/web/src/components/CardBackdrop.check.tsx`
+Run: `node --import tsx apps/web/src/components/CardBackdrop.check.ts`
 
-Expected: `CardBackdrop.check.tsx passed.`
+Expected: `CardBackdrop.check.ts passed.`
 
 - [ ] **Step 5: Replace the auth form screen with landing plus closed dialog**
 
@@ -698,14 +696,14 @@ In `screen.css`:
 
 - [ ] **Step 7: Run the component check and production build**
 
-Run: `npx tsx apps/web/src/components/CardBackdrop.check.tsx && npm run build:web`
+Run: `node --import tsx apps/web/src/components/CardBackdrop.check.ts && npm run build:web`
 
 Expected: backdrop check passes; TypeScript and Vite complete successfully.
 
 - [ ] **Step 8: Commit landing and backdrop**
 
 ```bash
-git add apps/web/src/components/CardBackdrop.tsx apps/web/src/components/CardBackdrop.check.tsx apps/web/src/auth/LandingScreen.tsx apps/web/src/styles/screen.css
+git add apps/web/src/components/CardBackdrop.tsx apps/web/src/components/CardBackdrop.check.ts apps/web/src/auth/LandingScreen.tsx apps/web/src/styles/screen.css
 git commit -m "feat: add public game landing"
 ```
 
@@ -715,6 +713,7 @@ git commit -m "feat: add public game landing"
 
 **Files:**
 - Create: `apps/web/src/components/ProfileDialog.tsx`
+- Create: `apps/web/src/components/ProfileDialog.check.ts`
 - Modify: `apps/web/src/auth/AuthClient.ts:19-70`
 - Modify: `apps/web/src/Root.tsx:1-114`
 - Modify: `apps/web/src/App.tsx:28-72`
@@ -827,14 +826,14 @@ Delete obsolete `.landing__logout`, `.lobby__nickname`, and `.lobby__nickname-ed
 
 - [ ] **Step 7: Run TypeScript, lint, and focused identity checks**
 
-Run: `npm run build:web && npm run lint && npx tsx packages/engine/src/GameStore.seats.check.ts && npx tsx apps/server/src/KinglierRoom.lobby.check.ts`
+Run: `node --import tsx apps/web/src/components/ProfileDialog.check.ts && npm run build:web && npm run lint && node --import tsx packages/engine/src/GameStore.seats.check.ts && node --import tsx apps/server/src/KinglierRoom.lobby.check.ts`
 
 Expected: Vite build completes, oxlint reports no errors, and both checks print `passed.`
 
 - [ ] **Step 8: Commit the complete profile UX**
 
 ```bash
-git add apps/web/src/components/ProfileDialog.tsx apps/web/src/auth/AuthClient.ts apps/web/src/Root.tsx apps/web/src/App.tsx apps/web/src/online/Lobby.tsx apps/web/src/components/PlayerCrest.tsx apps/web/src/components/OpponentSeat.tsx apps/web/src/styles/screen.css apps/web/src/styles/layout.css
+git add apps/web/src/components/ProfileDialog.tsx apps/web/src/components/ProfileDialog.check.ts apps/web/src/auth/AuthClient.ts apps/web/src/Root.tsx apps/web/src/App.tsx apps/web/src/online/Lobby.tsx apps/web/src/components/PlayerCrest.tsx apps/web/src/components/OpponentSeat.tsx apps/web/src/styles/screen.css apps/web/src/styles/layout.css
 git commit -m "feat: add editable player profiles"
 ```
 
@@ -868,7 +867,8 @@ Expected: every command prints its matching `passed.` line and exits 0.
 - [ ] **Step 2: Run the web component check, lint, and production build**
 
 ```bash
-npx tsx apps/web/src/components/CardBackdrop.check.tsx
+node --import tsx apps/web/src/components/CardBackdrop.check.ts
+node --import tsx apps/web/src/components/ProfileDialog.check.ts
 npm run lint
 npm run build:web
 ```

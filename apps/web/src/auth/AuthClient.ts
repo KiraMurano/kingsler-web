@@ -1,4 +1,5 @@
 import { Client } from '@colyseus/sdk';
+import type { ProfileAvatar, ProfileTitle } from '@kinglier/engine/profile';
 
 const SERVER_WS_URL = import.meta.env.VITE_SERVER_WS_URL
   ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
@@ -20,6 +21,8 @@ export interface Account {
   id: string;
   email: string;
   nickname: string;
+  avatar: ProfileAvatar;
+  title: ProfileTitle;
 }
 
 export interface MeResponse {
@@ -68,8 +71,8 @@ export async function fetchMe(): Promise<MeResponse | null> {
   }
 }
 
-export function updateNickname(nickname: string): Promise<void> {
-  return colyseusClient.http.patch('/api/me', { body: { nickname } }) as unknown as Promise<void>;
+export function updateProfile(profile: Pick<Account, 'nickname' | 'avatar' | 'title'>): Promise<void> {
+  return colyseusClient.http.patch('/api/me', { body: profile }) as unknown as Promise<void>;
 }
 
 export function logout(): void {

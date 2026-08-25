@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Globe, Swords, LogOut } from 'lucide-react';
+import { Globe, Swords, UserRoundPen } from 'lucide-react';
 import App from './App';
 import { Lobby } from './online/Lobby';
 import { onlineClient } from './online/OnlineGameClient';
 import { LandingScreen } from './auth/LandingScreen';
-import { consumeTokenFromUrl, fetchMe, logout, updateNickname, type Account } from './auth/AuthClient';
+import { consumeTokenFromUrl, fetchMe, logout, type Account } from './auth/AuthClient';
+import { CardBackdrop } from './components/CardBackdrop';
+import { ProfileDialog } from './components/ProfileDialog';
 import { Button } from './components/ui/Button';
 import './styles/screen.css';
 
@@ -12,6 +14,7 @@ type Mode = 'menu' | 'offline' | 'online-lobby' | 'online-game';
 
 export default function Root() {
   const [account, setAccount] = useState<Account | null | 'loading'>('loading');
+  const [profileOpen, setProfileOpen] = useState(false);
   const [autoJoinRoomId, setAutoJoinRoomId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>(
     () => (new URLSearchParams(location.search).has('room') ? 'online-lobby' : 'menu')
@@ -34,6 +37,13 @@ export default function Root() {
     setMode('menu');
   };
 
+  const handleLogout = () => {
+    onlineClient.leave();
+    logout();
+    setProfileOpen(false);
+    setAccount(null);
+  };
+
   if (account === 'loading') {
     return <div className="booting">СОЗЫВ ДВОРА</div>;
   }
@@ -45,6 +55,7 @@ export default function Root() {
   if (mode === 'menu') {
     return (
       <div className="screen">
+        <CardBackdrop />
         <div className="screen__panel">
           <div className="brand brand--hero">
             <div className="brand__title">
@@ -54,6 +65,17 @@ export default function Root() {
             </div>
             <div className="brand__sub">Битва за престол</div>
           </div>
+
+          <button type="button" className="account-button" onClick={() => setProfileOpen(true)}>
+            <span className="account-button__avatar">
+              <img src={account.avatar} alt="" />
+            </span>
+            <span className="account-button__identity">
+              <span className="account-button__title">{account.title}</span>
+              <span className="account-button__name">{account.nickname}</span>
+            </span>
+            <UserRoundPen size={16} />
+          </button>
 
           <div className="dialog__panel lobbycard">
             <Button
@@ -75,24 +97,23 @@ export default function Root() {
               <Globe size={18} /> Играть онлайн
             </Button>
           </div>
-
-          <button
-            type="button"
-            className="landing__logout"
-            onClick={() => {
-              logout();
-              setAccount(null);
-            }}
-          >
-            <LogOut size={13} /> Выйти из аккаунта ({account.nickname})
-          </button>
         </div>
+
+        {profileOpen && (
+          <ProfileDialog
+            open
+            account={account}
+            onClose={() => setProfileOpen(false)}
+            onSaved={setAccount}
+            onLogout={handleLogout}
+          />
+        )}
       </div>
     );
   }
 
   if (mode === 'offline') {
-    return <App mode="offline" onExit={exitToMenu} />;
+    return <App mode="offline" account={account} onExit={exitToMenu} />;
   }
 
   if (mode === 'online-lobby') {
@@ -100,15 +121,10 @@ export default function Root() {
       <Lobby
         onGameStarted={() => setMode('online-game')}
         onExit={exitToMenu}
-        nickname={account.nickname}
-        onNicknameChange={async nickname => {
-          await updateNickname(nickname);
-          setAccount(a => (a && a !== 'loading' ? { ...a, nickname } : a));
-        }}
         autoJoinRoomId={autoJoinRoomId}
       />
     );
   }
 
-  return <App mode="online" onExit={exitToMenu} />;
+  return <App mode="online" account={account} onExit={exitToMenu} />;
 }

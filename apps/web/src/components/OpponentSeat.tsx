@@ -99,6 +99,9 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         <Deltas events={deltas} kind="other" />
 
         <div className="seat__head">
+          <div className="seat__role">
+            {player.title ?? player.archetype?.title ?? 'Придворный'}
+          </div>
           <div className="seat__namerow">
             <span className="seat__name">{player.name}</span>
             <span className="delta-anchor">
@@ -111,7 +114,6 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
               </span>
             )}
           </div>
-          <div className="seat__role">{player.archetype?.title ?? 'Придворный'}</div>
         </div>
 
         <div className="seat__main">

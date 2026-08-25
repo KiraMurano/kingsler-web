@@ -54,8 +54,9 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
       <div className="crest__head">
         <Portrait src={player.avatar} name={player.name} className="crest__portrait" />
         <div>
+          <div className="crest__title">{player.title ?? 'Претендент'}</div>
           <div className="crest__namerow">
-            <div className="crest__name">Претендент</div>
+            <div className="crest__name">{player.name}</div>
             <span className="delta-anchor">
               <Bolts tokens={player.actionTokens} />
               <Deltas events={deltas} kind="act" />

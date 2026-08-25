@@ -440,6 +440,12 @@
   text-overflow: ellipsis;
 }
 
+.seat__head > .seat__role {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .seat__res {
   display: flex;
   flex-wrap: wrap;
@@ -1150,6 +1156,18 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.crest__title {
+  max-width: 145px;
+  overflow: hidden;
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .crest__name {

@@ -20,6 +20,7 @@ import { Button } from './components/ui/Button';
 import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
 import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
+import type { Account } from './auth/AuthClient';
 
 interface Status {
   text: string;
@@ -27,7 +28,15 @@ interface Status {
   hint?: string;
 }
 
-export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onExit: () => void }) {
+export default function App({
+  mode,
+  account,
+  onExit
+}: {
+  mode: 'offline' | 'online';
+  account: Account;
+  onExit: () => void;
+}) {
   const {
     players,
     activePlayerId,
@@ -68,7 +77,7 @@ export default function App({ mode, onExit }: { mode: 'offline' | 'online'; onEx
       setPendingTarget;
     if (mode !== 'offline') return;
     startBotEngine();
-    startGame();
+    startGame([{ id: 'p1', name: account.nickname, avatar: account.avatar, title: account.title }]);
     return () => {
       stopBotEngine();
       timerManager.clearAll();
