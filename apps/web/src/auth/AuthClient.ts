@@ -27,7 +27,7 @@ export interface MeResponse {
   activeRoom: { roomId: string; playerId: string } | null;
 }
 
-function setToken(token: string): void {
+export function setToken(token: string): void {
   colyseusClient.auth.token = token;
   if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
   else localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -43,8 +43,12 @@ export function consumeTokenFromUrl(): void {
   history.replaceState(null, '', location.pathname + location.search);
 }
 
-export function requestMagicLink(email: string): Promise<void> {
-  return colyseusClient.http.post('/api/auth/request-link', { body: { email } }) as unknown as Promise<void>;
+/** In dev (no RESEND_API_KEY on the server), the response carries a
+ *  `devToken` that's already a valid session — the server skips the "click
+ *  the link in your email" round-trip since there's nowhere to send it. */
+export async function requestMagicLink(email: string): Promise<{ devToken?: string }> {
+  const response = await colyseusClient.http.post('/api/auth/request-link', { body: { email } });
+  return (response.data ?? {}) as { devToken?: string };
 }
 
 export async function fetchMe(): Promise<MeResponse | null> {

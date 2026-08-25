@@ -82,5 +82,25 @@ await fetch(`http://localhost:${PORT}/api/auth/request-link`, {
 assert.equal(capturedHtml, '', 'a request within the cooldown must not trigger a new email');
 
 globalThis.fetch = originalFetch;
+
+// Dev mode: no RESEND_API_KEY configured must skip the email round-trip and
+// return an already-valid session token directly.
+delete process.env.RESEND_API_KEY;
+const devRequestResponse = await fetch(`http://localhost:${PORT}/api/auth/request-link`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'anya@example.com' })
+});
+assert.equal(devRequestResponse.status, 200);
+const { devToken } = await devRequestResponse.json();
+assert.ok(devToken, 'no RESEND_API_KEY must produce a usable devToken');
+
+const devMeResponse = await fetch(`http://localhost:${PORT}/api/me`, {
+  headers: { Authorization: `Bearer ${devToken}` }
+});
+assert.equal(devMeResponse.status, 200);
+const devMe = await devMeResponse.json();
+assert.equal(devMe.user.email, 'anya@example.com');
+
 console.log('routes.check.ts passed.');
 process.exit(0);

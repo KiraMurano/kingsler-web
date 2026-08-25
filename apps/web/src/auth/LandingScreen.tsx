@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Mail } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { requestMagicLink } from './AuthClient';
+import { requestMagicLink, setToken, fetchMe, type Account } from './AuthClient';
 import { useToast } from '../lib/toast';
 import '../styles/screen.css';
 
-export function LandingScreen() {
+export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) => void }) {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const toast = useToast();
@@ -14,7 +14,13 @@ export function LandingScreen() {
     if (!email.includes('@') || status === 'sending') return;
     setStatus('sending');
     try {
-      await requestMagicLink(email.trim().toLowerCase());
+      const { devToken } = await requestMagicLink(email.trim().toLowerCase());
+      if (devToken) {
+        setToken(devToken);
+        const me = await fetchMe();
+        if (me) onLoggedIn(me.user);
+        return;
+      }
       setStatus('sent');
     } catch {
       setStatus('idle');

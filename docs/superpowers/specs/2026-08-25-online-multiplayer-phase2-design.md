@@ -136,6 +136,11 @@ Three routes, mounted on the existing Express app from `apps/server/src/app.ts`:
   - Always responds `200` regardless of whether the email exists yet (a
     new `users` row is created on first successful verify, not on
     request) — this also avoids leaking which emails are registered.
+  - If `RESEND_API_KEY` isn't set (local dev only — a real deploy always
+    configures it), skips the token/email round-trip entirely and responds
+    with `{ ok: true, devToken }`, an already-signed session JWT for that
+    email. The client logs in immediately with it. Any email is accepted;
+    there is no confirmation step to bypass in dev.
 
 - `GET /api/auth/verify?token=...`
   - Hash the incoming token, look up by hash; reject if missing, expired,

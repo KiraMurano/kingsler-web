@@ -20,16 +20,24 @@ authRouter.post('/request-link', async (req, res) => {
     return;
   }
 
+  // No RESEND_API_KEY means there's no way to deliver a real email — a
+  // production deploy always has one configured. Treat that as "local dev"
+  // and skip straight to a signed session, via the same JWT.sign() call
+  // /verify uses, so the rest of the app can't tell the difference.
+  if (!process.env.RESEND_API_KEY) {
+    const user = findOrCreateUserByEmail(email);
+    const devToken = await JWT.sign({ userId: user.id }, { expiresIn: '30d' });
+    res.json({ ok: true, devToken });
+    return;
+  }
+
   const token = issueMagicLinkToken(email);
   if (token) {
     const verifyUrl = `${PUBLIC_URL}/api/auth/verify?token=${token}`;
     try {
       await sendMagicLinkEmail(email, verifyUrl);
     } catch (err) {
-      // No RESEND_API_KEY (e.g. local dev) or a delivery failure: print the
-      // link so the flow is still testable without a real mailbox.
       console.error('Failed to send magic link email:', err);
-      console.log(`Magic link for ${email}: ${verifyUrl}`);
     }
   }
 

@@ -39,7 +39,7 @@ export default function Root() {
   }
 
   if (!account) {
-    return <LandingScreen />;
+    return <LandingScreen onLoggedIn={setAccount} />;
   }
 
   if (mode === 'menu') {
