@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Mail } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { requestMagicLink } from './AuthClient';
+import { useToast } from '../lib/toast';
 import '../styles/screen.css';
 
 export function LandingScreen() {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const toast = useToast();
 
   const submit = async () => {
     if (!email.includes('@') || status === 'sending') return;
@@ -15,7 +17,8 @@ export function LandingScreen() {
       await requestMagicLink(email.trim().toLowerCase());
       setStatus('sent');
     } catch {
-      setStatus('error');
+      setStatus('idle');
+      toast('Не удалось отправить письмо. Попробуйте ещё раз.');
     }
   };
 
@@ -56,9 +59,6 @@ export function LandingScreen() {
               >
                 <Mail size={18} /> Получить ссылку для входа
               </Button>
-              {status === 'error' && (
-                <p className="landing__error">Не удалось отправить письмо. Попробуйте ещё раз.</p>
-              )}
             </>
           )}
         </div>

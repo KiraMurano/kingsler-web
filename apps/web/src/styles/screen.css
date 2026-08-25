@@ -247,12 +247,6 @@
   text-align: center;
 }
 
-.landing__error {
-  font-size: 0.78rem;
-  color: var(--crimson-soft);
-  text-align: center;
-}
-
 .landing__logout {
   display: inline-flex;
   align-items: center;
