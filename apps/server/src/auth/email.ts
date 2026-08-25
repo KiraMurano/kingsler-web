@@ -4,7 +4,7 @@ export async function sendMagicLinkEmail(email: string, verifyUrl: string, code:
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('RESEND_API_KEY is not set');
 
-  const from = process.env.MAGIC_LINK_FROM ?? 'Kinglier <auth@send.kingsler.ru>';
+  const from = process.env.MAGIC_LINK_FROM ?? 'Kinglier <auth@kingsler.ru>';
 
   const response = await fetch(RESEND_API_URL, {
     method: 'POST',
