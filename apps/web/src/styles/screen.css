@@ -236,3 +236,35 @@
   box-shadow: 0 0 0 3px rgba(232, 200, 119, 0.16);
   animation: beacon 2.4s ease-in-out infinite;
 }
+
+/* ==========================================================================
+   LANDING (email login) & account controls
+   ========================================================================== */
+.landing__sent {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.landing__error {
+  font-size: 0.78rem;
+  color: var(--crimson-soft);
+  text-align: center;
+}
+
+.landing__logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.landing__logout:hover {
+  color: var(--text-muted);
+}
