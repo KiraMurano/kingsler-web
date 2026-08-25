@@ -19,5 +19,9 @@ COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/apps/server ./apps/server
 COPY --from=build /repo/apps/web/dist ./apps/web/dist
 COPY --from=build /repo/apps/web/package.json ./apps/web/package.json
+# apps/server/src/db.ts opens data/kinglier.db here (resolved relative to
+# the repo root) — a named/bind-mounted volume keeps accounts across image
+# rebuilds; without it, every deploy silently resets every account.
+VOLUME /repo/data
 EXPOSE 2567
 CMD ["npm", "run", "start", "--workspace=apps/server"]

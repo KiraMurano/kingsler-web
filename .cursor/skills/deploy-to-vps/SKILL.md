@@ -20,6 +20,8 @@ description: >-
 | Container name | `kinglier` |
 | Port | `2567`, bound to `127.0.0.1` only (Nginx on the server reverse-proxies HTTPS + WebSocket to it — already configured, don't touch it for a routine deploy) |
 | Public URL | `https://kiramurano.fvds.ru` |
+| Data volume | `/var/www/admin/data/www/kingsler.ru/data` on the host, mounted at `/repo/data` — holds `kinglier.db` (accounts). **Never omit `-v` below**, or a redeploy wipes every account. |
+| Required env vars (Phase 2+) | `JWT_SECRET` (session signing — generate once, keep stable across deploys), `RESEND_API_KEY`, `MAGIC_LINK_FROM` (e.g. `Kinglier <auth@send.kingsler.ru>`), `PUBLIC_URL` (must match the public HTTPS URL exactly — it's embedded in magic-link emails) |
 
 ## Steps
 
@@ -49,8 +51,12 @@ Read the build output — the image's build stage runs `tsc -b` for the engine/s
 4. **Restart the container on the new image:**
 
 ```bash
-ssh ozero-ru "sudo docker stop kinglier && sudo docker rm kinglier && sudo docker run -d --name kinglier --restart unless-stopped -p 127.0.0.1:2567:2567 kinglier-game && sleep 2 && sudo docker ps --filter name=kinglier && sudo docker logs kinglier --tail 30"
+ssh ozero-ru "sudo docker stop kinglier && sudo docker rm kinglier && sudo docker run -d --name kinglier --restart unless-stopped -p 127.0.0.1:2567:2567 -v /var/www/admin/data/www/kingsler.ru/data:/repo/data -e JWT_SECRET=<value> -e RESEND_API_KEY=<value> -e MAGIC_LINK_FROM='Kinglier <auth@send.kingsler.ru>' -e PUBLIC_URL=https://kiramurano.fvds.ru kinglier-game && sleep 2 && sudo docker ps --filter name=kinglier && sudo docker logs kinglier --tail 30"
 ```
+
+`JWT_SECRET` and `RESEND_API_KEY` are secrets — keep the real values out of
+shell history/chat logs; store them once (e.g. in a root-only file on the
+server) and reference that file instead of retyping them per deploy.
 
 Confirm the logs show `Kinglier server listening on :2567` with no stack trace.
 
