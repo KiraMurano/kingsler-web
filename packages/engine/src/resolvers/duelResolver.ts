@@ -1,5 +1,7 @@
-import type { CardId, GameState, DuelOutcome, DuelResultType } from '../types';
+import type { CardId, CardInstance, GameState, DuelOutcome, DuelResultType } from '../types';
 import { byId, pluck } from '../cardInstance';
+import { isRole } from '../cards';
+import { botMemory } from '../bot/botMemory';
 import { triggerSingleCardFlight, triggerDuelCardFlight, triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
@@ -127,6 +129,19 @@ export function attackerAcceptDuel(
     return p;
   });
 
+  // RULES.md §6, правило 2: любая карта, вскрытая на столе (при проверке или
+  // дуэли), уходит в сброс. Both stakes leave their hands right here, so the
+  // very same instances have to land in the discard — otherwise the cards are
+  // destroyed and no longer have a zone to be drawn in.
+  const revealedInstances = [actorStaked, defenderStaked].filter(
+    (c): c is CardInstance => !!c
+  );
+
+  // Публично вскрытая карта больше не в руке — сбрасываем о ней память ботов,
+  // ровно как это делает doubtResolver при проверке «НЕ ВЕРЮ!».
+  if (isRole(actorRevealedRole)) botMemory.recordRevealedCard(actor.id, actorRevealedRole);
+  if (isRole(defenderRevealedRole)) botMemory.recordRevealedCard(defender.id, defenderRevealedRole);
+
   const isVaBanqueActive = get().isVaBanqueActive;
   let resultType: DuelResultType = 'clash_blocked';
   let sealsWinnerId: string | undefined = undefined;
@@ -174,6 +189,7 @@ export function attackerAcceptDuel(
 
   set(state => ({
     players: newPlayers,
+    discardPile: [...state.discardPile, ...revealedInstances],
     duelOutcome: outcome,
     turnPhase: 'DUEL_OUTCOME',
     activeSpeechReactions: {

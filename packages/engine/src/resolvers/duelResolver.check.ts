@@ -3,15 +3,27 @@
  * once both duel cards have been fought, neither staked instance is in its
  * owner's hand any more, so `StakedCardArena` must not re-stage a face-down
  * card while the winner's effect is on hold.
+ *
+ * And, per RULES.md §6 rule 2 ("Любая карта, которая была вскрыта на столе
+ * (при проверке или дуэли), отправляется в сброс"), both revealed duel stakes
+ * must land in the discard as the very same instances that left the hands —
+ * in every one of the four `DuelResultType` outcomes.
  * Run: npx tsx packages/engine/src/resolvers/duelResolver.check.ts
  */
 import assert from 'node:assert/strict';
-import type { Action, GameState, Player } from '../types.ts';
+import type { Action, CardInstance, GameCard, GameState, Player, Role } from '../types.ts';
 import { attackerAcceptDuel, closeDuelOutcome } from './duelResolver.ts';
 import { triggerVetoWindowOrResolveEffect, resolvePendingActionEffect } from './doubtResolver.ts';
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { mintDeck } from '../cardInstance.ts';
+import { assertCardCensus } from './cardCensus.check.ts';
+
+/** Like `mintDeck`, but ids stay unique across hands — two seats holding
+ *  `c0` would make the whole-state card census meaningless. */
+let mintedInCheck = 0;
+function mintDeck(cards: GameCard[]): CardInstance[] {
+  return cards.map(card => ({ id: `k${mintedInCheck++}`, card }));
+}
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -135,5 +147,105 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   assert.equal(showPile, false, 'the departed duel card must not be re-staged on the table');
 
   timerManager.clearAll();
-  console.log('duelResolver.check: ok');
 }
+
+// --- RULES.md §6 rule 2: both revealed duel stakes go to the discard ---
+//
+// `attackerAcceptDuel` used to pull both stakes out of the hands and push them
+// nowhere, destroying two card instances per duel: they left the discard (and
+// therefore the reshuffle and the bots' card counting) short, and gave the
+// presentation layer two ids with no zone to draw them in.
+{
+  const cases: {
+    resultType: string;
+    attackerStake: Role;
+    defenderStake: Role;
+  }[] = [
+    // Attacker claims «Вор», defender shields with «Казначей».
+    { resultType: 'clash_blocked', attackerStake: 'Вор', defenderStake: 'Казначей' },
+    { resultType: 'attacker_breakthrough', attackerStake: 'Вор', defenderStake: 'Рыцарь' },
+    { resultType: 'defender_counter', attackerStake: 'Шут', defenderStake: 'Казначей' },
+    { resultType: 'mutual_bluff', attackerStake: 'Шут', defenderStake: 'Рыцарь' }
+  ];
+
+  for (const c of cases) {
+    const attackerHand = mintDeck([c.attackerStake, 'Наследник']);
+    const defenderHand = mintDeck([c.defenderStake, 'Наследник']);
+    const attackerStakeId = attackerHand[0].id;
+    const defenderStakeId = defenderHand[0].id;
+    const deck = mintDeck(['Шантажист']);
+    const allIds = [...attackerHand, ...defenderHand, ...deck].map(x => x.id);
+
+    const pending: Action = {
+      id: 'a1',
+      type: 'role',
+      name: 'Вор',
+      actorId: 'p1',
+      targetId: 'p2',
+      roleClaim: 'Вор',
+      stakedCardId: attackerStakeId,
+      costGold: 0,
+      costTokens: 1,
+      description: ''
+    };
+
+    const { get, set, api } = makeHarness({
+      pendingAction: pending,
+      pendingDuelDefenderCardId: defenderStakeId,
+      pendingDuelDefenderRoleClaim: 'Казначей',
+      deck,
+      players: [
+        player({ id: 'p1', name: 'Атакующий', hand: attackerHand }),
+        player({ id: 'p2', name: 'Защитник', isBot: true, hand: defenderHand })
+      ]
+    });
+
+    assertCardCensus(api, allIds, `${c.resultType}: before the duel`);
+
+    attackerAcceptDuel(get, set, 'p1');
+
+    assert.equal(api.duelOutcome?.resultType, c.resultType, `${c.resultType}: expected outcome`);
+
+    const discardIds = api.discardPile.map(x => x.id);
+    assert.ok(
+      discardIds.includes(attackerStakeId),
+      `${c.resultType}: the attacker's revealed card must be in the discard`
+    );
+    assert.ok(
+      discardIds.includes(defenderStakeId),
+      `${c.resultType}: the defender's revealed card must be in the discard`
+    );
+    assert.equal(
+      api.discardPile.find(x => x.id === attackerStakeId)!.card,
+      c.attackerStake,
+      `${c.resultType}: the discarded instance is the one that was staked, not a copy`
+    );
+    assert.equal(
+      api.discardPile.find(x => x.id === defenderStakeId)!.card,
+      c.defenderStake,
+      `${c.resultType}: the discarded instance is the one that was staked, not a copy`
+    );
+
+    for (const p of api.players) {
+      assert.equal(
+        p.hand.some(x => x.id === attackerStakeId),
+        false,
+        `${c.resultType}: the attacker's revealed card must be in no hand`
+      );
+      assert.equal(
+        p.hand.some(x => x.id === defenderStakeId),
+        false,
+        `${c.resultType}: the defender's revealed card must be in no hand`
+      );
+    }
+
+    assertCardCensus(api, allIds, `${c.resultType}: after the duel`);
+
+    closeDuelOutcome(get, set);
+    assertCardCensus(api, allIds, `${c.resultType}: after the outcome modal closes`);
+
+    timerManager.clearAll();
+  }
+}
+
+console.log('duelResolver.check: ok');
