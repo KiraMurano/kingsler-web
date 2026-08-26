@@ -8,6 +8,7 @@ import { Dialog } from './ui/Overlay';
 import { UiIcon, renderWithIcons } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
+import { holds } from '@kinglier/engine/cardInstance';
 
 /** Instants that need a victim before they resolve. */
 const TARGETED_INSTANTS: InstantType[] = [
@@ -55,13 +56,13 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
   } = useGameStore();
   const human = pickViewer(players, viewerId);
 
-  const hasVaBanque = !!human?.hand.includes('Ва-банк');
+  const hasVaBanque = !!human && holds(human.hand, 'Ва-банк');
   const canUseVaBanque = hasVaBanque && (human?.actionTokens ?? 0) >= 1 && !hasPlayedRoleThisTurn;
   const [withVaBanque, setWithVaBanque] = useState(initialWithVaBanque && canUseVaBanque);
 
   if (!human) return null;
 
-  const card = human.hand[stakedCardIndex] ?? human.hand[0];
+  const card = (human.hand[stakedCardIndex] ?? human.hand[0]).card;
   const info = CARD_DESCRIPTIONS[card];
   const hasTokens = human.actionTokens >= 1;
 

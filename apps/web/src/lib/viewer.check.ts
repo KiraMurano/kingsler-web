@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { pickViewer } from './viewer.ts';
 import type { Player } from '@kinglier/engine/types';
+import { mintDeck } from '@kinglier/engine/cardInstance';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name' | 'seatNumber'>): Player {
   return {
@@ -17,7 +18,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name' | 'seatNum
     favor: 0,
     seals: 0,
     actionTokens: 2,
-    hand: ['Наследник', 'Шут'],
+    hand: mintDeck(['Наследник', 'Шут']),
     activePlot: null,
     ...partial
   };

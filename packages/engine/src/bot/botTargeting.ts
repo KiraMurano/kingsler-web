@@ -1,5 +1,6 @@
 import type { Player, Role } from '../types';
 import { isRole } from '../cards';
+import { faces, holds } from '../cardInstance';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
 
@@ -126,20 +127,20 @@ export function shouldPlaySearchNow(
     (target.id === nextId && morningPlot);
   if (urgent) return true;
 
-  const hasWinRole = bot.hand.includes('Наследник') || bot.hand.includes('Шантажист');
+  const hasWinRole = holds(bot.hand, 'Наследник') || holds(bot.hand, 'Шантажист');
   if (hasWinRole) return false;
 
   const weakPlot =
     plot.type === 'Досье' ||
     plot.type === 'Чёрная книга' ||
     plot.type === 'Сеть информаторов';
-  if (weakPlot && target.favor < 4 && bot.hand.some(isRole)) return false;
+  if (weakPlot && target.favor < 4 && faces(bot.hand).some(isRole)) return false;
 
   const arch = getBotArchetype(bot.id);
   let chance = 0.22 + arch.targetAggression * 0.28 - arch.bluffRate * 0.25;
   if (morningPlot) chance += 0.2;
   if (plot.type === 'Тайный заговор') chance += 0.12 + (plot.charges ?? 0) * 0.08;
-  if (bot.hand.some(isRole)) chance -= 0.2;
+  if (faces(bot.hand).some(isRole)) chance -= 0.2;
   return rng() < chance;
 }
 
@@ -184,8 +185,8 @@ export function shouldActivateConspiracyNow(
 
   const canCrown = charges >= 3 && target.favor >= 1;
   const goldHit = Math.min(charges, target.gold);
-  const hasWinRole = bot.hand.includes('Наследник') || bot.hand.includes('Шантажист');
-  const hasAnyRole = bot.hand.some(isRole);
+  const hasWinRole = holds(bot.hand, 'Наследник') || holds(bot.hand, 'Шантажист');
+  const hasAnyRole = faces(bot.hand).some(isRole);
 
   if (canCrown && (target.favor >= 5 || coronationCandidateId === target.id)) return true;
   if (charges >= 4 && (canCrown || goldHit >= 2)) return true;

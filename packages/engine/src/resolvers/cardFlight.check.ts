@@ -10,6 +10,7 @@ import { triggerVetoWindowOrResolveEffect } from './doubtResolver.ts';
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import { checkEndgameAndAdvanceTurn } from './turnResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
+import { mintDeck } from '../cardInstance.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -20,7 +21,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     favor: 0,
     seals: 0,
     actionTokens: 1,
-    hand: ['Наследник', 'Шут'],
+    hand: mintDeck(['Наследник', 'Шут']),
     activePlot: null,
     ...partial
   };
@@ -73,8 +74,8 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 {
   const { get, set, api } = makeHarness({
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Наследник', 'Шут'] }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: ['Казначей', 'Рыцарь'] })
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Наследник', 'Шут']) }),
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Рыцарь']) })
     ]
   });
 
@@ -100,7 +101,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 {
   const { get, set, api } = makeHarness({
     isVetoed: true,
-    players: [player({ id: 'p1', name: 'Анна', hand: ['Казначей', 'Шут'] })]
+    players: [player({ id: 'p1', name: 'Анна', hand: mintDeck(['Казначей', 'Шут']) })]
   });
 
   const action: Action = {
@@ -150,7 +151,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 //    `pendingAction` must send the instant flying to discard, not drop it.
 {
   const { get, set, api } = makeHarness({
-    players: [player({ id: 'p1', name: 'Анна', actionTokens: 1, hand: ['Наследник'] })],
+    players: [player({ id: 'p1', name: 'Анна', actionTokens: 1, hand: mintDeck(['Наследник']) })],
     pendingAction: {
       id: 'a3',
       type: 'instant',

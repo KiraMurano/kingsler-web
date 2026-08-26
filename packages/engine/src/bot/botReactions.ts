@@ -3,6 +3,7 @@ import type { GameState, Role } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { evaluateBotDoubt } from './botEvaluator';
 import { selectBestRedirectionTarget } from './botTargeting';
+import { faces, holds } from '../cardInstance';
 import {
   ACTION_HOLD_MS,
   BOT_REACTION_MS,
@@ -82,7 +83,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   if (!target || !target.isBot || !attacker) return;
 
   // 1. Возможность сыграть инстант ⚡ «Перенаправление» (0 ⚡)
-  const redirectIdx = target.hand.indexOf('Перенаправление');
+  const redirectIdx = faces(target.hand).indexOf('Перенаправление');
   if (redirectIdx !== -1 && Math.random() < 0.70) {
     const otherOpponents = players.filter(p => p.id !== attacker.id && p.id !== target.id);
     const newTarget = selectBestRedirectionTarget(attacker, target, otherOpponents, pendingAction.roleClaim);
@@ -98,9 +99,9 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   }
 
   const blockingRole: Role = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-  const hasCard = target.hand.includes(blockingRole);
+  const hasCard = holds(target.hand, blockingRole);
   const archetype = getBotArchetype(target.id);
-  const cardIndex = hasCard ? target.hand.indexOf(blockingRole) : 0;
+  const cardIndex = hasCard ? faces(target.hand).indexOf(blockingRole) : 0;
 
   const doubtEval = evaluateBotDoubt(
     target,
@@ -164,7 +165,7 @@ export function handleDuelAttackerPhase(state: GameState, schedule: BotScheduler
   if (!attacker || !attacker.isBot || !defender) return;
 
   const archetype = getBotArchetype(attacker.id);
-  const wasTruth = attacker.hand.includes(pendingAction.roleClaim!);
+  const wasTruth = holds(attacker.hand, pendingAction.roleClaim!);
 
   let willAccept = false;
   if (wasTruth) {
@@ -194,7 +195,7 @@ export function handleVetoPhase(state: GameState, schedule: BotScheduler): void 
   if (!pendingAction || isVetoed) return;
 
   const vetoBots = players.filter(
-    p => p.isBot && p.id !== pendingAction.actorId && p.hand.includes('Право вето')
+    p => p.isBot && p.id !== pendingAction.actorId && holds(p.hand, 'Право вето')
   );
 
   for (const bot of vetoBots) {
@@ -217,7 +218,7 @@ export function handleVetoPhase(state: GameState, schedule: BotScheduler): void 
     }
 
     if (shouldVeto || Math.random() < 0.40) {
-      const vetoIdx = bot.hand.indexOf('Право вето');
+      const vetoIdx = faces(bot.hand).indexOf('Право вето');
       schedule('veto', () => {
         const cur = useGameStore.getState();
         if (cur.turnPhase === 'VETO_WINDOW' && !cur.isVetoed) {

@@ -5,11 +5,12 @@
  *   npx tsx src/resolvers/doubtResolver.check.ts
  */
 import assert from 'node:assert/strict';
-import type { Player } from '../types.ts';
+import type { GameCard, Player } from '../types.ts';
+import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
 import { ACTION_HOLD_MS } from '../timing.ts';
 
-function human(id: string, hand: Player['hand']): Player {
+function human(id: string, hand: GameCard[]): Player {
   return {
     id,
     name: id,
@@ -20,12 +21,12 @@ function human(id: string, hand: Player['hand']): Player {
     favor: 0,
     seals: 0,
     actionTokens: 2,
-    hand,
+    hand: mintDeck(hand),
     activePlot: null
   };
 }
 
-function bot(id: string, hand: Player['hand']): Player {
+function bot(id: string, hand: GameCard[]): Player {
   return {
     id,
     name: id,
@@ -36,7 +37,7 @@ function bot(id: string, hand: Player['hand']): Player {
     favor: 0,
     seals: 0,
     actionTokens: 0, // can't doubt — keeps this check deterministic
-    hand,
+    hand: mintDeck(hand),
     activePlot: null
   };
 }
@@ -46,7 +47,7 @@ useGameStore.setState({
   players: [
     human('p1', ['Наследник', 'Шут']),
     human('p2', ['Казначей', 'Рыцарь']),
-    human('p3', ['Вор', 'Шпион']),
+    human('p3', ['Вор', 'Шут']),
     bot('b1', ['Казначей', 'Рыцарь'])
   ],
   activePlayerId: 'p1'
@@ -89,7 +90,7 @@ useGameStore.setState({
   players: [
     human('p1', ['Наследник', 'Шут']),
     human('p2', ['Казначей', 'Рыцарь']),
-    human('p3', ['Право вето', 'Шпион'])
+    human('p3', ['Право вето', 'Шут'])
   ],
   activePlayerId: 'p1'
 });

@@ -3,8 +3,9 @@ import type {
   GameState,
   Player,
   Action,
-  GameCard
+  CardInstance
 } from './types';
+import { idOf, pluck } from './cardInstance';
 import {
   createInitialDeck,
   drawCardsFromDeck,
@@ -201,12 +202,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     disruptPlayerPlotsOnLoss(get, set, victimId, reason);
   },
 
-  _drawCardForPlayerWithInformantCheck: (_playerIndex: number): GameCard => {
+  _drawCardForPlayerWithInformantCheck: (_playerIndex: number): CardInstance => {
     const { deck, discardPile } = get();
     const { drawn, deck: newDeck, discardPile: newDiscardPile } = drawCardsFromDeck(1, deck, discardPile);
-    const newCard = drawn[0] || 'Наследник';
     set({ deck: newDeck, discardPile: newDiscardPile });
-    return newCard;
+    return drawn[0];
   },
 
   // --------------------------------------------------------------------------
@@ -260,16 +260,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     let actorHand = [...actor.hand];
-    let newDiscard = [...get().discardPile];
+    const newDiscard = [...get().discardPile];
     let stakedCardIndex = actionData.stakedCardIndex !== undefined
       ? actionData.stakedCardIndex
       : 0;
 
     if (withVaBanque) {
-      const vbIdx = actorHand.indexOf('Ва-банк');
-      if (vbIdx !== -1) {
-        actorHand.splice(vbIdx, 1);
-        newDiscard.push('Ва-банк');
+      const vbId = idOf(actorHand, 'Ва-банк');
+      if (vbId) {
+        const { taken, rest } = pluck(actorHand, vbId);
+        actorHand = rest;
+        if (taken) newDiscard.push(taken);
         stakedCardIndex = 0;
       }
     }

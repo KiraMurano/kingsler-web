@@ -66,16 +66,16 @@ export function executeNormalAction(
 
       const newHand = [...actor.hand];
       finalIndices.forEach((idx, i) => {
-        newHand[idx] = drawn[i] || 'Наследник';
+        newHand[idx] = drawn[i];
       });
 
-      actor = { ...actor, hand: newHand };
+      actor = { ...actor, hand: newHand.filter(Boolean) };
       newPlayers[actorIdx] = actor;
       botMemory.invalidatePlayerHand(actor.id);
 
       const count = finalIndices.length;
       const countStr = count === 1 ? '1 карту' : '2 карты';
-      const drawnCardsStr = drawn.map(c => `«${c}»`).join(', ');
+      const drawnCardsStr = drawn.map(c => `«${c.card}»`).join(', ');
       const drawNotice = actor.id === 'p1' ? ` (получено: ${drawnCardsStr})` : '';
       const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
 

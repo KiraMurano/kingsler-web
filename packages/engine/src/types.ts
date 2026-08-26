@@ -1,5 +1,7 @@
 import type { Role, PlotType, InstantType, GameCard } from './cards';
+import type { CardId, CardInstance } from './cardInstance';
 export type { Role, PlotType, InstantType, GameCard } from './cards';
+export type { CardId, CardInstance } from './cardInstance';
 
 export type BotPersonalityType = 'gambler' | 'cautious' | 'pragmatic' | 'provocateur' | 'opportunist';
 
@@ -16,6 +18,8 @@ export interface BotArchetype {
 
 export interface ActivePlotData {
   id: string;
+  /** The card instance resting in the slot — the same one that left the hand. */
+  cardId: CardId;
   type: PlotType;
   targetPlayerId?: string;
   charges?: number; // Тайный заговор: 0–4
@@ -33,7 +37,7 @@ export interface Player {
   favor: number;       // Crowns 👑 (0 to 6, 6 = win condition)
   seals: number;       // Royal Seals ⚜️ (0 or 1, 2 seals = 1 crown)
   actionTokens: number;// Action tokens (0 to 2, refilled to 2 at turn start)
-  hand: GameCard[];
+  hand: CardInstance[];
   activePlot: ActivePlotData | null;
 }
 
@@ -51,6 +55,9 @@ export interface Action {
   instantType?: InstantType;
   stakedCardIndex?: number; // Face-down staked card from hand (0 or 1)
   stakedCardIndices?: number[]; // For exchanging 1 or 2 cards in normal action
+  /** The card instance this action put on the table — staked role card, laid
+   *  plot or played instant. Identity survives hand → table → discard. */
+  stakedCardId?: CardId;
   costGold: number;
   costTokens: number;
   withVaBanque?: boolean;   // Played together with Va-banque instant modifier (x2 on challenge)
@@ -154,8 +161,8 @@ export interface GameState {
   activePlayerId: string;
   /** Only set in online mode: which seat this browser's connection is. Undefined offline. */
   viewerId?: string;
-  deck: GameCard[];
-  discardPile: GameCard[];
+  deck: CardInstance[];
+  discardPile: CardInstance[];
   turnPhase: TurnPhase;
   turnSubPhase: TurnSubPhase;
   timerSeconds: number;
@@ -239,5 +246,5 @@ export interface GameState {
   _resolvePendingActionEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
   _checkEndgameAndAdvanceTurn: () => void;
   _disruptPlayerPlotsOnLoss: (playerId: string, reason: string) => void;
-  _drawCardForPlayerWithInformantCheck: (playerIndex: number) => GameCard;
+  _drawCardForPlayerWithInformantCheck: (playerIndex: number) => CardInstance;
 }

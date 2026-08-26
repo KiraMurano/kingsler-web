@@ -13,6 +13,7 @@ import {
   proceedAfterVetoWindow,
   resolvePendingActionEffect
 } from './doubtResolver.ts';
+import { faces, mintDeck } from '../cardInstance.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
   (globalThis as { window: typeof globalThis }).window = globalThis;
@@ -27,7 +28,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     favor: 3,
     seals: 0,
     actionTokens: 2,
-    hand: ['Наследник', 'Право вето'],
+    hand: mintDeck(['Наследник', 'Право вето']),
     activePlot: null,
     ...partial
   };
@@ -109,15 +110,15 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 {
   const { get, set, api } = makeHarness({
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Шантажист', 'Вор'] }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Шантажист', 'Вор']) }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         favor: 2,
         gold: 3,
-        hand: ['Казначей', 'Рыцарь'],
-        activePlot: { id: 'pl1', type: 'Королевский приём' }
+        hand: mintDeck(['Казначей', 'Рыцарь']),
+        activePlot: { id: 'pl1', cardId: 'plot-pl1', type: 'Королевский приём' }
       })
     ]
   });
@@ -132,20 +133,20 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const after = api.players.find(p => p.id === 'p2')!;
   assert.equal(after.favor, 1);
   assert.equal(after.activePlot, null);
-  assert.ok(api.discardPile.includes('Королевский приём'));
+  assert.ok(faces(api.discardPile).includes('Королевский приём'));
 }
 
 {
   const { get, set, api } = makeHarness({
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Вор', 'Шут'] }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 3, hand: ['Казначей', 'Рыцарь'] }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Вор', 'Шут']) }),
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 3, hand: mintDeck(['Казначей', 'Рыцарь']) }),
       player({
         id: 'p3',
         name: 'Вера',
         isBot: true,
-        hand: ['Наследник', 'Шут'],
-        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 0 }
+        hand: mintDeck(['Наследник', 'Шут']),
+        activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 0 }
       })
     ]
   });
@@ -166,13 +167,13 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     activePlayerId: 'p2',
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Право вето', 'Наследник'], favor: 2 }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Право вето', 'Наследник']), favor: 2 }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         actionTokens: 2,
-        hand: ['Обвинение в измене', 'Шут'],
+        hand: mintDeck(['Обвинение в измене', 'Шут']),
         favor: 1
       })
     ]
@@ -192,13 +193,13 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     activePlayerId: 'p2',
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Право вето', 'Наследник'], favor: 2 }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Право вето', 'Наследник']), favor: 2 }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         actionTokens: 2,
-        hand: ['Обвинение в измене', 'Шут']
+        hand: mintDeck(['Обвинение в измене', 'Шут'])
       })
     ]
   });
@@ -212,13 +213,13 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     activePlayerId: 'p2',
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Право вето', 'Наследник'] }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Право вето', 'Наследник']) }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         actionTokens: 2,
-        hand: ['Королевский приём', 'Шут']
+        hand: mintDeck(['Королевский приём', 'Шут'])
       })
     ]
   });
@@ -243,13 +244,13 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     turnPhase: 'TARGET_REACTION_WINDOW',
     pendingAction: pending,
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Вор', 'Шут'] }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Вор', 'Шут']) }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         actionTokens: 2,
-        hand: ['Казначей', 'Рыцарь']
+        hand: mintDeck(['Казначей', 'Рыцарь'])
       })
     ]
   });
@@ -271,13 +272,13 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     turnPhase: 'TARGET_REACTION_WINDOW',
     pendingAction: pending,
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Вор', 'Шут'] }),
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Вор', 'Шут']) }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         actionTokens: 0,
-        hand: ['Казначей', 'Рыцарь']
+        hand: mintDeck(['Казначей', 'Рыцарь'])
       })
     ]
   });
@@ -291,8 +292,8 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     isPendingActionAfterTruthChallenge: true,
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Наследник', 'Шут'] }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: ['Право вето', 'Рыцарь'] })
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Наследник', 'Шут']) }),
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Право вето', 'Рыцарь']) })
     ]
   });
   const rolePlay = action({
@@ -314,15 +315,15 @@ function makeHarness(overrides: Partial<GameState> = {}) {
       player({
         id: 'p1',
         name: 'Анна',
-        hand: ['Право вето', 'Наследник'],
-        activePlot: { id: 'pl1', type: 'Королевский приём' }
+        hand: mintDeck(['Право вето', 'Наследник']),
+        activePlot: { id: 'pl1', cardId: 'plot-pl1', type: 'Королевский приём' }
       }),
       player({
         id: 'p2',
         name: 'Борис',
         isBot: true,
         actionTokens: 2,
-        hand: ['Обыск покоев', 'Шут']
+        hand: mintDeck(['Обыск покоев', 'Шут'])
       })
     ]
   });
@@ -333,7 +334,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
   proceedAfterVetoWindow(get, set);
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null);
-  assert.ok(api.discardPile.includes('Королевский приём'));
+  assert.ok(faces(api.discardPile).includes('Королевский приём'));
 }
 
 {
@@ -343,9 +344,9 @@ function makeHarness(overrides: Partial<GameState> = {}) {
         id: 'p1',
         name: 'Анна',
         actionTokens: 1,
-        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 0 }
+        activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 0 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: ['Казначей', 'Рыцарь'] })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: mintDeck(['Казначей', 'Рыцарь']) })
     ]
   });
   chargeActiveConspiracies(get, set, 'проверку');
@@ -359,9 +360,9 @@ function makeHarness(overrides: Partial<GameState> = {}) {
         id: 'p1',
         name: 'Анна',
         actionTokens: 1,
-        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 1 }
+        activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 1 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: ['Казначей', 'Рыцарь'] })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: mintDeck(['Казначей', 'Рыцарь']) })
     ]
   });
   applyConspiracyEffect(get, set, action({
@@ -382,9 +383,9 @@ function makeHarness(overrides: Partial<GameState> = {}) {
         id: 'p1',
         name: 'Анна',
         actionTokens: 1,
-        activePlot: { id: 'c1', type: 'Тайный заговор', charges: 4 }
+        activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 4 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, favor: 3, hand: ['Казначей', 'Рыцарь'] })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, favor: 3, hand: mintDeck(['Казначей', 'Рыцарь']) })
     ]
   });
   applyConspiracyEffect(get, set, action({

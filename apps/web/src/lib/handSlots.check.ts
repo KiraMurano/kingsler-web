@@ -7,6 +7,7 @@ import { compactIndex, isCardStaked, reconcileHandSlots, type HandSlots } from '
 import type { Action, GameState, Player } from '@kinglier/engine/types';
 import { triggerVetoWindowOrResolveEffect } from '@kinglier/engine/resolvers/doubtResolver';
 import { timerManager } from '@kinglier/engine/utils/timerManager';
+import { mintDeck } from '@kinglier/engine/cardInstance';
 
 const empty: HandSlots = [null, null];
 
@@ -45,7 +46,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     favor: 0,
     seals: 0,
     actionTokens: 1,
-    hand: ['Наследник', 'Шут'],
+    hand: mintDeck(['Наследник', 'Шут']),
     activePlot: null,
     ...partial
   };
@@ -86,8 +87,8 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 {
   const { get, set, api } = makeHarness({
     players: [
-      player({ id: 'p1', name: 'Анна', hand: ['Наследник', 'Шут'] }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: ['Казначей', 'Рыцарь'] })
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Наследник', 'Шут']) }),
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Рыцарь']) })
     ]
   });
 

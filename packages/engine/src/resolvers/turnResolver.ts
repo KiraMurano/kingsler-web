@@ -1,5 +1,6 @@
 import type { Action, GameCard, GameState, Player } from '../types';
 import { drawCardsFromDeck } from '../cards';
+import { holds } from '../cardInstance';
 import { timerManager } from '../utils/timerManager';
 import { triggerFaceCardFlight } from '../utils/visualEffects';
 import { resolveMorningPlots } from './plotResolver';
@@ -141,7 +142,7 @@ export function endTurn(
   const morningType = nextFromUpdated.activePlot?.type;
   const morningNeedsVeto =
     (morningType === 'Королевский приём' || morningType === 'Золотая булла') &&
-    updatedPlayers.some(p => p.id !== nextFromUpdated.id && p.hand.includes('Право вето'));
+    updatedPlayers.some(p => p.id !== nextFromUpdated.id && holds(p.hand, 'Право вето'));
 
   if (morningNeedsVeto && morningType) {
     const morningAction: Action = {

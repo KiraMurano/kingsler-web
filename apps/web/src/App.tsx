@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { pickViewer } from './lib/viewer';
+import { faces } from '@kinglier/engine/cardInstance';
 import { useToast } from './lib/toast';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
@@ -185,7 +186,7 @@ export default function App({
         else if (e.key === '2') targetDoubtAttack(human.id);
         else if (e.key === '3') {
           const shield = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-          const index = human.hand.indexOf(shield);
+          const index = faces(human.hand).indexOf(shield);
           targetDeclareDuel(human.id, index === -1 ? 0 : index);
         }
       }

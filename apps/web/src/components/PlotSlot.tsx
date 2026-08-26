@@ -23,6 +23,7 @@ function laidPlotPreview(pending: Action | null, ownerId: string): ActivePlotDat
   }
   return {
     id: pending.id,
+    cardId: pending.stakedCardId ?? pending.id,
     type: pending.plotType,
     targetPlayerId: pending.targetId,
     charges: pending.plotType === 'Тайный заговор' ? 0 : undefined

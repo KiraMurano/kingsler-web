@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import type { Role } from '@kinglier/engine/types';
 import { pickViewer } from '../lib/viewer';
+import { faces } from '@kinglier/engine/cardInstance';
 import { Button } from './ui/Button';
 import { UiIcon } from './ui/Icon';
 
@@ -83,7 +84,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   const isActor = pendingAction?.actorId === human.id;
   const isTarget = pendingAction?.targetId === human.id;
   const hasTokens = human.actionTokens >= 1;
-  const redirectIndex = human.hand.indexOf('Перенаправление');
+  const redirectIndex = faces(human.hand).indexOf('Перенаправление');
   const pendingDoubter = pendingDoubtDoubterId
     ? players.find(p => p.id === pendingDoubtDoubterId)
     : null;
@@ -147,7 +148,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           alert
           busy={busy}
         >
-          {human.hand.map((card, idx) => {
+          {human.hand.map(({ card }, idx) => {
             const truthful = card === shieldRole;
             return (
               <Button
@@ -304,7 +305,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   /* 4. Veto window before the effect lands. Closes immediately on click,
      same as every other action popup — no lingering panel. */
   if (turnPhase === 'VETO_WINDOW' && !vetoDismissed) {
-    const vetoIndex = human.hand.indexOf('Право вето');
+    const vetoIndex = faces(human.hand).indexOf('Право вето');
     const canVeto = vetoIndex !== -1 && !isVetoed;
     return (
       <Panel

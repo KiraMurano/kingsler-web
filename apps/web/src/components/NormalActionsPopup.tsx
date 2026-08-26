@@ -138,7 +138,7 @@ export const NormalActionsPopup: React.FC<{ onClose: () => void }> = ({ onClose 
             Сбросьте одну или обе карты и немедленно доберите новые.
           </div>
           <div className="optgrid">
-            {human.hand.map((card, idx) => (
+            {human.hand.map(({ card }, idx) => (
               <Button
                 key={idx}
                 tone="calm"
@@ -180,7 +180,7 @@ export const NormalActionsPopup: React.FC<{ onClose: () => void }> = ({ onClose 
                   actorId: human.id,
                   costGold: 0,
                   costTokens: 1,
-                  description: `Сбросил обе карты («${human.hand[0]}», «${human.hand[1]}») и взял две новые.`
+                  description: `Сбросил обе карты («${human.hand[0].card}», «${human.hand[1].card}») и взял две новые.`
                 });
               }}
             >

@@ -1,5 +1,6 @@
 import type { Action, GameState, RevealOutcome } from '../types';
 import { isRole } from '../cards';
+import { holds } from '../cardInstance';
 import { declineAcc, verbDoubted, verbCaught } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
 import { triggerResourceFloat, triggerSingleCardFlight } from '../utils/visualEffects';
@@ -142,7 +143,8 @@ export function executeRevealOutcome(
   let stakedIndex = pendingAction.stakedCardIndex ?? 0;
   if (stakedIndex < 0 || stakedIndex >= actorHand.length) stakedIndex = 0;
 
-  const revealedRole = actorHand[stakedIndex] || actorHand[0] || 'Наследник';
+  const staked = actorHand[stakedIndex] ?? actorHand[0];
+  const revealedRole = staked?.card ?? 'Наследник';
   const wasTruth = revealedRole === claimedRole;
 
   const newPlayers = [...players];
@@ -160,7 +162,7 @@ export function executeRevealOutcome(
     // Failed check: Black Book is discarded without reward
     if (doubterPlot && doubterPlot.type === 'Чёрная книга') {
       newPlayers[doubterIdx] = { ...newPlayers[doubterIdx], activePlot: null };
-      set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
+      set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
     }
 
     if (claimedRole === 'Шут') {
@@ -202,7 +204,7 @@ export function executeRevealOutcome(
           activePlot: null
         };
       }
-      set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
+      set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
 
       if (newPlayers[doubterIdx].favor >= 6) {
         beginCoronationIfNeeded(get, set, doubter.id);
@@ -216,6 +218,7 @@ export function executeRevealOutcome(
     // Check Dossier (Досье) on the accused actor: awards +1 👑 directly!
     const dossierOwner = newPlayers.find(p => p.activePlot?.type === 'Досье' && p.activePlot.targetPlayerId === actor.id);
     if (dossierOwner) {
+      const dossierCardId = dossierOwner.activePlot!.cardId;
       dossierBonusPlayerId = dossierOwner.id;
       const dIdx = newPlayers.findIndex(p => p.id === dossierOwner.id);
       const dNextFavor = Math.min(6, dossierOwner.favor + 1);
@@ -226,7 +229,7 @@ export function executeRevealOutcome(
         activePlot: null
       };
       triggerResourceFloat(set, dossierOwner.id, `+${dGained} 👑 Досье!`, true);
-      set(state => ({ discardPile: [...state.discardPile, 'Досье'] }));
+      set(state => ({ discardPile: [...state.discardPile, { id: dossierCardId, card: 'Досье' as const }] }));
 
       if (newPlayers[dIdx].favor >= 6) {
         beginCoronationIfNeeded(get, set, dossierOwner.id);
@@ -234,10 +237,11 @@ export function executeRevealOutcome(
     }
   }
 
-  // Remove revealed card from hand to discard
+  // Remove revealed card from hand to discard — the very instance that was
+  // staked, so the card keeps its identity all the way into the graveyard.
   actorHand.splice(stakedIndex, 1);
   newPlayers[actorIdx] = { ...newPlayers[actorIdx], hand: actorHand };
-  const newDiscard = [...get().discardPile, revealedRole];
+  const newDiscard = staked ? [...get().discardPile, staked] : [...get().discardPile];
 
   if (isRole(revealedRole)) botMemory.recordRevealedCard(actor.id, revealedRole);
 
@@ -409,8 +413,8 @@ export function triggerVetoWindowOrResolveEffect(
   // human needs the manual VETO_WINDOW to react in — not just "the first
   // non-bot player" (with 2+ humans, that used to skip straight to the
   // bot-timer path whenever the *other* human, not the first one, held it).
-  const humanHoldsVeto = players.some(p => !p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
-  const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
+  const humanHoldsVeto = players.some(p => !p.isBot && p.id !== action.actorId && holds(p.hand, 'Право вето'));
+  const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && holds(p.hand, 'Право вето'));
 
   if (humanHoldsVeto) {
     set({
@@ -521,9 +525,9 @@ export function proceedAfterVetoWindow(
       discardMorningPlot(get, set, pendingAction.actorId);
       return;
     }
-    if (pendingAction.type === 'plot' && !pendingAction.conspiracyEffect && pendingAction.plotType) {
+    if (pendingAction.type === 'plot' && !pendingAction.conspiracyEffect && pendingAction.plotType && pendingAction.stakedCardId) {
       set(state => ({
-        discardPile: [...state.discardPile, pendingAction.plotType!]
+        discardPile: [...state.discardPile, { id: pendingAction.stakedCardId!, card: pendingAction.plotType! }]
       }));
     }
     timerManager.scheduleDelay(() => {

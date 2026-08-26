@@ -63,13 +63,13 @@ export function attackerRetreatDuel(
 
   const actorHand = [...actor.hand];
   const stakedIdx = pendingAction.stakedCardIndex ?? 0;
-  const discardedCard = actorHand[stakedIdx] || actorHand[0] || 'Наследник';
-  actorHand.splice(stakedIdx, 1);
+  const discarded = actorHand[stakedIdx] ?? actorHand[0];
+  if (discarded) actorHand.splice(actorHand.indexOf(discarded), 1);
 
   const newPlayers = players.map(p => p.id === actor.id ? { ...p, hand: actorHand } : p);
-  const newDiscard = [...get().discardPile, discardedCard];
+  const newDiscard = discarded ? [...get().discardPile, discarded] : [...get().discardPile];
 
-  triggerSingleCardFlight(set, 'to_discard', actor.id, pendingAction.roleClaim, discardedCard);
+  triggerSingleCardFlight(set, 'to_discard', actor.id, pendingAction.roleClaim, discarded?.card);
 
   set(state => ({
     players: newPlayers,
@@ -105,16 +105,18 @@ export function attackerAcceptDuel(
 
   const actorHand = [...actor.hand];
   const actorStakedIdx = pendingAction.stakedCardIndex ?? 0;
-  const actorRevealedRole = actorHand[actorStakedIdx] || actorHand[0] || 'Наследник';
+  const actorStaked = actorHand[actorStakedIdx] ?? actorHand[0];
+  const actorRevealedRole = actorStaked?.card ?? 'Наследник';
   const actorWasTruth = actorRevealedRole === pendingAction.roleClaim;
 
   const defenderHand = [...defender.hand];
   const defStakedIdx = pendingDuelDefenderCardIndex ?? 0;
-  const defenderRevealedRole = defenderHand[defStakedIdx] || defenderHand[0] || 'Наследник';
+  const defenderStaked = defenderHand[defStakedIdx] ?? defenderHand[0];
+  const defenderRevealedRole = defenderStaked?.card ?? 'Наследник';
   const defenderWasTruth = defenderRevealedRole === pendingDuelDefenderRoleClaim;
 
-  actorHand.splice(actorStakedIdx, 1);
-  defenderHand.splice(defStakedIdx, 1);
+  if (actorStaked) actorHand.splice(actorHand.indexOf(actorStaked), 1);
+  if (defenderStaked) defenderHand.splice(defenderHand.indexOf(defenderStaked), 1);
 
   const newPlayers = players.map(p => {
     if (p.id === actor.id) return { ...p, hand: actorHand };

@@ -3,6 +3,7 @@ import type { GameCard, Player } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { courtly } from '../lib/text';
 import { useHandSlots } from '../lib/handSlots';
+import { faces } from '@kinglier/engine/cardInstance';
 import { usePresence } from '../lib/presence';
 import { Bolts, Deltas, Res, Seals } from './ui/Res';
 import { Portrait } from './Portrait';
@@ -67,7 +68,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
 
   const speech = useSeatSpeech(player);
   const { shown: spoken, exiting: speechOut } = usePresence(speech);
-  const { slots, leaving } = useHandSlots(player.hand);
+  const { slots, leaving } = useHandSlots(faces(player.hand));
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
 
   return (

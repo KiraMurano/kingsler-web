@@ -11,6 +11,8 @@ import {
   CARD_DESCRIPTIONS 
 } from './data/cardDescriptions';
 
+import { mintDeck, mintCard, type CardInstance } from './cardInstance';
+
 export type { Role, PlotType, InstantType, GameCard, CardCategory, CardDescription };
 export type CardInfo = CardDescription;
 
@@ -63,9 +65,11 @@ export function isInstant(card: GameCard): card is InstantType {
 }
 
 /**
- * Создает полную колоду из всех карт согласно CARD_COPIES_MAP
+ * Создает полную колоду из всех карт согласно CARD_COPIES_MAP.
+ * Ids are minted after the shuffle, so they are stable but arbitrary — a card's
+ * identity says nothing about which card it is.
  */
-export function createInitialDeck(): GameCard[] {
+export function createInitialDeck(): CardInstance[] {
   const deck: GameCard[] = [];
 
   for (const [card, count] of Object.entries(CARD_COPIES_MAP)) {
@@ -80,24 +84,24 @@ export function createInitialDeck(): GameCard[] {
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
 
-  return deck;
+  return mintDeck(deck);
 }
 
 export function drawCardsFromDeck(
-  count: number, 
-  deck: GameCard[], 
-  discardPile: GameCard[]
-): { drawn: GameCard[]; deck: GameCard[]; discardPile: GameCard[]; wasReshuffled: boolean; reshuffledCount: number } {
+  count: number,
+  deck: CardInstance[],
+  discardPile: CardInstance[]
+): { drawn: CardInstance[]; deck: CardInstance[]; discardPile: CardInstance[]; wasReshuffled: boolean; reshuffledCount: number } {
   let curDeck = [...deck];
   let curDiscard = [...discardPile];
-  const drawn: GameCard[] = [];
+  const drawn: CardInstance[] = [];
   let wasReshuffled = false;
   let reshuffledCount = 0;
 
   for (let i = 0; i < count; i++) {
     if (curDeck.length === 0) {
       if (curDiscard.length === 0) {
-        drawn.push('Наследник');
+        drawn.push(mintCard('Наследник'));
         continue;
       }
       wasReshuffled = true;

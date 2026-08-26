@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Action, GameCard, Player } from '@kinglier/engine/types';
 import { compactIndex, isCardStaked, useHandSlots } from '../lib/handSlots';
+import { faces } from '@kinglier/engine/cardInstance';
 import { Card } from './Card';
 
 interface HandProps {
@@ -25,14 +26,15 @@ export const Hand: React.FC<HandProps> = ({
   stakedCardIndex,
   onCardClick
 }) => {
-  const { slots, leaving } = useHandSlots(player.hand);
+  const handFaces = faces(player.hand);
+  const { slots, leaving } = useHandSlots(handFaces);
 
   return (
     <div className="hand">
       {([0, 1] as const).map(index => {
         const live = slots[index];
         const gone = leaving[index];
-        const engineIndex = compactIndex(player.hand, slots, index);
+        const engineIndex = compactIndex(handFaces, slots, index);
         const staked = isCardStaked(pendingAction, player.id, engineIndex);
         const vetoReady = !!live && isVetoWindow && live === 'Право вето';
         const card = gone ?? live;

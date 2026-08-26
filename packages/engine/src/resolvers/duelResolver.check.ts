@@ -11,6 +11,7 @@ import { attackerAcceptDuel, closeDuelOutcome } from './duelResolver.ts';
 import { triggerVetoWindowOrResolveEffect, resolvePendingActionEffect } from './doubtResolver.ts';
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
+import { mintDeck } from '../cardInstance.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -21,7 +22,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     favor: 3,
     seals: 0,
     actionTokens: 2,
-    hand: ['Наследник', 'Право вето'],
+    hand: mintDeck(['Наследник', 'Право вето']),
     activePlot: null,
     ...partial
   };
@@ -87,8 +88,8 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     pendingAction: pending,
     players: [
-      player({ id: 'p1', name: 'Атакующий', hand: ['Вор', 'Шут'] }),
-      player({ id: 'p2', name: 'Защитник', isBot: true, gold: 3, hand: ['Рыцарь', 'Шут'] })
+      player({ id: 'p1', name: 'Атакующий', hand: mintDeck(['Вор', 'Шут']) }),
+      player({ id: 'p2', name: 'Защитник', isBot: true, gold: 3, hand: mintDeck(['Рыцарь', 'Шут']) })
     ]
   });
 

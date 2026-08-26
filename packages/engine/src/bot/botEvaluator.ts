@@ -1,4 +1,4 @@
-import type { GameCard, Player, Role } from '../types';
+import type { CardInstance, Player, Role } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
 
@@ -18,7 +18,7 @@ export function evaluateBotDoubt(
   _isTargetedDirectDoubt: boolean,
   coronationCandidateId: string | null,
   targetId: string | undefined,
-  discardPile: GameCard[],
+  discardPile: CardInstance[],
   _allPlayers: Player[]
 ): DoubtDecision {
   // Без жетонов действия бот не может сомневаться
@@ -32,8 +32,8 @@ export function evaluateBotDoubt(
   // - В сбросе
   // - В собственной руке бота
   // - В известных боту картах других игроков из памяти
-  const copiesInDiscard = discardPile.filter(c => c === claimedRole).length;
-  const copiesInBotHand = bot.hand.filter(c => c === claimedRole).length;
+  const copiesInDiscard = discardPile.filter(c => c.card === claimedRole).length;
+  const copiesInBotHand = bot.hand.filter(c => c.card === claimedRole).length;
   const knownInOthers = botMemory.getAllKnownRoleCardsForBot(bot.id, actor.id).filter(c => c === claimedRole).length;
 
   const totalKnownExcluded = copiesInDiscard + copiesInBotHand + knownInOthers;
