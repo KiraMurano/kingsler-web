@@ -14,6 +14,7 @@ import { Dialog } from './ui/Overlay';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Res } from './ui/Res';
+import { UiIcon, renderWithIcons } from './ui/Icon';
 import { Portrait } from './Portrait';
 
 const CardPlate: React.FC<{ card: GameCard; caption?: string; width?: number }> = ({
@@ -61,7 +62,11 @@ function ConspiracyDialog({
       title={`Тайный заговор · ${prompt.charges} из 4`}
       description={
         <div style={{ display: 'flex', gap: 6 }}>
-          <Tag tone="arcane">активация в ход · 1 ⚡</Tag>
+          <Tag tone="arcane">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              активация в ход · 1 <UiIcon kind="move" size="xs" />
+            </span>
+          </Tag>
           {unvetoable && <Tag tone="danger">вето невозможно</Tag>}
         </div>
       }
@@ -109,7 +114,14 @@ function ConspiracyDialog({
             <Button
               tone={effect === 'gold' ? 'gold' : 'plain'}
               block
-              sub={target ? `Отнимет ${Math.min(prompt.charges, target.gold)} 🪙` : undefined}
+              sub={
+                target ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    Отнимет {Math.min(prompt.charges, target.gold)}{' '}
+                    <UiIcon kind="coin" size="xs" />
+                  </span>
+                ) : undefined
+              }
               onClick={() => setEffect('gold')}
             >
               Сбить казну
@@ -118,7 +130,15 @@ function ConspiracyDialog({
               tone={effect === 'crown' ? 'danger' : 'plain'}
               block
               disabled={prompt.charges < 3}
-              sub={prompt.charges < 3 ? 'нужно 3 заряда' : `Отнимет 1 👑 у ${target?.name}`}
+              sub={
+                prompt.charges < 3 ? (
+                  'нужно 3 заряда'
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    Отнимет 1 <UiIcon kind="crown" size="xs" /> у {target?.name}
+                  </span>
+                )
+              }
               onClick={() => prompt.charges >= 3 && setEffect('crown')}
             >
               Лишить короны
@@ -171,7 +191,11 @@ function RedirectChoiceDialog({
         <button type="button" className="opt" onClick={onRedirect}>
           <div className="opt__row">
             <span className="opt__name">Разыграть как инстант</span>
-            <Tag tone="gold">0 ⚡</Tag>
+            <Tag tone="gold">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                0 <UiIcon kind="move" size="xs" />
+              </span>
+            </Tag>
           </div>
           <div className="opt__desc">
             Нападение уходит на другого придворного — защищаться будет он.
@@ -337,24 +361,32 @@ export const Modals: React.FC<ModalsProps> = ({
         onClose={onCloseRules}
         width={700}
         title="Свод законов двора"
-        description={`Единая колода из ${TOTAL_DECK_SIZE} карт · цель — удержать 6 👑 полный круг`}
+        description={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            Единая колода из {TOTAL_DECK_SIZE} карт · цель — удержать 6{' '}
+            <UiIcon kind="crown" size="xs" /> полный круг
+          </span>
+        }
       >
         <div className="rules">
           <div>
             <h4>Колода и победа</h4>
             {TOTAL_ROLES_COUNT} карт ролей, {TOTAL_PLOTS_COUNT} интриг и {TOTAL_INSTANTS_COUNT}{' '}
-            инстантов. Побеждает тот, кто первым удержит 6 👑 целый круг. За выигранные споры
-            начисляются печати: 2 ⚜️ обращаются в 1 👑.
+            инстантов. Побеждает тот, кто первым удержит 6 <UiIcon kind="crown" size="xs" /> целый
+            круг. За выигранные споры начисляются печати: 2 <UiIcon kind="bulla" size="xs" />{' '}
+            обращаются в 1 <UiIcon kind="crown" size="xs" />.
           </div>
 
           <div>
             <h4>Ход состоит из трёх фаз</h4>
             <ul>
               <li>
-                <b>Утро.</b> Жетоны восполняются до 2 ⚡, срабатывают выложенные интриги.
+                <b>Утро.</b> Жетоны восполняются до 2 <UiIcon kind="move" size="xs" />,
+                срабатывают выложенные интриги.
               </li>
               <li>
-                <b>Действие двора</b> (не более одного): содержание, пир, слух или обмен карт — 1 ⚡.
+                <b>Действие двора</b> (не более одного): содержание, пир, слух или обмен карт — 1{' '}
+                <UiIcon kind="move" size="xs" />.
               </li>
               <li>
                 <b>Розыгрыш карт:</b> одна интрига, одна роль и любые инстанты. Добор карт
@@ -374,7 +406,7 @@ export const Modals: React.FC<ModalsProps> = ({
             <div className="rules__grid">
               {ALL_ROLES.map(role => (
                 <div key={role} className="rules__cell">
-                  <b>{role}.</b> {CARD_DESCRIPTIONS[role].shortDescription}
+                  <b>{role}.</b> {renderWithIcons(CARD_DESCRIPTIONS[role].shortDescription)}
                 </div>
               ))}
             </div>
@@ -385,7 +417,7 @@ export const Modals: React.FC<ModalsProps> = ({
             <div className="rules__grid">
               {ALL_PLOTS.map(plot => (
                 <div key={plot} className="rules__cell">
-                  <b>{plot}.</b> {CARD_DESCRIPTIONS[plot].shortDescription}
+                  <b>{plot}.</b> {renderWithIcons(CARD_DESCRIPTIONS[plot].shortDescription)}
                 </div>
               ))}
             </div>
@@ -396,7 +428,8 @@ export const Modals: React.FC<ModalsProps> = ({
             <div className="rules__grid">
               {ALL_INSTANTS.map(instant => (
                 <div key={instant} className="rules__cell">
-                  <b>{instant}.</b> {courtly(CARD_DESCRIPTIONS[instant].shortDescription)}
+                  <b>{instant}.</b>{' '}
+                  {renderWithIcons(courtly(CARD_DESCRIPTIONS[instant].shortDescription))}
                 </div>
               ))}
             </div>

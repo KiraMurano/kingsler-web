@@ -5,6 +5,7 @@ import type { PlotType, InstantType } from '@kinglier/engine/types';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';
+import { UiIcon, renderWithIcons } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
 
@@ -111,132 +112,153 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
         </span>
       }
     >
-        <div className="optlist">
-          {hasVaBanque && !hasPlayedRoleThisTurn && (
-            <div className={`notice ${withVaBanque ? 'notice--arcane' : ''}`}>
-              <div className="notice__row">
+      <div className="optlist">
+        {hasVaBanque && !hasPlayedRoleThisTurn && (
+          <div className={`notice ${withVaBanque ? 'notice--arcane' : ''}`}>
+            <div className="notice__row">
+              <div>
+                <div className="notice__title">Сыграть с Ва-банком</div>
                 <div>
-                  <div className="notice__title">Сыграть с Ва-банком</div>
-                  <div>
-                    При проверке эффект роли удваивается, при блефе поймавший получает +2 ⚜️.
-                  </div>
+                  При проверке эффект роли удваивается, при блефе поймавший получает +2{' '}
+                  <UiIcon kind="bulla" size="xs" />.
                 </div>
-                <Button
-                  tone={withVaBanque ? 'danger' : 'arcane'}
-                  size="sm"
-                  disabled={!canUseVaBanque && !withVaBanque}
-                  onClick={() => setWithVaBanque(!withVaBanque)}
-                >
-                  {withVaBanque ? 'Отключить' : 'Удвоить'}
-                </Button>
               </div>
+              <Button
+                tone={withVaBanque ? 'danger' : 'arcane'}
+                size="sm"
+                disabled={!canUseVaBanque && !withVaBanque}
+                onClick={() => setWithVaBanque(!withVaBanque)}
+              >
+                {withVaBanque ? 'Отключить' : 'Удвоить'}
+              </Button>
             </div>
-          )}
+          </div>
+        )}
 
-          {!withVaBanque && isPlot(card) && (
-            <div className="notice notice--gold">
-              <div className="notice__row">
-                <div>
-                  <div className="notice__title">Выложить открыто как интригу · 1 ⚡</div>
-                  <div>
-                    {hasPlayedPlotThisTurn
-                      ? 'За ход можно выложить только одну интригу.'
-                      : info.shortDescription}
-                  </div>
+        {!withVaBanque && isPlot(card) && (
+          <div className="notice notice--gold">
+            <div className="notice__row">
+              <div>
+                <div className="notice__title">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    Выложить открыто как интригу · 1 <UiIcon kind="move" size="xs" />
+                  </span>
                 </div>
-                <Button
-                  tone="gold"
-                  size="sm"
-                  disabled={hasPlayedPlotThisTurn || !hasTokens}
-                  onClick={playAsPlot}
-                >
-                  На стол
-                </Button>
+                <div>
+                  {hasPlayedPlotThisTurn
+                    ? 'За ход можно выложить только одну интригу.'
+                    : renderWithIcons(info.shortDescription)}
+                </div>
               </div>
+              <Button
+                tone="gold"
+                size="sm"
+                disabled={hasPlayedPlotThisTurn || !hasTokens}
+                onClick={playAsPlot}
+              >
+                На стол
+              </Button>
             </div>
-          )}
+          </div>
+        )}
 
-          {!withVaBanque && isInstant(card) && card !== 'Ва-банк' && (
-            <div className="notice notice--arcane">
-              <div className="notice__row">
-                <div>
-                  <div className="notice__title">
-                    {OPENLY_PLAYABLE_INSTANTS.includes(card as InstantType)
-                      ? 'Разыграть инстант · 1 ⚡'
-                      : 'Реактивный инстант — ждёт своего окна'}
-                  </div>
-                  <div>{info.shortDescription}</div>
+        {!withVaBanque && isInstant(card) && card !== 'Ва-банк' && (
+          <div className="notice notice--arcane">
+            <div className="notice__row">
+              <div>
+                <div className="notice__title">
+                  {OPENLY_PLAYABLE_INSTANTS.includes(card as InstantType) ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      Разыграть инстант · 1 <UiIcon kind="move" size="xs" />
+                    </span>
+                  ) : (
+                    'Реактивный инстант — ждёт своего окна'
+                  )}
                 </div>
-                {OPENLY_PLAYABLE_INSTANTS.includes(card as InstantType) && (
-                  <Button tone="arcane" size="sm" disabled={!hasTokens} onClick={playAsInstant}>
-                    Сыграть
-                  </Button>
+                <div>{renderWithIcons(info.shortDescription)}</div>
+              </div>
+              {OPENLY_PLAYABLE_INSTANTS.includes(card as InstantType) && (
+                <Button tone="arcane" size="sm" disabled={!hasTokens} onClick={playAsInstant}>
+                  Сыграть
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div
+        className="overlay__desc"
+        style={{
+          margin: '4px 0 10px',
+          color: hasPlayedRoleThisTurn ? 'var(--crimson-soft)' : undefined
+        }}
+      >
+        {hasPlayedRoleThisTurn ? (
+          'За ход можно разыграть только одну роль.'
+        ) : withVaBanque ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            Выберите заявляемую роль · 1 <UiIcon kind="move" size="xs" />
+          </span>
+        ) : (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            Положите карту взакрытую и заявите любую роль двора · 1{' '}
+            <UiIcon kind="move" size="xs" />
+          </span>
+        )}
+      </div>
+
+      <div className="optgrid">
+        {ALL_ROLES.map(role => {
+          const roleInfo = CARD_DESCRIPTIONS[role];
+          const affordable = human.gold >= roleInfo.cost && hasTokens && !hasPlayedRoleThisTurn;
+          const truthful = role === card;
+
+          return (
+            <button
+              key={role}
+              type="button"
+              className={`opt ${truthful ? 'opt--truth' : ''}`}
+              disabled={!affordable}
+              onClick={() => {
+                onClose();
+                if (roleInfo.targeted) {
+                  startTargeting({
+                    type: 'role',
+                    name: role,
+                    roleClaim: role,
+                    stakedCardIndex,
+                    withVaBanque,
+                    cost: roleInfo.cost
+                  });
+                } else {
+                  performAction({
+                    type: 'role',
+                    name: role,
+                    roleClaim: role,
+                    stakedCardIndex,
+                    actorId: human.id,
+                    withVaBanque,
+                    costGold: roleInfo.cost,
+                    costTokens: 1,
+                    description: roleInfo.fullDescription
+                  });
+                }
+              }}
+            >
+              <div className="opt__row">
+                <span className="opt__name">{role}</span>
+                <Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'правда' : 'блеф'}</Tag>
+              </div>
+              <div className="opt__desc">
+                {renderWithIcons(
+                  withVaBanque ? VA_BANQUE_EFFECT[role] : roleInfo.shortDescription
                 )}
               </div>
-            </div>
-          )}
-        </div>
-
-        <div
-          className="overlay__desc"
-          style={{ margin: '4px 0 10px', color: hasPlayedRoleThisTurn ? 'var(--crimson-soft)' : undefined }}
-        >
-          {hasPlayedRoleThisTurn
-            ? 'За ход можно разыграть только одну роль.'
-            : withVaBanque
-              ? 'Выберите заявляемую роль · 1 ⚡'
-              : 'Положите карту взакрытую и заявите любую роль двора · 1 ⚡'}
-        </div>
-
-        <div className="optgrid">
-          {ALL_ROLES.map(role => {
-            const roleInfo = CARD_DESCRIPTIONS[role];
-            const affordable = human.gold >= roleInfo.cost && hasTokens && !hasPlayedRoleThisTurn;
-            const truthful = role === card;
-
-            return (
-              <button
-                key={role}
-                type="button"
-                className={`opt ${truthful ? 'opt--truth' : ''}`}
-                disabled={!affordable}
-                onClick={() => {
-                  onClose();
-                  if (roleInfo.targeted) {
-                    startTargeting({
-                      type: 'role',
-                      name: role,
-                      roleClaim: role,
-                      stakedCardIndex,
-                      withVaBanque,
-                      cost: roleInfo.cost
-                    });
-                  } else {
-                    performAction({
-                      type: 'role',
-                      name: role,
-                      roleClaim: role,
-                      stakedCardIndex,
-                      actorId: human.id,
-                      withVaBanque,
-                      costGold: roleInfo.cost,
-                      costTokens: 1,
-                      description: roleInfo.fullDescription
-                    });
-                  }
-                }}
-              >
-                <div className="opt__row">
-                  <span className="opt__name">{role}</span>
-                  <Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'правда' : 'блеф'}</Tag>
-                </div>
-                <div className="opt__desc">
-                  {withVaBanque ? VA_BANQUE_EFFECT[role] : roleInfo.shortDescription}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+            </button>
+          );
+        })}
+      </div>
     </Dialog>
   );
 };

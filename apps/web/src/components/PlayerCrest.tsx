@@ -3,6 +3,7 @@ import type { GameCard, Player } from '@kinglier/engine/types';
 import { DEFAULT_PROFILE_TITLE } from '@kinglier/engine/profile';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { Bolts, Deltas, Res, Seals, type DeltaEvent } from './ui/Res';
+import { UiIcon } from './ui/Icon';
 import { Portrait } from './Portrait';
 import { PlotSlot } from './PlotSlot';
 
@@ -17,7 +18,7 @@ export const CrownsTrack: React.FC<{
     <div className="crowns__head">
       <span className="eyebrow">До престола</span>
       <span className="crowns__value delta-anchor">
-        👑 {favor}/{CROWNS_TO_WIN}
+        <UiIcon kind="crown" size="sm" /> {favor}/{CROWNS_TO_WIN}
         <Deltas events={events} kind="crown" />
       </span>
     </div>
@@ -54,14 +55,16 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
 
       <div className="crest__head">
         <Portrait src={player.avatar} name={player.name} className="crest__portrait" />
-        <div>
-          <div className="crest__title">{player.title ?? DEFAULT_PROFILE_TITLE}</div>
-          <div className="crest__namerow">
-            <div className="crest__name">{player.name}</div>
-            <span className="delta-anchor">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="crest__toprow">
+            <div className="crest__title">{player.title ?? DEFAULT_PROFILE_TITLE}</div>
+            <span className="delta-anchor crest__bolts">
               <Bolts tokens={player.actionTokens} />
               <Deltas events={deltas} kind="act" />
             </span>
+          </div>
+          <div className="crest__namerow">
+            <div className="crest__name">{player.name}</div>
           </div>
           <div className={`crest__state ${isActive ? 'crest__state--mine' : ''}`}>
             <span key={isActive ? 'mine' : 'wait'}>{isActive ? 'ваш ход' : 'ожидание'}</span>

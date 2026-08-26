@@ -400,6 +400,21 @@
   gap: 4px;
 }
 
+.seat__toprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.seat__bolts {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .seat__namerow {
   display: flex;
   align-items: center;
@@ -435,7 +450,7 @@
   text-overflow: ellipsis;
 }
 
-.seat__head > .seat__role {
+.seat__head .seat__role {
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -474,6 +489,7 @@
 .bolts {
   display: inline-flex;
   align-items: center;
+  gap: 0;
   flex-shrink: 0;
   line-height: 1;
 }
@@ -485,13 +501,23 @@
 }
 
 .bolt {
-  font-size: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  top: 1.5px;
   transition: opacity var(--dur-move) var(--ease-out), filter var(--dur-move) var(--ease-out);
 }
 
+.bolt .ui-icon {
+  width: 18px;
+  height: 18px;
+  margin: 0 -0.5px;
+}
+
 .bolt--off {
-  opacity: 0.28;
-  filter: grayscale(0.65);
+  opacity: 0.25;
+  filter: grayscale(0.75);
 }
 
 .seat__plot {
@@ -988,6 +1014,7 @@
 .plaque__desc {
   display: -webkit-box;
   -webkit-line-clamp: 6;
+  line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 0.76rem;
@@ -1148,6 +1175,21 @@
   box-shadow: 0 0 0 3px rgba(200, 160, 74, 0.14);
 }
 
+.crest__toprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.crest__bolts {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .crest__namerow {
   display: flex;
   align-items: center;
@@ -1214,12 +1256,22 @@
 }
 
 .crowns__value {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-display);
   font-size: 0.78rem;
   font-weight: 800;
   color: var(--gold-pale);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.crowns__value .ui-icon {
+  position: relative;
+  top: -1.5px;
+  width: 17px;
+  height: 17px;
+  margin-right: 4px;
 }
 
 .crowns__track {
@@ -1259,6 +1311,13 @@
   font-size: 0.68rem;
 }
 
+.crowns--compact .crowns__value .ui-icon {
+  top: -1px;
+  width: 15px;
+  height: 15px;
+  margin-right: 3px;
+}
+
 /* --- Hand: the two hero cards --- */
 .hand {
   position: relative;
@@ -1284,7 +1343,7 @@
   height: 100%;
 }
 
-.hand__slot > .handcard:not(.handcard--empty):not(.handcard--out) {
+.hand__slot > .handcard:not(.handcard--out) {
   z-index: 1;
   animation: hand-in var(--dur-move) var(--ease-out);
 }
@@ -1349,44 +1408,6 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   white-space: nowrap;
-}
-
-.handcard--staked {
-  display: grid;
-  place-items: center;
-  gap: 6px;
-  border-style: dashed;
-  border-color: rgba(200, 160, 74, 0.4);
-  background: rgba(200, 160, 74, 0.04);
-  cursor: pointer;
-  text-align: center;
-  padding: 12px;
-}
-
-.handcard--staked:hover {
-  border-color: var(--gold);
-}
-
-.handcard--empty {
-  border-style: dashed;
-  border-color: var(--line-cold);
-  background: rgba(8, 12, 18, 0.4);
-  box-shadow: none;
-  pointer-events: none;
-}
-
-.handcard__staked-label {
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--gold);
-}
-
-.handcard__staked-claim {
-  font-family: var(--font-display);
-  font-size: 0.86rem;
-  color: var(--gold-pale);
 }
 
 /* --- Action column --- */

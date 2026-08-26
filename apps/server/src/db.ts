@@ -61,11 +61,11 @@ export interface ProfileUpdate {
 }
 
 export function findUserByEmail(email: string): UserRow | undefined {
-  return db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
+  return db.prepare('SELECT * FROM users WHERE email = ?').get(email) as unknown as UserRow | undefined;
 }
 
 export function findUserById(id: string): UserRow | undefined {
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as UserRow | undefined;
 }
 
 export function findOrCreateUserByEmail(email: string): UserRow {

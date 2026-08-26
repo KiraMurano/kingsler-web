@@ -3,6 +3,7 @@ import { CARD_DESCRIPTIONS, type GameCard } from '@kinglier/engine/data/cardDesc
 import { Dialog } from './ui/Overlay';
 import { Tag } from './ui/Tag';
 import { Res } from './ui/Res';
+import { renderWithIcons } from './ui/Icon';
 
 const CATEGORY_LABEL = {
   role: 'Роль двора',
@@ -44,11 +45,11 @@ export const CardDetailModal: React.FC<{ card: GameCard | null; onClose: () => v
         </div>
 
         <div className="detail__col">
-          <div className="notice notice--gold">{info.shortDescription}</div>
+          <div className="notice notice--gold">{renderWithIcons(info.shortDescription)}</div>
 
           <div>
             <div className="detail__label">Правило карты</div>
-            <div className="detail__rule">{info.fullDescription}</div>
+            <div className="detail__rule">{renderWithIcons(info.fullDescription)}</div>
           </div>
 
           {(info.blocksRole || info.blockableBy || info.targeted) && (
@@ -62,7 +63,7 @@ export const CardDetailModal: React.FC<{ card: GameCard | null; onClose: () => v
           {info.strategyTip && (
             <div>
               <div className="detail__label">Тактика</div>
-              <div className="detail__tip">{info.strategyTip}</div>
+              <div className="detail__tip">{renderWithIcons(info.strategyTip)}</div>
             </div>
           )}
 

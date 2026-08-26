@@ -3,6 +3,7 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import { courtly } from '../lib/text';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';
+import { UiIcon, renderWithIcons } from './ui/Icon';
 
 type ChronicleFilter = 'all' | 'claims' | 'duels' | 'plots';
 
@@ -68,7 +69,7 @@ export const Chronicle: React.FC<ChronicleProps> = ({ open, onClose, onOpenRules
         candidate ? `Коронация: ${candidate.name}` : `${history.length} записей`
       }
     >
-      <Tabs
+      <Tabs<ChronicleFilter>
         active={filter}
         onChange={setFilter}
         items={[
@@ -89,7 +90,7 @@ export const Chronicle: React.FC<ChronicleProps> = ({ open, onClose, onOpenRules
                 key={`${idx}-${entry}`}
                 className={`log__item ${idx === 0 ? 'log__item--fresh' : toneOf(entry)}`}
               >
-                {entry}
+                {renderWithIcons(entry)}
               </div>
             ))}
           </div>
@@ -97,7 +98,9 @@ export const Chronicle: React.FC<ChronicleProps> = ({ open, onClose, onOpenRules
       </div>
 
       <div className="panel__foot">
-        <span>2 ⚜️ обращаются в 1 👑</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          2 <UiIcon kind="bulla" size="xs" /> обращаются в 1 <UiIcon kind="crown" size="xs" />
+        </span>
         <button type="button" className="iconbtn" onClick={onOpenRules}>
           Правила
         </button>

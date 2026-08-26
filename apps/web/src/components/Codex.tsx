@@ -6,6 +6,7 @@ import type { GameCard } from '@kinglier/engine/types';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';
 import { Tag } from './ui/Tag';
+import { renderWithIcons } from './ui/Icon';
 import { pickViewer } from '../lib/viewer';
 
 type CodexTab = 'all' | 'roles' | 'plots' | 'instants';
@@ -58,7 +59,7 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
         />
       </div>
 
-      <Tabs
+      <Tabs<CodexTab>
         active={tab}
         onChange={setTab}
         items={[
@@ -99,7 +100,7 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
                       <Tag>{getCardMaxCopies(card)} шт.</Tag>
                     )}
                   </div>
-                  <div className="codexrow__desc">{info.shortDescription}</div>
+                  <div className="codexrow__desc">{renderWithIcons(info.shortDescription)}</div>
                 </div>
               </div>
             );

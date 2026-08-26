@@ -12,7 +12,7 @@ interface HandProps {
   roleClaimOpen: boolean;
   stakedCardIndex: number;
   onCardClick: (card: GameCard, compactIndex: number) => void;
-  onInspectStaked: (card: GameCard) => void;
+  onInspectStaked?: (card: GameCard) => void;
 }
 
 export const Hand: React.FC<HandProps> = ({
@@ -23,8 +23,7 @@ export const Hand: React.FC<HandProps> = ({
   isVetoWindow,
   roleClaimOpen,
   stakedCardIndex,
-  onCardClick,
-  onInspectStaked
+  onCardClick
 }) => {
   const { slots, leaving } = useHandSlots(player.hand);
 
@@ -40,17 +39,6 @@ export const Hand: React.FC<HandProps> = ({
 
         return (
           <div key={index} className="hand__slot">
-            <div className="handcard handcard--empty" aria-hidden />
-            {!gone && live && staked && (
-              <div
-                className="handcard handcard--staked"
-                onClick={() => onInspectStaked((pendingAction?.roleClaim ?? live) as GameCard)}
-                title="Карта выставлена на кон"
-              >
-                <span className="handcard__staked-label">на кону</span>
-                <span className="handcard__staked-claim">«{pendingAction?.roleClaim ?? live}»</span>
-              </div>
-            )}
             {!gone && live && !staked && (
               <Card
                 card={live}

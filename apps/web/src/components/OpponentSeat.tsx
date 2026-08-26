@@ -99,15 +99,17 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         <Deltas events={deltas} kind="other" />
 
         <div className="seat__head">
-          <div className="seat__role">
-            {player.title ?? player.archetype?.title ?? 'Придворный'}
-          </div>
-          <div className="seat__namerow">
-            <span className="seat__name">{player.name}</span>
-            <span className="delta-anchor">
+          <div className="seat__toprow">
+            <div className="seat__role">
+              {player.title ?? player.archetype?.title ?? 'Придворный'}
+            </div>
+            <span className="delta-anchor seat__bolts">
               <Bolts tokens={player.actionTokens} />
               <Deltas events={deltas} kind="act" />
             </span>
+          </div>
+          <div className="seat__namerow">
+            <span className="seat__name">{player.name}</span>
             {isTargetable && (
               <span className="seat__role" style={{ color: 'var(--crimson-soft)' }}>
                 цель

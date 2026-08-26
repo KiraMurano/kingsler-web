@@ -1,17 +1,17 @@
 import React from 'react';
 import { courtly, resourceDeltaKind } from '../../lib/text';
+import { UiIcon, renderWithIcons, type UiIconKind } from './Icon';
 
 /**
- * Resource chips. These four glyphs are the only pictograms allowed in the
- * interface — everything else is set in type.
+ * Resource chips. Visualised via crisp WebP resource icons.
  */
 export type ResourceKind = 'gold' | 'crown' | 'seal' | 'act';
 
-const RESOURCE_GLYPH: Record<ResourceKind, string> = {
-  gold: '🪙',
-  crown: '👑',
-  seal: '⚜️',
-  act: '⚡'
+const RESOURCE_ICON_KIND: Record<ResourceKind, UiIconKind> = {
+  gold: 'coin',
+  crown: 'crown',
+  seal: 'bulla',
+  act: 'move'
 };
 
 const RESOURCE_LABEL: Record<ResourceKind, string> = {
@@ -38,7 +38,7 @@ export const Res: React.FC<ResProps> = ({ kind, value, suffix, size = 'sm', mute
     title={title ?? RESOURCE_LABEL[kind]}
   >
     <span className="res__i" aria-hidden>
-      {RESOURCE_GLYPH[kind]}
+      <UiIcon kind={RESOURCE_ICON_KIND[kind]} size={size === 'lg' ? 'md' : 'sm'} />
     </span>
     <span>
       <span key={String(value)} className="res__n">
@@ -56,7 +56,7 @@ export const Bolts: React.FC<{ tokens: number }> = ({ tokens }) => (
   <span className="bolts" title={RESOURCE_LABEL.act} aria-label={`${tokens} из ${TOKEN_MAX}`}>
     {Array.from({ length: TOKEN_MAX }, (_, i) => (
       <span key={i} className={tokens > i ? 'bolt' : 'bolt bolt--off'} aria-hidden>
-        {RESOURCE_GLYPH.act}
+        <UiIcon kind="move" size="sm" />
       </span>
     ))}
   </span>
@@ -70,7 +70,7 @@ export const Seals: React.FC<{ count: number }> = ({ count }) => (
   >
     {Array.from({ length: SEAL_MAX }, (_, i) => (
       <span key={i} className={count > i ? 'res__i' : 'res__i res__i--off'} aria-hidden>
-        {RESOURCE_GLYPH.seal}
+        <UiIcon kind="bulla" size="sm" />
       </span>
     ))}
   </span>
@@ -87,7 +87,7 @@ export const Deltas: React.FC<{ events: readonly DeltaEvent[]; kind: ResourceKin
       .filter(e => resourceDeltaKind(e.text) === kind)
       .map(d => (
         <div key={d.id} className={`delta ${d.isGain ? 'delta--gain' : 'delta--loss'}`}>
-          {courtly(d.text)}
+          {renderWithIcons(courtly(d.text))}
         </div>
       ))}
   </>

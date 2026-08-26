@@ -3,6 +3,7 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import type { Role } from '@kinglier/engine/types';
 import { pickViewer } from '../lib/viewer';
 import { Button } from './ui/Button';
+import { UiIcon } from './ui/Icon';
 
 interface ActionControlsProps {
   onOpenNormalActions: () => void;
@@ -185,7 +186,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           tone="calm"
           block
           hotkey="1"
-          sub="Позволить эффект • 0 ⚡"
+          sub={<>Позволить эффект • 0 <UiIcon kind="move" size="xs" /></>}
           onClick={act('Действие вступает в силу…', () => targetAcceptAttack(human.id))}
         >
           Принять
@@ -195,7 +196,13 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           block
           hotkey="2"
           disabled={!hasTokens}
-          sub={hasTokens ? 'Проверить заявление • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
+          sub={
+            hasTokens ? (
+              <>Проверить заявление • 1 <UiIcon kind="move" size="xs" /></>
+            ) : (
+              <>Нет жетонов • 0 <UiIcon kind="move" size="xs" /></>
+            )
+          }
           onClick={act('Вскрываем карту…', () => targetDoubtAttack(human.id))}
         >
           Не верю
@@ -205,7 +212,13 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           block
           hotkey="3"
           disabled={!hasTokens}
-          sub={hasTokens ? `Щит «${shieldRole}» • 1 ⚡` : 'Нет жетонов • 0 ⚡'}
+          sub={
+            hasTokens ? (
+              <>Щит «{shieldRole}» • 1 <UiIcon kind="move" size="xs" /></>
+            ) : (
+              <>Нет жетонов • 0 <UiIcon kind="move" size="xs" /></>
+            )
+          }
           onClick={() => setDuelPicker(true)}
         >
           Дуэль
@@ -214,7 +227,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           <Button
             tone="arcane"
             block
-            sub="Инстант из руки • 0 ⚡"
+            sub={<>Инстант из руки • 0 <UiIcon kind="move" size="xs" /></>}
             onClick={() => setRedirectPicker(true)}
           >
             Перенаправить
@@ -264,7 +277,13 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           block
           hotkey="D"
           disabled={!hasTokens}
-          sub={hasTokens ? 'Разоблачить блеф • 1 ⚡' : 'Нет жетонов • 0 ⚡'}
+          sub={
+            hasTokens ? (
+              <>Разоблачить блеф • 1 <UiIcon kind="move" size="xs" /></>
+            ) : (
+              <>Нет жетонов • 0 <UiIcon kind="move" size="xs" /></>
+            )
+          }
           onClick={act('Вскрываем карту…', () => doubtAction(human.id))}
         >
           Не верю
@@ -297,7 +316,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           <Button
             tone="danger"
             block
-            sub="Отменить действие • 0 ⚡"
+            sub={<>Отменить действие • 0 <UiIcon kind="move" size="xs" /></>}
             onClick={() => {
               setVetoDismissed(true);
               playInstant(human.id, 'Право вето', vetoIndex);
@@ -333,7 +352,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
         block
         hotkey="1"
         disabled={!isMyTurn || !hasTokens || !canUseNormalAction}
-        sub={canUseNormalAction ? '1 ⚡' : 'уже было'}
+        sub={canUseNormalAction ? <>1 <UiIcon kind="move" size="xs" /></> : 'уже было'}
         onClick={onOpenNormalActions}
       >
         Действие двора
@@ -344,11 +363,13 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           tone="arcane"
           block
           sub={
-            conspiracyCharges <= 2
-              ? `Сбить до ${conspiracyCharges} 🪙 • 1 ⚡`
-              : conspiracyCharges === 3
-                ? 'До 3 🪙 или 1 👑 • 1 ⚡'
-                : 'До 4 🪙 или 1 👑 • без вето'
+            conspiracyCharges <= 2 ? (
+              <>Сбить до {conspiracyCharges} <UiIcon kind="coin" size="xs" /> • 1 <UiIcon kind="move" size="xs" /></>
+            ) : conspiracyCharges === 3 ? (
+              <>До 3 <UiIcon kind="coin" size="xs" /> или 1 <UiIcon kind="crown" size="xs" /> • 1 <UiIcon kind="move" size="xs" /></>
+            ) : (
+              <>До 4 <UiIcon kind="coin" size="xs" /> или 1 <UiIcon kind="crown" size="xs" /> • без вето</>
+            )
           }
           onClick={() => openConspiracyDialog(false)}
         >
@@ -362,9 +383,11 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
         hotkey="Пробел"
         disabled={!isMyTurn}
         sub={
-          human.actionTokens > 0
-            ? `Сохранить ${human.actionTokens} ⚡ на защиту`
-            : 'Добор карт и передача хода'
+          human.actionTokens > 0 ? (
+            <>Сохранить {human.actionTokens} <UiIcon kind="move" size="sm" /> на защиту</>
+          ) : (
+            'Добор карт и передача хода'
+          )
         }
         onClick={act('Передаём ход…', endTurnManually)}
       >
