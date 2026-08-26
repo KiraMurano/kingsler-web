@@ -515,11 +515,22 @@ export function proceedAfterVetoWindow(
   set: StateSetter
 ): void {
   timerManager.clearAll();
-  const { pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
+  const { turnPhase, pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
   if (!pendingAction) {
     get()._checkEndgameAndAdvanceTurn();
     return;
   }
+
+  // The veto window is single-entry. `turnPhase` is the window itself, so it
+  // is consumed synchronously here — before the effect lands and before the
+  // ACTION_HOLD_MS hold that follows it. Otherwise the phase stayed
+  // 'VETO_WINDOW' for that whole hold and a bot's veto timer (which only
+  // checks `turnPhase === 'VETO_WINDOW' && !isVetoed`) could still fire after
+  // everyone had already passed: it spent a «Право вето» for nothing and
+  // re-entered here, pushing an already-landed plot card into the discard
+  // while its instance also sat in the plot slot.
+  if (turnPhase !== 'VETO_WINDOW') return;
+  set({ turnPhase: 'IDLE' });
 
   if (isVetoed) {
     flightHomeOrDiscard(get, set, pendingAction, !!isPendingActionAfterTruthChallenge);
