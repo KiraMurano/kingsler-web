@@ -12,11 +12,21 @@
  * card starts moving, and the card would sit still until the next one.
  */
 import React, { useMemo } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import type { Action, ActivePlotData, GameCard } from '@kinglier/engine/types';
-import { usePresence } from '../lib/presence';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
+import { dur } from '../motion/tokens.ts';
+
+/**
+ * How long the label takes to leave. It matches the exit the hand-rolled
+ * presence hook used to give it, so a plot being resolved still reads as the
+ * label letting go rather than as the label being deleted.
+ */
+const LABEL_OUT_S = 0.28;
+
+const EASE = [0.4, 0, 0.2, 1] as const;
 
 interface PlotSlotProps {
   plot: ActivePlotData | null;
@@ -55,8 +65,8 @@ export const PlotSlot: React.FC<PlotSlotProps> = ({ plot, ownerId, ownerName }) 
     () => laidPlotPreview(pendingAction, ownerId),
     [pendingAction, ownerId]
   );
-  const display = incoming ?? plot;
-  const { shown, exiting } = usePresence(display);
+  const shown = incoming ?? plot;
+  const reduce = !!useReducedMotion();
 
   const info = shown ? CARD_DESCRIPTIONS[shown.type] : undefined;
   const target = shown?.targetPlayerId
@@ -65,22 +75,41 @@ export const PlotSlot: React.FC<PlotSlotProps> = ({ plot, ownerId, ownerName }) 
 
   return (
     <CardAnchor className="feltplot" zone={{ kind: 'plot', playerId: ownerId }}>
-      {shown && info && (
-        <span
-          key={shown.id}
-          className={`feltplot__label${exiting ? ' feltplot__label--out' : ''}`}
-          title={`${ownerName}: «${shown.type}»${target ? ` → ${target.name}` : ''}`}
-        >
-          <span className="feltplot__name">{info.name}</span>
-          {target && <span className="feltplot__owner">{target.name}</span>}
-          {shown.charges !== undefined && (
-            <span className="plotcard__charge">
-              {shown.charges}
-              {shown.type === 'Тайный заговор' ? '/4' : ''}
-            </span>
-          )}
-        </span>
-      )}
+      {/* The anchor itself is never inside the `AnimatePresence` — `CardLayer`
+          measures it every frame, and an anchor drifting through an exit
+          animation would drag the plot card along with it. Only the label
+          comes and goes. */}
+      <AnimatePresence mode="wait">
+        {shown && info && (
+          <motion.span
+            key={shown.id}
+            className="feltplot__label"
+            title={`${ownerName}: «${shown.type}»${target ? ` → ${target.name}` : ''}`}
+            initial={{ opacity: 0, y: reduce ? 0 : 16, scale: reduce ? 1 : 0.96 }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: reduce ? 0.12 : dur.fade, ease: EASE }
+            }}
+            exit={{
+              opacity: 0,
+              y: reduce ? 0 : 10,
+              scale: reduce ? 1 : 0.96,
+              transition: { duration: reduce ? 0.12 : LABEL_OUT_S, ease: EASE }
+            }}
+          >
+            <span className="feltplot__name">{info.name}</span>
+            {target && <span className="feltplot__owner">{target.name}</span>}
+            {shown.charges !== undefined && (
+              <span className="plotcard__charge">
+                {shown.charges}
+                {shown.type === 'Тайный заговор' ? '/4' : ''}
+              </span>
+            )}
+          </motion.span>
+        )}
+      </AnimatePresence>
     </CardAnchor>
   );
 };
