@@ -844,29 +844,84 @@
   aspect-ratio: 2 / 3;
 }
 
-/* Deck and discard are anchors and nothing more — the felt has no room for
-   visible piles, and the user does not want them. `.arena` is `inset: 0` on
-   the round table, so its square corners lie outside the felt; 16% in puts
-   these boxes just inside the rim on the diagonal (the circle crosses the
-   diagonal at 14.6%). A card leaving for the discard therefore reads as
-   crossing the table towards its top-right, not as flying off-screen.
-   Sized at 40% of a hand card so the shrink on approach is visible. */
-.arena .cardanchor--deck,
-.arena .cardanchor--discard {
+/* ==========================================================================
+   DECK & DISCARD — real piles, standing off the felt
+   ==========================================================================
+   Both sit in the top corners of `.app__stage`, the only region that is free
+   of everything at every size worth supporting. The felt is a circle centred
+   at 50%/44% whose square bounding box starts 381px in at 1280×720 and 571px
+   in at 1920×1080; the left and right seat panels hang off the middle of that
+   box (their chips reach x≈158 and x≈1122 at 1280); the hand and the crest
+   live along the bottom. That leaves the two top corners empty by a wide
+   margin at both sizes, and it keeps the old reading of the table: draws arc
+   out of the left, the discard swallows cards to the right.
+
+   The pile is a caption under a back. The `CardAnchor` wraps the back alone,
+   so an arriving card lands on the picture rather than on the word beneath
+   it. Sized at 45% of a hand card: unmistakably furniture, not something you
+   could play. */
+.pile {
   position: absolute;
-  top: 16%;
-  width: calc(min(32vh, 258px) * 2 / 3 * 0.4);
-  aspect-ratio: 2 / 3;
-  opacity: 0;
+  top: 14px;
+  z-index: var(--z-tabled);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   pointer-events: none;
 }
 
-.arena .cardanchor--deck {
-  left: 16%;
+.pile--deck {
+  left: 16px;
 }
 
-.arena .cardanchor--discard {
-  right: 16%;
+.pile--discard {
+  right: 16px;
+}
+
+.pile__slot {
+  width: calc(min(32vh, 258px) * 2 / 3 * 0.45);
+  aspect-ratio: 2 / 3;
+}
+
+/* The stacked edge is box-shadow, never extra boxes: `CardLayer` measures
+   this element with `getBoundingClientRect()`, and a shadow does not move
+   the rect a card flies to. */
+.pile__back {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  border: 1px solid var(--line-mid);
+  background-size: cover;
+  background-position: center;
+  box-shadow:
+    3px 3px 0 -1px var(--ink-800),
+    3px 3px 0 var(--line),
+    6px 6px 0 -1px var(--ink-900),
+    6px 6px 0 var(--line),
+    var(--shadow-sm);
+}
+
+/* Nothing is sitting here. An empty outline, not a dimmed card: a pile at
+   zero must not read as a pile with one card left in it. */
+.pile__back--empty {
+  border: 1px dashed var(--line-mid);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.55);
+}
+
+.pile__count {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 2px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(10, 13, 20, 0.92);
+  color: var(--gold-pale);
+  font-variant-numeric: tabular-nums;
 }
 
 .tablecard {

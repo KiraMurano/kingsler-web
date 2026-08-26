@@ -3,7 +3,6 @@ import { StakedCardArena } from './StakedCardArena';
 import { Button } from './ui/Button';
 import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
-import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 
 interface ArenaProps {
   pendingTargetAction: PendingTargetAction | null;
@@ -18,14 +17,9 @@ interface ArenaProps {
 export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarget }) => {
   return (
     <section className="arena">
-      {/* Where cards come from and where they go. There are no visible piles
-          on the felt — there is no room for them — so these are two invisible
-          points just inside the table's rim: draws arc out of the top-left,
-          the discard swallows cards into the top-right. They are anchors and
-          nothing else, hence `opacity: 0`. */}
-      <CardAnchor className="cardanchor--deck" zone={{ kind: 'deck' }} />
-      <CardAnchor className="cardanchor--discard" zone={{ kind: 'discard' }} />
-
+      {/* Deck and discard used to be two invisible points just inside the
+          felt's rim. They are real piles now, standing outside the table
+          where they cannot collide with a seat panel — see `CardPiles`. */}
       <div className="stage">
         <StakedCardArena />
       </div>

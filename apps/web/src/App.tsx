@@ -8,6 +8,7 @@ import { timerManager } from '@kinglier/engine/utils/timerManager';
 import { TopBar } from './components/TopBar';
 import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
+import { CardPiles } from './components/CardPiles';
 import { Hand } from './components/Hand';
 import { PlayerCrest } from './components/PlayerCrest';
 import { ActionControls } from './components/ActionControls';
@@ -358,6 +359,10 @@ export default function App({
                 onInspectCard={setInspectedCard}
               />
             </div>
+
+            {/* Outside `.table` on purpose: the piles stand beside the felt,
+                clear of every seat panel. */}
+            <CardPiles />
 
             <div className="hero">
               <PlayerCrest
