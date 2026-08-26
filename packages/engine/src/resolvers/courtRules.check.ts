@@ -73,8 +73,6 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     pendingDuelDefenderRoleClaim: null,
     activeSpeechReactions: {} as Record<string, string>,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
-    cardFlightEvent: null,
-    hasCardDeparted: false,
     overlayInstant: null,
     winnerId: null,
     history: [] as string[],

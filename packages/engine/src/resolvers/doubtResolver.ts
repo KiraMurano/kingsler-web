@@ -3,7 +3,7 @@ import { isRole } from '../cards';
 import { byId, holds, pluck } from '../cardInstance';
 import { declineAcc, verbDoubted, verbCaught } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
-import { triggerResourceFloat, triggerSingleCardFlight } from '../utils/visualEffects';
+import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
@@ -326,52 +326,16 @@ export function closeRevealOutcome(
   if (goesToVeto) {
     set({
       revealOutcome: null,
-      hasCardDeparted: false,
       isPendingActionAfterTruthChallenge: true
     });
     get()._triggerVetoWindowOrResolveEffect(pendingAction, true);
     return;
   }
 
-  triggerSingleCardFlight(
-    set,
-    'to_discard',
-    revealOutcome.accusedId,
-    revealOutcome.claimedRole,
-    revealOutcome.revealedRole,
-    revealOutcome.wasTruth
-  );
   set({ revealOutcome: null });
   timerManager.scheduleDelay(() => {
     get()._checkEndgameAndAdvanceTurn();
   }, 800);
-}
-
-/**
- * A staked role card that never got revealed by a challenge flies back to its
- * owner's hand; one that was already shown (truth-challenge path) flies to
- * the discard. Shared by every place a pending role action stops being
- * "on the table" — resolved, vetoed, or vetoed-after-truth-reveal — so the
- * staked card never just vanishes off the arena.
- */
-function flightHomeOrDiscard(
-  get: StateGetter,
-  set: StateSetter,
-  action: Action,
-  isAfterTruthChallenge: boolean
-): void {
-  if (!action.roleClaim) return;
-  // A card that is no longer in its owner's hand and was never revealed by a
-  // challenge has already left the table on its own (the duel clash) — flying
-  // it home would resurrect a card that no longer exists.
-  const actor = get().players.find(p => p.id === action.actorId);
-  const stillHeld = !action.stakedCardId || !!byId(actor?.hand ?? [], action.stakedCardId);
-  if (!isAfterTruthChallenge && !stillHeld) return;
-  if (isAfterTruthChallenge) {
-    triggerSingleCardFlight(set, 'to_discard', action.actorId, action.roleClaim);
-  } else {
-    triggerSingleCardFlight(set, 'to_hand', action.actorId, action.roleClaim);
-  }
 }
 
 export function proceedAfterDoubtPassed(
@@ -382,7 +346,6 @@ export function proceedAfterDoubtPassed(
   timerManager.clearAll();
 
   set(state => ({
-    hasCardDeparted: false,
     history: [`🂠 Действие «${action.roleClaim}» от ${state.players.find(p => p.id === action.actorId)?.name || 'игрока'} не оспорено двором (карта остаётся в руке).`, ...state.history].slice(0, 50)
   }));
 
@@ -404,7 +367,6 @@ export function triggerVetoWindowOrResolveEffect(
   }
 
   if (isVetoed) {
-    flightHomeOrDiscard(get, set, action, isAfterTruthChallenge);
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
@@ -425,7 +387,6 @@ export function triggerVetoWindowOrResolveEffect(
   if (humanHoldsVeto) {
     set({
       turnPhase: 'VETO_WINDOW',
-      hasCardDeparted: false,
       pendingVetoPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0,
@@ -434,7 +395,6 @@ export function triggerVetoWindowOrResolveEffect(
   } else if (botHoldsVeto) {
     set({
       turnPhase: 'VETO_WINDOW',
-      hasCardDeparted: false,
       pendingVetoPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0,
@@ -446,7 +406,6 @@ export function triggerVetoWindowOrResolveEffect(
       }
     }, 2200);
   } else {
-    flightHomeOrDiscard(get, set, action, isAfterTruthChallenge);
     set({
       turnPhase: 'IDLE'
     });
@@ -533,7 +492,6 @@ export function proceedAfterVetoWindow(
   set({ turnPhase: 'IDLE' });
 
   if (isVetoed) {
-    flightHomeOrDiscard(get, set, pendingAction, !!isPendingActionAfterTruthChallenge);
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${pendingAction.roleClaim || pendingAction.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
@@ -552,8 +510,6 @@ export function proceedAfterVetoWindow(
     }, ACTION_HOLD_MS);
     return;
   }
-
-  flightHomeOrDiscard(get, set, pendingAction, !!isPendingActionAfterTruthChallenge);
 
   get()._resolvePendingActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
 }

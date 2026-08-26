@@ -126,26 +126,6 @@ export interface FloatingResourceEvent {
   isGain: boolean;
 }
 
-export interface CardFlightEvent {
-  id: string;
-  isDuel?: boolean;
-  flightType?: 'to_discard' | 'to_hand' | 'to_plot';
-  actorId?: string;
-  roleClaim?: Role;
-  revealedRole?: GameCard;
-  wasTruth?: boolean;
-  /** Instant/plot cards that are already face-up — no flip reveal, just a flight. */
-  card?: GameCard;
-  attackerFlight?: 'to_discard' | 'to_hand';
-  attackerId?: string;
-  attackerRevealedRole?: GameCard;
-  attackerWasTruth?: boolean;
-  defenderFlight?: 'to_discard' | 'to_hand';
-  defenderId?: string;
-  defenderRevealedRole?: GameCard;
-  defenderWasTruth?: boolean;
-}
-
 export interface ConspiracyPromptData {
   playerId: string;
   charges: number;
@@ -197,8 +177,6 @@ export interface GameState {
   // Animation & Visual Feedback States
   activeSpeechReactions: Record<string, string>;
   floatingResourceEvents: FloatingResourceEvent[];
-  cardFlightEvent: CardFlightEvent | null;
-  hasCardDeparted: boolean;
   /** Instant laid on the table on top of the current action (veto / redirect). */
   overlayInstant: { card: InstantType; actorId: string } | null;
   

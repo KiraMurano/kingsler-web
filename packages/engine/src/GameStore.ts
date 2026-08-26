@@ -90,8 +90,6 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   activeSpeechReactions: {},
   floatingResourceEvents: [],
-  cardFlightEvent: null,
-  hasCardDeparted: false,
   overlayInstant: null,
 
   winnerId: null,
@@ -327,7 +325,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         : `«Заявляю: ${action.roleClaim}!${withVaBanque ? ' ВА-БАНК!' : ''}${target ? ` Цель: ${target.name}` : ''}»`;
 
     set(state => ({
-      hasCardDeparted: false,
       activeSpeechReactions: { [actor.id]: speechText },
       history: [`${actor.name} заявляет: ${roleName}${targetInfo}${stakeNotice}${vbNotice} (потрачено ${tokensRequired} ⚡).`, ...state.history].slice(0, 50)
     }));

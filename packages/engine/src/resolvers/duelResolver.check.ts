@@ -53,8 +53,6 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     isVaBanqueActive: false,
     isVetoed: false,
     isPendingActionAfterTruthChallenge: false,
-    hasCardDeparted: false,
-    cardFlightEvent: null as GameState['cardFlightEvent'],
     overlayInstant: null,
     activeSpeechReactions: {} as Record<string, string>,
     history: [] as string[],
@@ -129,22 +127,26 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
   assert.equal(api.duelOutcome, null, 'duel outcome modal must close');
   assert.ok(api.pendingAction, 'the winning attack is still resolving');
-  assert.equal(
-    api.cardFlightEvent?.isDuel,
-    true,
-    'the duel flight owns both cards — no second "home" flight may be started for a card that already left'
-  );
-
-  // Mirrors StakedCardArena's `showPile` guard: even though hasCardDeparted was
-  // reset to false while the effect resolves (no veto held), identity keeps the
-  // ghost card hidden — neither duel card is in a hand any more.
+  // Both clashed stakes have left their hands for good; the presentation layer
+  // derives the zone from that, so neither may be re-staged on the table while
+  // the winning attack keeps resolving.
   const attacker = api.players.find(p => p.id === 'p1')!;
   const defender = api.players.find(p => p.id === 'p2')!;
-  const duelCardsSpent =
-    !attacker.hand.some(c => c.id === api.pendingAction!.stakedCardId) &&
-    !defender.hand.some(c => c.id === api.pendingDuelDefenderCardId);
-  const showPile = !duelCardsSpent && !api.hasCardDeparted;
-  assert.equal(showPile, false, 'the departed duel card must not be re-staged on the table');
+  assert.equal(
+    attacker.hand.some(c => c.id === api.pendingAction!.stakedCardId),
+    false,
+    "the attacker's clashed stake must not come back to hand"
+  );
+  assert.equal(
+    defender.hand.some(c => c.id === api.pendingDuelDefenderCardId),
+    false,
+    "the defender's clashed stake must not come back to hand"
+  );
+  assert.ok(
+    api.discardPile.some(c => c.id === attackerStakeId) &&
+      api.discardPile.some(c => c.id === defenderStakeId),
+    'both clashed stakes live in the discard once the duel outcome closes'
+  );
 
   timerManager.clearAll();
 }

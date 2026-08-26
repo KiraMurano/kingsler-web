@@ -74,7 +74,6 @@
   --z-toast: 1200;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --dur-move: 280ms;
 
   /* Mirrors of `motion/tokens.ts` — the same numbers, in milliseconds, for
      the handful of effects that stay on CSS. Change them in both places. */
@@ -270,7 +269,7 @@ img {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  transition: opacity var(--dur-move) var(--ease-out), filter var(--dur-move) var(--ease-out);
+  transition: opacity var(--dur-fade) var(--ease-out), filter var(--dur-fade) var(--ease-out);
 }
 
 .res__i .ui-icon {

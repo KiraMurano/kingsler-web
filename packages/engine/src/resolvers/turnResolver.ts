@@ -1,8 +1,7 @@
-import type { Action, GameCard, GameState, Player } from '../types';
+import type { Action, GameState, Player } from '../types';
 import { drawCardsFromDeck } from '../cards';
 import { holds } from '../cardInstance';
 import { timerManager } from '../utils/timerManager';
-import { triggerFaceCardFlight } from '../utils/visualEffects';
 import { resolveMorningPlots } from './plotResolver';
 import {
   beginCoronationIfNeeded,
@@ -53,21 +52,10 @@ function applyCoronationTurnStart(
   }
 }
 
-/** An instant sits on the table for its whole reaction window as `pendingAction`;
- *  once it resolves this is the one place it always gets cleared, so it's the
- *  one place that must send it flying to the discard instead of just vanishing. */
-function flightInstantToDiscard(get: StateGetter, set: StateSetter): void {
-  const { pendingAction, cardFlightEvent } = get();
-  if (pendingAction?.type !== 'instant' || cardFlightEvent) return;
-  const card = (pendingAction.instantType || pendingAction.name) as GameCard;
-  triggerFaceCardFlight(set, 'to_discard', pendingAction.actorId, card);
-}
-
 export function checkEndgameAndAdvanceTurn(
   get: StateGetter,
   set: StateSetter
 ): void {
-  flightInstantToDiscard(get, set);
   const { players, coronationCandidateId, activePlayerId, hasPlayedRoleThisTurn, hasPlayedPlotThisTurn } = get();
   const actor = players.find(p => p.id === activePlayerId);
 

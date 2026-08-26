@@ -102,8 +102,8 @@
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-soft);
-  transition: border-color var(--dur-move) var(--ease-out),
-    background-color var(--dur-move) var(--ease-out), color var(--dur-move) var(--ease-out);
+  transition: border-color var(--dur-fade) var(--ease-out),
+    background-color var(--dur-fade) var(--ease-out), color var(--dur-fade) var(--ease-out);
 }
 
 .turnchip__copy {
@@ -244,7 +244,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: opacity var(--dur-move) var(--ease-out);
+  transition: opacity var(--dur-fade) var(--ease-out);
 }
 
 .seat--left {
@@ -343,16 +343,6 @@
   height: 100%;
 }
 
-.minislot .minicard:not(.minicard--empty):not(.minicard--out) {
-  animation: hand-in var(--dur-move) var(--ease-out);
-}
-
-.minicard--out {
-  z-index: 1;
-  pointer-events: none;
-  animation: hand-out var(--dur-move) var(--ease-out) forwards;
-}
-
 .seat__head {
   min-width: 0;
   display: flex;
@@ -376,7 +366,7 @@
   overflow: hidden;
   border: 1px solid var(--line-mid);
   background: var(--ink-900);
-  transition: border-color var(--dur-move) var(--ease-out), box-shadow var(--dur-move) var(--ease-out);
+  transition: border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out);
 }
 
 .seat--active .seat__portrait {
@@ -434,7 +424,7 @@
   text-overflow: ellipsis;
   flex: 1;
   min-width: 0;
-  transition: color var(--dur-move) var(--ease-out);
+  transition: color var(--dur-fade) var(--ease-out);
 }
 
 .seat--active .seat__name {
@@ -506,7 +496,7 @@
   justify-content: center;
   position: relative;
   top: 1.5px;
-  transition: opacity var(--dur-move) var(--ease-out), filter var(--dur-move) var(--ease-out);
+  transition: opacity var(--dur-fade) var(--ease-out), filter var(--dur-fade) var(--ease-out);
 }
 
 .bolt .ui-icon {
@@ -926,7 +916,6 @@
   pointer-events: auto;
   cursor: pointer;
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
-  animation: card-deal 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
 .tablecard:not(.tablecard--overlay):not(.tablecard--veto):hover {
@@ -1170,55 +1159,6 @@
   writing-mode: vertical-rl;
 }
 
-/* Card flight */
-.fly-discard {
-  animation: fly-discard 0.75s cubic-bezier(0.3, 0.7, 0.3, 1) forwards !important;
-  pointer-events: none;
-}
-
-.fly-hand {
-  animation: fly-hand 0.8s cubic-bezier(0.3, 0.7, 0.3, 1) forwards !important;
-  pointer-events: none;
-}
-
-.fly-seat-2 {
-  animation: fly-seat-left 0.8s cubic-bezier(0.3, 0.7, 0.3, 1) forwards !important;
-  pointer-events: none;
-}
-
-.fly-seat-3 {
-  animation: fly-seat-mid 0.8s cubic-bezier(0.3, 0.7, 0.3, 1) forwards !important;
-  pointer-events: none;
-}
-
-.fly-seat-4 {
-  animation: fly-seat-right 0.8s cubic-bezier(0.3, 0.7, 0.3, 1) forwards !important;
-  pointer-events: none;
-}
-
-.flypill {
-  position: absolute;
-  top: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 2px 7px;
-  border-radius: 5px;
-  font-size: 0.62rem;
-  font-weight: 800;
-  white-space: nowrap;
-  box-shadow: var(--shadow-sm);
-}
-
-.flypill--discard {
-  background: var(--violet);
-  color: #fff;
-}
-
-.flypill--hand {
-  background: var(--sage);
-  color: #04110d;
-}
-
 /* ==========================================================================
    HERO — overlays the table edge, never a stretching bottom panel
    ========================================================================== */
@@ -1252,7 +1192,7 @@
   border: 1px solid var(--line-cold);
   background: linear-gradient(180deg, rgba(20, 26, 38, 0.92) 0%, rgba(10, 13, 20, 0.94) 100%);
   box-shadow: var(--shadow-sm);
-  transition: border-color var(--dur-move) var(--ease-out), box-shadow var(--dur-move) var(--ease-out);
+  transition: border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out);
 }
 
 .crest--active {
@@ -1273,7 +1213,7 @@
   border-radius: 50%;
   overflow: hidden;
   border: 1px solid var(--line-mid);
-  transition: border-color var(--dur-move) var(--ease-out), box-shadow var(--dur-move) var(--ease-out);
+  transition: border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out);
 }
 
 .crest--active .crest__portrait {
@@ -1324,7 +1264,7 @@
 .crest__state {
   font-size: 0.7rem;
   color: var(--text-dim);
-  transition: color var(--dur-move) var(--ease-out);
+  transition: color var(--dur-fade) var(--ease-out);
 }
 
 .crest__state span {
@@ -1457,11 +1397,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-}
-
-.hand__slot > .handcard:not(.handcard--out) {
   z-index: 1;
-  animation: hand-in var(--dur-move) var(--ease-out);
 }
 
 .handcard {
@@ -1478,17 +1414,11 @@
     border-color 0.22s ease;
 }
 
-.handcard--out {
-  z-index: 2;
-  pointer-events: none;
-  animation: hand-out var(--dur-move) var(--ease-out) forwards;
-}
-
 .handcard__art {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: filter var(--dur-move) var(--ease-out);
+  transition: filter var(--dur-fade) var(--ease-out);
 }
 
 .handcard--idle .handcard__art {
@@ -1572,7 +1502,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--gold-pale);
-  transition: color var(--dur-move) var(--ease-out);
+  transition: color var(--dur-fade) var(--ease-out);
 }
 
 .actions--alert .actions__title {

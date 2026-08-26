@@ -2,7 +2,7 @@ import type { CardId, CardInstance, GameState, DuelOutcome, DuelResultType } fro
 import { byId, pluck } from '../cardInstance';
 import { isRole } from '../cards';
 import { botMemory } from '../bot/botMemory';
-import { triggerSingleCardFlight, triggerDuelCardFlight, triggerResourceFloat } from '../utils/visualEffects';
+import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { chargeActiveConspiracies } from './plotResolver';
@@ -73,8 +73,6 @@ export function attackerRetreatDuel(
 
   const newPlayers = players.map(p => p.id === actor.id ? { ...p, hand: actorHand } : p);
   const newDiscard = discarded ? [...get().discardPile, discarded] : [...get().discardPile];
-
-  triggerSingleCardFlight(set, 'to_discard', actor.id, pendingAction.roleClaim, discarded?.card);
 
   set(state => ({
     players: newPlayers,
@@ -211,18 +209,6 @@ export function closeDuelOutcome(
 ): void {
   const { duelOutcome, pendingAction } = get();
   if (!duelOutcome || !pendingAction) return;
-
-  triggerDuelCardFlight(
-    set,
-    'to_discard',
-    duelOutcome.attackerId,
-    'to_discard',
-    duelOutcome.defenderId,
-    duelOutcome.attackerRevealedRole,
-    duelOutcome.attackerWasTruth,
-    duelOutcome.defenderRevealedRole,
-    duelOutcome.defenderWasTruth
-  );
 
   const breakthrough = duelOutcome.resultType === 'attacker_breakthrough';
   set({ duelOutcome: null });

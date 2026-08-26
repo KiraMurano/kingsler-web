@@ -819,15 +819,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes hand-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes hand-out {
-  to { opacity: 0; transform: translateY(10px) scale(0.96); }
-}
-
 @keyframes slide-from-right {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
@@ -846,11 +837,6 @@
 @keyframes target-breathe {
   0%, 100% { box-shadow: var(--shadow-sm), 0 0 0 0 rgba(180, 64, 90, 0.35); }
   50% { box-shadow: var(--shadow-sm), 0 0 0 6px rgba(180, 64, 90, 0.08); }
-}
-
-@keyframes card-deal {
-  from { opacity: 0; transform: translateY(26px) scale(0.8); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes overlay-lay {
@@ -872,32 +858,6 @@
   18% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
   70% { opacity: 1; transform: translate(-50%, -22px) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -44px) scale(0.9); }
-}
-
-/* Flight trajectories — tuned to the seats row (top) / hand (bottom) / discard (right) */
-@keyframes fly-discard {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(34vw, 0) scale(0.42) rotate(9deg); opacity: 0; }
-}
-
-@keyframes fly-hand {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(0, 34vh) scale(0.55); opacity: 0; }
-}
-
-@keyframes fly-seat-left {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(-26vw, -28vh) scale(0.3) rotate(-24deg); opacity: 0; }
-}
-
-@keyframes fly-seat-mid {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(0, -30vh) scale(0.3); opacity: 0; }
-}
-
-@keyframes fly-seat-right {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(26vw, -28vh) scale(0.3) rotate(24deg); opacity: 0; }
 }
 
 /* Type frame: role = gold, plot = violet, instant = crimson */

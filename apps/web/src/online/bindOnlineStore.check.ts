@@ -1,6 +1,6 @@
 /**
  * Self-check: hidden opponent hand cards must round-trip as truthy
- * placeholders, not `null` — `useHandSlots`/`OpponentSeat` treat `null` as
+ * placeholders, not `null` — `deriveCardZones`/`OpponentSeat` treat `null` as
  * "no card here", so a redacted (face-hidden) hand rendered as an empty
  * hand instead of showing the right number of card backs. Card ids survive
  * the trip untouched: identity is public, only the face is hidden.
