@@ -35,6 +35,41 @@ export const spring = {
  * Durations, in seconds, for the things a spring cannot express: a flip has
  * a fixed arc, a crossfade has a fixed length, a stagger is a fixed offset.
  *
- * Mirrored into CSS as milliseconds in `styles/tokens.css`.
+ * `flip`, `fade` and `panel` are mirrored into CSS as milliseconds in
+ * `styles/tokens.css`.
+ *
+ *  - `stagger` separates two cards that leave at the same instant, so a
+ *    two-card draw reads as two cards rather than as one wide one.
+ *  - `hold` is how long a card that has just turned face-up stays put before
+ *    it is allowed to leave. A revealed card must be readable; the layer,
+ *    not the engine, owns that pause.
+ *  - `trail` is the gap between the staked card leaving for the discard and
+ *    the instant that was lying on top of it following. It is longer than
+ *    `stagger` on purpose: two cards departing from the *same* point need a
+ *    clearer gap than two arriving at different slots.
  */
-export const dur = { flip: 0.5, fade: 0.18, panel: 0.26, stagger: 0.06 } as const;
+export const dur = {
+  flip: 0.5,
+  fade: 0.18,
+  panel: 0.26,
+  stagger: 0.06,
+  hold: 0.4,
+  trail: 0.18
+} as const;
+
+/**
+ * Resting tilt, in degrees, by what the card is doing. A card lying square
+ * on the felt reads as part of the table; a card at an angle reads as an
+ * object someone just put down.
+ */
+export const tilt = {
+  /** An instant laid across the action it interrupts. */
+  overlay: 14,
+  /** A card staked on a claim — swung in from the hand towards the middle. */
+  stake: -4,
+  /** The two cards of a duel, leaning into each other. */
+  duelAttacker: -6,
+  duelDefender: 6,
+  /** How far the card under the cursor leans towards it. */
+  pointerMax: 6
+} as const;

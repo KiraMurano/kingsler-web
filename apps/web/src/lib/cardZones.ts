@@ -94,36 +94,63 @@ export function deriveCardZones(state: ZoneState, viewerId: string): PlacedCard[
    * "the viewer knows the face": a discarded card is face-up to everyone but
    * nobody is staring at it, whereas a card under a reveal or a duel outcome
    * must be turned up right now.
+   *
+   * `verdicts` runs alongside: for each scrutinised card, whether the claim it
+   * was staked on turned out to be true. That is what the ПРАВДА / БЛЕФ stamp
+   * on the card's front face reads.
    */
   const scrutinised = new Map<CardId, GameCard>();
+  const verdicts = new Map<CardId, boolean>();
   if (revealOutcome) {
     const stakedByAccused =
       pendingAction?.actorId === revealOutcome.accusedId ? pendingAction.stakedCardId : undefined;
     const accused = players.find(p => p.id === revealOutcome.accusedId);
     const fallback = accused?.hand.find(h => h.card === revealOutcome.revealedRole)?.id;
     const id = stakedByAccused ?? fallback;
-    if (id) scrutinised.set(id, revealOutcome.revealedRole);
+    if (id) {
+      scrutinised.set(id, revealOutcome.revealedRole);
+      verdicts.set(id, revealOutcome.wasTruth);
+    }
   }
   if (duelOutcome) {
     const attackerCardId =
       pendingAction?.actorId === duelOutcome.attackerId ? pendingAction.stakedCardId : undefined;
-    if (attackerCardId) scrutinised.set(attackerCardId, duelOutcome.attackerRevealedRole);
+    if (attackerCardId) {
+      scrutinised.set(attackerCardId, duelOutcome.attackerRevealedRole);
+      verdicts.set(attackerCardId, duelOutcome.attackerWasTruth);
+    }
     if (pendingDuelDefenderCardId) {
       scrutinised.set(pendingDuelDefenderCardId, duelOutcome.defenderRevealedRole);
+      verdicts.set(pendingDuelDefenderCardId, duelOutcome.defenderWasTruth);
     }
   }
 
   /**
+   * The graveyard is open by the rules, so an instance that has reached the
+   * discard array is readable by everyone — even while a higher-precedence
+   * rule is still drawing it somewhere else. This is what keeps a revealed
+   * card face-up: the engine puts it in the discard at the same moment it
+   * publishes the outcome, and when that outcome expires a second or two
+   * later the card must not turn itself back over on its way to the corner.
+   */
+  const discarded = new Set<CardId>(discardPile.map(d => d.id));
+
+  /**
    * What the viewer may see. A card is open to everyone once it is laid out
    * in public (discard, plot slot, open instant) or turned up by an outcome;
-   * otherwise only its owner reads it.
+   * otherwise only its owner reads it — and a card staked face-down on the
+   * table is read by nobody at all, including the player who staked it. That
+   * last rule is what gives the reveal something to reveal: `hidden: true`
+   * means "this card is lying face-down in front of everyone".
    */
   function faceFor(
     id: CardId,
-    opts: { open?: GameCard | null; ownerId?: string | null } = {}
+    opts: { open?: GameCard | null; ownerId?: string | null; hidden?: boolean } = {}
   ): Face {
     const shown = scrutinised.get(id);
     if (shown) return { known: shown };
+    if (discarded.has(id)) return { known: faceIndex.get(id) ?? null };
+    if (opts.hidden) return { known: null };
     if (opts.open !== undefined && opts.open !== null) return { known: opts.open };
     if (opts.ownerId && opts.ownerId === viewerId) return { known: faceIndex.get(id) ?? null };
     return { known: null };
@@ -138,7 +165,9 @@ export function deriveCardZones(state: ZoneState, viewerId: string): PlacedCard[
   function claim(id: CardId, zone: Zone, face: Face, ownerId: string | null): void {
     const previous = claimed.get(id);
     if (previous && ZONE_PRECEDENCE[previous.zone.kind] >= ZONE_PRECEDENCE[zone.kind]) return;
-    claimed.set(id, { id, zone, face, revealed: scrutinised.has(id), ownerId });
+    const placed: PlacedCard = { id, zone, face, revealed: scrutinised.has(id), ownerId };
+    if (verdicts.has(id)) placed.wasTruth = verdicts.get(id);
+    claimed.set(id, placed);
   }
 
   /* 1. overlay — an instant laid on top of the current action. */
@@ -165,26 +194,30 @@ export function deriveCardZones(state: ZoneState, viewerId: string): PlacedCard[
       claim(
         pendingAction.stakedCardId,
         { kind: 'duel', side: 'attacker' },
-        faceFor(pendingAction.stakedCardId, { ownerId: attackerId }),
+        faceFor(pendingAction.stakedCardId, { hidden: true }),
         attackerId
       );
     }
     claim(
       pendingDuelDefenderCardId,
       { kind: 'duel', side: 'defender' },
-      faceFor(pendingDuelDefenderCardId, { ownerId: defenderId }),
+      faceFor(pendingDuelDefenderCardId, { hidden: true }),
       defenderId
     );
   }
 
   /* 3. stake — the face-down card a role claim rests on. It stays in the
      actor's hand array until the reveal, and stays named by the action after
-     the engine has moved it to the discard, so this rule outranks both. */
+     the engine has moved it to the discard, so this rule outranks both.
+
+     `hidden` is the point of the whole zone: once a card is staked it is
+     lying face-down in front of the court, unreadable even by the player who
+     staked it. Anything else and «не верю» has nothing left to turn over. */
   if (pendingAction?.type === 'role' && pendingAction.stakedCardId) {
     claim(
       pendingAction.stakedCardId,
       { kind: 'stake' },
-      faceFor(pendingAction.stakedCardId, { ownerId: pendingAction.actorId }),
+      faceFor(pendingAction.stakedCardId, { hidden: true }),
       pendingAction.actorId
     );
   }

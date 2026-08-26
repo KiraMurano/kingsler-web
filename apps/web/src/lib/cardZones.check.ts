@@ -181,9 +181,24 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   );
   assert.equal(at(placed, stakedId, 'stake').revealed, false, 'nobody is scrutinising it yet');
   assert.equal(at(placed, stakedId, 'stake').ownerId, 'p1');
+  assert.equal(
+    at(placed, stakedId, 'stake').wasTruth,
+    undefined,
+    'no verdict has been passed on it'
+  );
+  assert.equal(
+    at(placed, stakedId, 'stake').face.known,
+    null,
+    'a staked card lies face-down for everyone, its own owner included — otherwise «не верю» has nothing to turn over'
+  );
+  assert.equal(
+    at(placed, survivorId, 'stake').face.known,
+    'Шут',
+    'the card still in hand is still readable by its owner'
+  );
 
   // Same state seen from the other side of the table: the staked card is
-  // face-down for everyone but its owner, but it is still placed.
+  // face-down for everyone, but it is still placed.
   const asP2 = deriveCardZones(state, 'p2');
   assertUnique(asP2, 'stake/p2');
   assert.equal(keyAt(asP2, stakedId, 'stake/p2'), 'stake');
@@ -202,6 +217,17 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   assertUnique(spliced, 'stake/spliced');
   assert.equal(keyAt(spliced, stakedId, 'stake/spliced'), 'stake');
   assert.equal(keyAt(spliced, survivorId, 'stake/spliced'), 'hand:p1:0', 'the survivor slides to slot 0');
+  assert.equal(
+    at(spliced, stakedId, 'stake/spliced').face.known,
+    'Наследник',
+    'once it has reached the graveyard it stays readable — a card that has been shown must not turn back over on its way to the corner'
+  );
+  const splicedAsP2 = deriveCardZones(afterSplice, 'p2');
+  assert.equal(
+    at(splicedAsP2, stakedId, 'stake/spliced/p2').face.known,
+    'Наследник',
+    'the graveyard is open, so this holds for every viewer'
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -328,6 +354,11 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   );
   assert.equal(at(placed, attackStakeId, 'duel').revealed, false, 'the clash has not been shown yet');
   assert.equal(at(placed, defendStakeId, 'duel').face.known, null, 'the defender shield is face-down for the attacker');
+  assert.equal(
+    at(placed, attackStakeId, 'duel').face.known,
+    null,
+    'and the attacker cannot read their own card once it is committed — both turn over together'
+  );
 
   // Once the outcome is showing, both are turned face-up for everyone even
   // though the engine has already taken them out of both hands.
@@ -358,6 +389,12 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   assert.equal(at(clash, defendStakeId, 'duel/outcome').face.known, 'Вор', 'the outcome reveals the shield');
   assert.equal(at(clash, defendStakeId, 'duel/outcome').revealed, true);
   assert.equal(at(clash, attackStakeId, 'duel/outcome').revealed, true);
+  assert.equal(
+    at(clash, attackStakeId, 'duel/outcome').wasTruth,
+    false,
+    'a mutual bluff stamps both cards БЛЕФ'
+  );
+  assert.equal(at(clash, defendStakeId, 'duel/outcome').wasTruth, false);
 }
 
 /* ------------------------------------------------------------------ */
@@ -440,6 +477,16 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   assert.equal(shown.face.known, 'Наследник', "a reveal opens an opponent's card to everyone");
   assert.equal(shown.revealed, true, 'the table wants it turned face-up right now');
   assert.equal(zoneKey(shown.zone), 'stake', 'it flips on the table before it flies to the discard');
+  assert.equal(
+    shown.wasTruth,
+    false,
+    'claiming «Казначей» and turning up «Наследник» is a bluff — the card carries the verdict its stamp reads'
+  );
+  assert.equal(
+    at(placed, survivorId, 'reveal').wasTruth,
+    undefined,
+    'no verdict is passed on a card nobody turned over'
+  );
   assert.equal(
     at(placed, survivorId, 'reveal').face.known,
     null,

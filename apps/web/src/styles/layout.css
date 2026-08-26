@@ -772,6 +772,43 @@
   pointer-events: none;
 }
 
+/* ---- The card in the layer ----------------------------------------------
+   Position, size, tilt and every flight belong to `motion/CardLayer.tsx`.
+   What is left here is what a card looks like when the cursor is on it —
+   colour only. The lift is reserved for cards the player can actually do
+   something with, so a card that cannot be played may warm its edge and
+   nothing more; that distinction is the difference between an affordance and
+   a decoration. */
+.cardlayer__hit .flip__inner,
+.cardlayer__hit .flip__face {
+  transition: border-color var(--dur-fade) ease, box-shadow var(--dur-fade) ease;
+}
+
+.cardlayer__hit.is-playable:hover .flip__inner,
+.cardlayer__hit.is-selected .flip__inner {
+  box-shadow: 0 26px 48px rgba(0, 0, 0, 0.8), 0 0 26px rgba(200, 160, 74, 0.34);
+}
+
+.cardlayer__hit.is-playable:hover .flip__face,
+.cardlayer__hit.is-playable:hover .flip__face--front {
+  border-color: var(--gold-bright);
+}
+
+.cardlayer__hit.is-selected .flip__inner {
+  box-shadow: 0 26px 48px rgba(0, 0, 0, 0.8), 0 0 32px rgba(232, 200, 119, 0.42);
+}
+
+.cardlayer__hit.is-selected .flip__face,
+.cardlayer__hit.is-selected .flip__face--front {
+  border-color: var(--gold-pale);
+}
+
+/* Not playable: a cold hairline, no movement. */
+.cardlayer__hit.is-idle:hover .flip__face,
+.cardlayer__hit.is-idle:hover .flip__face--front {
+  border-color: var(--line-strong);
+}
+
 .staked__pile {
   position: relative;
   isolation: isolate;

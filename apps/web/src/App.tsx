@@ -316,6 +316,8 @@ export default function App({
   const cardInteraction: CardInteraction = {
     onActivate: handleCardClick,
     onInspect: setInspectedCard,
+    isOwnHand: isOwnHandCard,
+    isSelected: placed => roleClaimOpen && stakedCardId === placed.id,
     isPlayable: placed =>
       isOwnHandCard(placed) && (isMyTurn || isTargetReaction || vetoReady(placed.face.known)),
     hintFor: placed => {

@@ -39,6 +39,13 @@ export interface PlacedCard {
   face: Face;
   /** True while the table wants this card turned face-up for scrutiny. */
   revealed: boolean;
+  /**
+   * Did the claim this card was staked on hold up? Set only while a reveal or
+   * a duel outcome is on screen, and only for the cards that outcome turned
+   * up — it is what the ПРАВДА / БЛЕФ stamp reads. `undefined` means no
+   * verdict has been passed on this card, which is different from `false`.
+   */
+  wasTruth?: boolean;
   /** Whose card this is, when that is meaningful (hand, plot, duel side). */
   ownerId: string | null;
 }

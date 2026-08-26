@@ -21,13 +21,21 @@
  * lands exactly on the anchor's. Layout is never invalidated by an animating
  * card; the whole thing stays on the compositor.
  *
- * ## No React renders in the frame loop
+ * ## The springs are integrated here, by hand
  *
- * The per-frame work is: read the anchor's rect out of the registry's ref,
- * and push three numbers into `MotionValue`s with `.set()`. No `useState`,
- * no store subscription, nothing that could schedule a render. React only
- * re-renders this tree when the set of cards or their zones actually change —
- * which is a handful of times per turn, not sixty times per second.
+ * Not out of bravado: the *catalog* (see `planFor`) gives each leg of a
+ * journey its own spring, its own delay and its own fade, and it has to be
+ * able to change all three in the middle of a flight. A `useSpring` is
+ * configured once when it is created; swapping its configuration means
+ * tearing the follower down and rebuilding it, which throws away exactly the
+ * thing that makes springs worth having — the velocity the card is already
+ * carrying. Twenty lines of semi-implicit Euler keep position and velocity in
+ * a ref, so retargeting mid-flight, stiffening the spring mid-flight and
+ * pausing the chase for a beat are all the same one-line change to that ref.
+ *
+ * The per-frame work stays what it was: read the anchor's rect out of the
+ * registry's ref, integrate, and push numbers into `MotionValue`s. No
+ * `useState`, no store subscription, nothing that schedules a render.
  *
  * ## A missing anchor never teleports a card
  *
@@ -51,9 +59,9 @@ import type { CardId } from '@kinglier/engine/cardInstance';
 import type { GameCard } from '@kinglier/engine/types';
 import { CARD_INFO } from '@kinglier/engine/cards';
 import { useAnchorRects } from './AnchorRegistry.tsx';
-import { dur, spring } from './tokens.ts';
+import { dur, spring, tilt } from './tokens.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
-import type { PlacedCard, Zone } from './zones.ts';
+import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
 
 const CARD_BACK = '/assets/cards/back-dual-face.webp';
 
@@ -71,8 +79,8 @@ const CARD_LAYER_Z = 75;
 /**
  * How many deck cards are worth a DOM node. `deriveCardZones` honestly emits
  * every card in the deck — around forty-seven of them — all stacked on one
- * invisible corner anchor where at most the top one is ever seen. Only the
- * few that a draw could plausibly pull are drawn.
+ * invisible corner anchor. Only the few that a draw could plausibly pull are
+ * drawn, and even those are invisible until they leave.
  */
 const DECK_VISIBLE = 3;
 
@@ -82,6 +90,23 @@ const DECK_VISIBLE = 3;
  * before they are allowed to vanish into the culled remainder.
  */
 const DECK_SETTLE_MS = 900;
+
+/** Position tolerance, in px, below which a card counts as arrived. */
+const ARRIVED_PX = 0.6;
+
+/** Reduced motion swaps every spring for this crossfade. */
+const REDUCED_FADE_S = 0.12;
+
+/**
+ * Fraction of a journey over which a card entering or leaving an invisible
+ * corner fades. §4 of the spec: «карта на подлёте к углу уменьшается и
+ * гаснет, из угла — наоборот».
+ */
+const CORNER_FADE = 0.3;
+
+/** Below this, a "journey" is really a nudge and fades on a timer instead. */
+const MIN_FADE_TRAVEL_PX = 40;
+const NUDGE_FADE_MS = 240;
 
 /* -------------------------------------------------------------------------
    Interaction
@@ -100,6 +125,15 @@ export interface CardInteraction {
   onInspect?: (card: GameCard) => void;
   /** May this card be acted on right now? Drives hover, press and cursor. */
   isPlayable?: (placed: PlacedCard) => boolean;
+  /**
+   * Is this a card in the viewer's own hand? Own cards answer to `onActivate`
+   * whether or not they are playable, because the refusal — «Сейчас
+   * распоряжается …» — is more useful than a card description the player did
+   * not ask for. Everyone else's cards fall through to `onInspect`.
+   */
+  isOwnHand?: (placed: PlacedCard) => boolean;
+  /** Is this card picked out right now, e.g. staked behind an open popup? */
+  isSelected?: (placed: PlacedCard) => boolean;
   /** Short label pinned to the card, e.g. «вето», «на дуэль». */
   hintFor?: (placed: PlacedCard) => string | undefined;
 }
@@ -114,6 +148,134 @@ export const CardInteractionProvider: React.FC<{
 );
 
 /* -------------------------------------------------------------------------
+   The motion catalog
+   ------------------------------------------------------------------------- */
+
+interface SpringSpec {
+  stiffness: number;
+  damping: number;
+  mass: number;
+}
+
+/**
+ * How one leg of a card's journey is flown. Recomputed the moment the card's
+ * zone changes, and only then; everything else — a moving anchor, a resizing
+ * window — is chased with whatever plan is current.
+ */
+interface Plan {
+  /** Spring for the whole move. */
+  move: SpringSpec;
+  /**
+   * Spring for the horizontal axis alone. Giving x a different stiffness from
+   * y is what bends a straight line into an arc: the card gets across before
+   * it comes down, the way a dealt card does.
+   */
+  moveX: SpringSpec;
+  /** ms the card stays where it is before it starts chasing the new anchor. */
+  delayMs: number;
+  /** Resting tilt in degrees, or `null` to keep whatever tilt it has. */
+  rotate: number | null;
+  /** ms before the card is allowed to turn over, if its face also changed. */
+  flipDelayMs: number;
+  /** Whether this leg emerges from an invisible corner, sinks into one, or neither. */
+  fade: 'in' | 'out' | 'none';
+}
+
+/** The two corners are anchors, not piles: a card at rest in one is not drawn. */
+function isCorner(kind: ZoneKind): boolean {
+  return kind === 'deck' || kind === 'discard';
+}
+
+/** Where a card lies at rest, by what it is doing. */
+function restingRotation(zone: Zone): number | null {
+  switch (zone.kind) {
+    case 'overlay':
+      return tilt.overlay;
+    case 'stake':
+      return tilt.stake;
+    case 'duel':
+      return zone.side === 'attacker' ? tilt.duelAttacker : tilt.duelDefender;
+    case 'discard':
+      /* Already fading into the corner — a straightening card on the way out
+         is motion nobody asked for. It keeps the tilt it was lying at. */
+      return null;
+    default:
+      return 0;
+  }
+}
+
+const ARC: SpringSpec = { stiffness: 350, damping: 32, mass: 1 };
+
+/** Context the catalog needs that the two zones do not carry themselves. */
+interface LegContext {
+  /** Hand slot being flown into, for staggering a two-card draw. */
+  slot: number;
+  /**
+   * How long this card has been readable, in ms, or `null` if it is face-down.
+   * A card that has just been turned over has to stay put long enough to be
+   * read before it is allowed to leave — and a card nobody has turned over has
+   * nothing to read, so it leaves at once.
+   */
+  faceUpForMs: number | null;
+}
+
+/**
+ * The per-transition catalog, keyed on where the card was and where it is
+ * going. Everything the table does to a card is one of these rows; nothing
+ * anywhere else in the app writes a card animation.
+ */
+function planFor(from: Zone, to: Zone, ctx: LegContext): Plan {
+  const base: Plan = {
+    move: spring.flight,
+    moveX: spring.flight,
+    delayMs: 0,
+    rotate: restingRotation(to),
+    flipDelayMs: 0,
+    fade: isCorner(from.kind) === isCorner(to.kind) ? 'none' : isCorner(to.kind) ? 'out' : 'in'
+  };
+
+  switch (to.kind) {
+    case 'hand': {
+      /* Dealt out of the top-left corner: face-down, arcing across, turning
+         over as it lands. Two cards drawn at once are separated by a beat. */
+      if (from.kind === 'deck') {
+        return {
+          ...base,
+          moveX: ARC,
+          delayMs: ctx.slot * dur.stagger * 1000,
+          flipDelayMs: 260 + ctx.slot * dur.stagger * 1000
+        };
+      }
+      /* Coming home to a slot it already owns: nobody doubted, the duel was
+         called off. One continuous move, tighter than a flight, no fade. */
+      return { ...base, move: spring.settle, moveX: spring.settle };
+    }
+
+    case 'discard': {
+      /* An instant lying on top of the stake follows it out rather than
+         leaving with it, so two cards departing the same point read as two. */
+      if (from.kind === 'overlay') return { ...base, delayMs: dur.trail * 1000 };
+      /* A card the table just turned over has to be readable before it goes.
+         This pause belongs to the layer: the engine holds its outcome on
+         screen for its own reasons and knows nothing about the flight. A card
+         leaving one invisible corner for the other has nothing to be read and
+         waits for nothing. */
+      if (ctx.faceUpForMs !== null && !isCorner(from.kind)) {
+        const readable = (dur.flip + dur.hold) * 1000;
+        return { ...base, delayMs: Math.max(0, readable - ctx.faceUpForMs) };
+      }
+      return base;
+    }
+
+    /* Everything else — the stake, an overlay laid across it, the two sides
+       of a duel, an instant laid open, a plot shrinking into its slot — is a
+       flight to a new place at whatever tilt that place implies. */
+    default:
+      return base;
+  }
+}
+
+/* -------------------------------------------------------------------------
    Helpers
    ------------------------------------------------------------------------- */
 
@@ -122,7 +284,7 @@ interface BaseSize {
   height: number;
 }
 
-interface Target {
+interface Vec {
   x: number;
   y: number;
   scale: number;
@@ -134,12 +296,29 @@ function drive(value: MotionValue<number>, next: number): void {
 }
 
 /**
- * A card's resting tilt, by zone. An instant laid over the stake sits askew
- * so both cards read as two objects rather than one; everything else lies
- * square. Task 7 extends this into the full per-transition catalog.
+ * One semi-implicit Euler step of a damped spring, sub-stepped so a dropped
+ * frame cannot blow the integration up. Returns the new position; velocity is
+ * written back through `vel`.
  */
-function restingRotation(zone: Zone): number {
-  return zone.kind === 'overlay' ? 12 : 0;
+function integrate(
+  pos: number,
+  vel: { v: number },
+  target: number,
+  s: SpringSpec,
+  deltaMs: number
+): number {
+  const clamped = Math.min(deltaMs, 64);
+  const steps = Math.max(1, Math.ceil(clamped / 8));
+  const h = clamped / steps / 1000;
+  let p = pos;
+  let v = vel.v;
+  for (let i = 0; i < steps; i++) {
+    const a = (s.stiffness * (target - p) - s.damping * v) / s.mass;
+    v += a * h;
+    p += v * h;
+  }
+  vel.v = v;
+  return p;
 }
 
 /** Touch and pen devices get no hover state — there is no cursor to follow. */
@@ -160,6 +339,32 @@ function useCoarsePointer(): boolean {
    One card
    ------------------------------------------------------------------------- */
 
+/** Everything the frame loop keeps between frames. */
+interface Flight {
+  /** Integrated position, or `null` until an anchor has ever been found. */
+  pos: Vec | null;
+  vel: { x: { v: number }; y: { v: number }; scale: { v: number } };
+  /** Last anchor rect seen for the *current* zone, in card-node coordinates. */
+  target: Vec | null;
+  /** Zone the current plan was made for, as a key and in full. */
+  zone: string | null;
+  zoneValue: Zone | null;
+  plan: Plan;
+  /** Where the card waits out `plan.delayMs`. */
+  parked: Vec | null;
+  /** Timestamp at which the new target takes over. */
+  startAt: number;
+  /** Straight-line distance at the start of the leg, for the fade envelope. */
+  travel: number;
+  /** Timestamp the leg began, for fading a journey too short to measure. */
+  legAt: number;
+  arrived: boolean;
+  /** When the card last became readable, for the pause before it leaves. */
+  faceUpAt: number | null;
+  /** Flip state the loop has already acted on. */
+  flipped: boolean;
+}
+
 const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   placed,
   getBase
@@ -170,90 +375,183 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const coarse = useCoarsePointer();
 
   const key = zoneKey(placed.zone);
+  const slot = placed.zone.kind === 'hand' ? placed.zone.slot : 0;
 
-  /* Targets are written every frame; the springs chase them. Under reduced
-     motion the targets are used directly and the springs idle unused. */
-  const targetX = useMotionValue(0);
-  const targetY = useMotionValue(0);
-  const targetScale = useMotionValue(1);
-  const springX = useSpring(targetX, spring.flight);
-  const springY = useSpring(targetY, spring.flight);
-  const springScale = useSpring(targetScale, spring.settle);
-  const x = reduce ? targetX : springX;
-  const y = reduce ? targetY : springY;
-  const scale = reduce ? targetScale : springScale;
-
-  const rotate = useMotionValue(restingRotation(placed.zone));
-  const rotateY = useMotionValue(placed.face.known !== null ? 180 : 0);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const scale = useMotionValue(1);
   const opacity = useMotionValue(0);
+  const zIndex = useMotionValue(ZONE_PRECEDENCE[placed.zone.kind]);
+  const rotate = useMotionValue(restingRotation(placed.zone) ?? 0);
+  const rotateY = useMotionValue(placed.face.known !== null ? 180 : 0);
 
-  const lastTarget = useRef<Target | null>(null);
-  const placedOnce = useRef(false);
+  /* The lean towards the cursor. Static spring configuration, so these two
+     may stay `useSpring` followers — only the flight springs need swapping. */
+  const tiltXTarget = useMotionValue(0);
+  const tiltYTarget = useMotionValue(0);
+  const tiltX = useSpring(tiltXTarget, spring.hover);
+  const tiltY = useSpring(tiltYTarget, spring.hover);
 
-  useAnimationFrame(() => {
-    const rect = rects.get(key);
-    const base = getBase();
-    if (rect && base.width > 0) {
-      lastTarget.current = { x: rect.left, y: rect.top, scale: rect.width / base.width };
-    }
+  const flipped = placed.face.known !== null;
 
-    const target = lastTarget.current;
-    /* Never had an anchor: stay invisible rather than sit at 0,0. */
-    if (!target) return;
-
-    if (!placedOnce.current) {
-      placedOnce.current = true;
-      /* Arrive, do not fly in from the origin. `jump` moves the spring and
-         its target together without leaving velocity behind. */
-      targetX.jump(target.x);
-      targetY.jump(target.y);
-      targetScale.jump(target.scale);
-      springX.jump(target.x);
-      springY.jump(target.y);
-      springScale.jump(target.scale);
-      animate(opacity, 1, { duration: reduce ? 0 : dur.fade });
-      return;
-    }
-
-    drive(targetX, target.x);
-    drive(targetY, target.y);
-    drive(targetScale, target.scale);
+  const flight = useRef<Flight>({
+    pos: null,
+    vel: { x: { v: 0 }, y: { v: 0 }, scale: { v: 0 } },
+    target: null,
+    zone: null,
+    zoneValue: null,
+    plan: {
+      move: spring.flight,
+      moveX: spring.flight,
+      delayMs: 0,
+      rotate: restingRotation(placed.zone),
+      flipDelayMs: 0,
+      fade: 'none'
+    },
+    parked: null,
+    startAt: 0,
+    travel: 0,
+    legAt: 0,
+    arrived: true,
+    faceUpAt: null,
+    flipped
   });
 
-  /* Resting tilt follows the zone, so it changes on render, not per frame. */
-  const restRotation = restingRotation(placed.zone);
-  const mounted = useRef(false);
-  useEffect(() => {
-    if (reduce || !mounted.current) {
-      rotate.set(restRotation);
+  useAnimationFrame((time, delta) => {
+    const f = flight.current;
+    const base = getBase();
+    const rect = rects.get(key);
+
+    /* 1. Where does this zone sit right now? A zone with no registered anchor
+       leaves the last target standing; the card holds rather than teleports. */
+    if (rect && base.width > 0) {
+      f.target = { x: rect.left, y: rect.top, scale: rect.width / base.width };
+    }
+    const target = f.target;
+    if (!target) return;
+
+    /* 2. First sighting: arrive, do not fly in from the origin. */
+    if (!f.pos) {
+      f.pos = { ...target };
+      f.zone = key;
+      f.zoneValue = placed.zone;
+      f.arrived = true;
+      f.faceUpAt = flipped ? time : null;
+      drive(x, target.x);
+      drive(y, target.y);
+      drive(scale, target.scale);
+      drive(zIndex, ZONE_PRECEDENCE[placed.zone.kind]);
+      animate(opacity, isCorner(placed.zone.kind) ? 0 : 1, {
+        duration: reduce ? 0 : dur.fade
+      });
       return;
     }
-    const controls = animate(rotate, restRotation, spring.flight);
-    return () => controls.stop();
-  }, [restRotation, reduce, rotate]);
 
-  /* The flip. Face-down whenever the viewer may not read the card. Under
-     reduced motion the 3D turn is replaced by a crossfade of the two faces
-     (see `frontStyle` below) and `rotateY` is pinned flat. */
-  const known = placed.face.known;
-  const flipped = known !== null;
-  useEffect(() => {
+    /* 3. Face changes are their own event, independent of the zone: a card
+       can turn over without moving (a reveal) or move without turning (a
+       stake). `faceUpAt` is what the catalog's readability pause is measured
+       from, so it is tracked here rather than in the plan. */
+    if (flipped !== f.flipped) {
+      f.flipped = flipped;
+      f.faceUpAt = flipped ? time : null;
+      if (reduce) {
+        rotateY.set(0);
+      } else {
+        animate(rotateY, flipped ? 180 : 0, {
+          duration: dur.flip,
+          delay: f.plan.flipDelayMs / 1000,
+          ease: [0.4, 0, 0.2, 1]
+        });
+      }
+    }
+
+    /* 4. A new zone is a new leg: pick its row out of the catalog. */
+    if (key !== f.zone) {
+      const previous = f.zoneValue ?? placed.zone;
+      const plan = planFor(previous, placed.zone, {
+        slot,
+        faceUpForMs: f.faceUpAt === null ? null : time - f.faceUpAt
+      });
+      f.zone = key;
+      f.zoneValue = placed.zone;
+      f.plan = plan;
+      f.parked = { ...f.pos };
+      f.startAt = time + (reduce ? 0 : plan.delayMs);
+      f.travel = Math.hypot(target.x - f.pos.x, target.y - f.pos.y);
+      f.legAt = f.startAt;
+      f.arrived = false;
+      /* Ride above both the zone left and the zone entered while in transit,
+         so a card crossing the table is never briefly behind one it passes. */
+      drive(
+        zIndex,
+        Math.max(ZONE_PRECEDENCE[previous.kind], ZONE_PRECEDENCE[placed.zone.kind]) + 1
+      );
+      if (plan.rotate !== null) {
+        if (reduce) rotate.set(plan.rotate);
+        else animate(rotate, plan.rotate, { ...spring.settle, delay: plan.delayMs / 1000 });
+      }
+    }
+
+    /* 5. Chase. While a leg is still parked the card keeps the position it
+       held when the leg began — that is the pause a revealed card takes to be
+       read, and the beat a trailing instant waits out. */
+    const parked = time < f.startAt && f.parked ? f.parked : null;
+    const chase = parked ?? target;
+
     if (reduce) {
-      rotateY.set(0);
-      return;
+      f.pos = { ...chase };
+      f.vel.x.v = f.vel.y.v = f.vel.scale.v = 0;
+    } else {
+      const plan = f.plan;
+      f.pos = {
+        x: integrate(f.pos.x, f.vel.x, chase.x, plan.moveX, delta),
+        y: integrate(f.pos.y, f.vel.y, chase.y, plan.move, delta),
+        scale: integrate(f.pos.scale, f.vel.scale, chase.scale, plan.move, delta)
+      };
     }
-    const target = flipped ? 180 : 0;
-    if (!mounted.current) {
-      rotateY.set(target);
-      return;
-    }
-    const controls = animate(rotateY, target, { duration: dur.flip, ease: [0.4, 0, 0.2, 1] });
-    return () => controls.stop();
-  }, [flipped, reduce, rotateY]);
 
+    const gap = Math.hypot(target.x - f.pos.x, target.y - f.pos.y);
+    if (!parked && !f.arrived && gap < ARRIVED_PX && Math.abs(target.scale - f.pos.scale) < 0.002) {
+      f.pos = { ...target };
+      f.vel.x.v = f.vel.y.v = f.vel.scale.v = 0;
+      f.arrived = true;
+      drive(zIndex, ZONE_PRECEDENCE[placed.zone.kind]);
+    }
+
+    drive(x, f.pos.x);
+    drive(y, f.pos.y);
+    drive(scale, f.pos.scale);
+
+    /* 6. The corner envelope. A card sinking into a corner keeps its opacity
+       until the last `CORNER_FADE` of the trip and then goes out; a card
+       coming out of one arrives at full opacity that far in. Tying the fade
+       to distance rather than to a duration means it always finishes exactly
+       as the card lands, whatever the spring did on the way. */
+    const at = isCorner(placed.zone.kind) ? 0 : 1;
+    if (parked) {
+      /* Still standing where the leg began, so it is *that* zone's opacity
+         that applies, not the destination's: a card waiting its turn to be
+         dealt is still in the corner and still invisible, and a card holding
+         to be read is still on the table and still solid. `fade` encodes
+         which of the two ends is a corner; when neither or both are, the
+         destination's answer is also the origin's. */
+      drive(opacity, f.plan.fade === 'in' ? 0 : f.plan.fade === 'out' ? 1 : at);
+    } else if (f.arrived || f.plan.fade === 'none') {
+      drive(opacity, at);
+    } else if (f.travel < MIN_FADE_TRAVEL_PX) {
+      const t = Math.min(1, (time - f.legAt) / NUDGE_FADE_MS);
+      drive(opacity, f.plan.fade === 'out' ? 1 - t : t);
+    } else {
+      const left = gap / (f.travel * CORNER_FADE);
+      drive(opacity, Math.max(0, Math.min(1, f.plan.fade === 'out' ? left : 1 - left)));
+    }
+  });
+
+  /* Under reduced motion the 3D turn is replaced by a crossfade of the two
+     faces (see `frontStyle` below) and `rotateY` is pinned flat. */
   useEffect(() => {
-    mounted.current = true;
-  }, []);
+    if (reduce) rotateY.set(0);
+  }, [reduce, rotateY]);
 
   /* Keep the last face we were allowed to see. The art is then already
      loaded and painted on the hidden side before a flip starts, and a card
@@ -261,23 +559,56 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
      turn, while the front is still pointing at the viewer. Adjusting state
      during render is the React-sanctioned way to remember a previous prop —
      it costs one extra render on the frame a face becomes readable. */
-  const [lastKnown, setLastKnown] = useState<GameCard | null>(known);
-  if (known !== null && known !== lastKnown) setLastKnown(known);
-  const art = known ?? lastKnown;
+  const [lastKnown, setLastKnown] = useState<GameCard | null>(placed.face.known);
+  if (placed.face.known !== null && placed.face.known !== lastKnown) {
+    setLastKnown(placed.face.known);
+  }
+  const art = placed.face.known ?? lastKnown;
   const info = art ? CARD_INFO[art] : undefined;
 
-  const playable = interaction.isPlayable?.(placed) ?? false;
+  /* The verdict outlives the outcome that produced it. The engine clears
+     `revealOutcome` a second or two before it clears the action, and a stamp
+     that vanished while the card was still lying there would read as a bug.
+     A card that has been judged never returns to a hand, so remembering the
+     verdict for the life of the node is safe. */
+  const [verdict, setVerdict] = useState<boolean | null>(null);
+  if (placed.wasTruth !== undefined && placed.wasTruth !== verdict) setVerdict(placed.wasTruth);
+  const showVerdict =
+    verdict !== null && flipped && placed.zone.kind !== 'hand' && placed.zone.kind !== 'deck';
+
+  const corner = isCorner(placed.zone.kind);
+  const playable = !corner && (interaction.isPlayable?.(placed) ?? false);
+  const own = !corner && (interaction.isOwnHand?.(placed) ?? false);
+  const selected = !corner && (interaction.isSelected?.(placed) ?? false);
   const hint = interaction.hintFor?.(placed);
-  const canInspect = !!interaction.onInspect && !!art;
-  const interactive = playable || canInspect;
+  const canInspect = !corner && !!interaction.onInspect && !!art;
+  const interactive = own || canInspect;
   const lift = playable && !coarse && !reduce;
 
   const onClick = () => {
-    if (playable && interaction.onActivate) {
+    /* The player's own card answers to the game first: if it cannot be played
+       right now, `onActivate` is what says so. Only somebody else's card —
+       on the table, in a plot slot, in the graveyard — opens its description. */
+    if (own && interaction.onActivate) {
       interaction.onActivate(placed.id);
       return;
     }
     if (art && interaction.onInspect) interaction.onInspect(art);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!lift) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    const dx = (e.clientX - (box.left + box.width / 2)) / (box.width / 2);
+    const dy = (e.clientY - (box.top + box.height / 2)) / (box.height / 2);
+    const cap = tilt.pointerMax;
+    tiltYTarget.set(Math.max(-cap, Math.min(cap, dx * cap)));
+    tiltXTarget.set(Math.max(-cap, Math.min(cap, -dy * cap)));
+  };
+
+  const releaseTilt = () => {
+    tiltXTarget.set(0);
+    tiltYTarget.set(0);
   };
 
   return (
@@ -291,7 +622,8 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
         height: CARD_BASE_HEIGHT,
         width: CARD_BASE_WIDTH,
         transformOrigin: 'top left',
-        zIndex: ZONE_PRECEDENCE[placed.zone.kind],
+        perspective: 900,
+        zIndex,
         pointerEvents: 'none',
         x,
         y,
@@ -302,31 +634,51 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       {/* Tilt, hover and press. Separate from the node above so the rotation
           pivots around the card's middle rather than the anchor corner. */}
       <motion.div
-        className={`cardlayer__hit ${playable ? 'is-playable' : 'is-idle'}`}
+        className={[
+          'cardlayer__hit',
+          playable ? 'is-playable' : 'is-idle',
+          own ? 'is-own' : '',
+          selected ? 'is-selected' : ''
+        ]
+          .filter(Boolean)
+          .join(' ')}
         style={{
           position: 'relative',
           width: '100%',
           height: '100%',
           pointerEvents: interactive ? 'auto' : 'none',
           cursor: interactive ? 'pointer' : 'default',
-          rotate
+          rotate,
+          rotateX: reduce ? 0 : tiltX,
+          rotateY: reduce ? 0 : tiltY,
+          transformStyle: 'preserve-3d'
         }}
+        animate={{ y: selected && !reduce ? -18 : 0 }}
+        transition={spring.hover}
         whileHover={lift ? { y: -14, scale: 1.03, transition: spring.hover } : undefined}
-        whileTap={playable ? { scale: 0.97, transition: spring.press } : undefined}
+        whileTap={playable && !reduce ? { scale: 0.97, transition: spring.press } : undefined}
+        onPointerMove={onPointerMove}
+        onPointerLeave={releaseTilt}
+        onPointerDown={releaseTilt}
         onClick={interactive ? onClick : undefined}
         title={info ? `«${info.name}» — ${info.shortDescription}` : undefined}
       >
         {/* `.flip` is pure art treatment now — perspective, radius, border,
             shadow and `backface-visibility`. Size, entrance and the turn all
             belong to this layer; see `styles/layout.css`. */}
-        <div className="flip">
+        <div className={`flip${flipped ? ' is-flipped' : ''}`}>
           <motion.div
             className="flip__inner"
             style={{ transformStyle: reduce ? 'flat' : 'preserve-3d', rotateY }}
           >
             <div className="flip__face" style={{ backgroundImage: `url(${CARD_BACK})` }} />
             <div
-              className={['flip__face', 'flip__face--front', info ? `cardframe cardframe--${info.category}` : '']
+              className={[
+                'flip__face',
+                'flip__face--front',
+                showVerdict ? (verdict ? 'flip__face--truth' : 'flip__face--bluff') : '',
+                info ? `cardframe cardframe--${info.category}` : ''
+              ]
                 .filter(Boolean)
                 .join(' ')}
               style={{
@@ -338,11 +690,17 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
                       transform: 'none',
                       backfaceVisibility: 'visible' as const,
                       opacity: flipped ? 1 : 0,
-                      transition: `opacity ${dur.fade}s linear`
+                      transition: `opacity ${REDUCED_FADE_S}s linear`
                     }
                   : null)
               }}
-            />
+            >
+              {showVerdict && (
+                <span className={`verdict ${verdict ? 'verdict--truth' : 'verdict--bluff'}`}>
+                  {verdict ? 'ПРАВДА' : 'БЛЕФ'}
+                </span>
+              )}
+            </div>
           </motion.div>
         </div>
         {hint && <span className="handcard__hint">{hint}</span>}
@@ -367,7 +725,8 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
  * it as an arrival rather than as one of the anonymous forty-seven.
  *
  * The deck's own order is the order `deriveCardZones` emitted it in, which is
- * the order of `GameState.deck` — the top of the deck first.
+ * the order of `GameState.deck` — and the engine draws with `deck.pop()`, so
+ * the *last* entries are the top of the deck and the ones a draw will pull.
  */
 function sameIds(a: ReadonlySet<CardId>, b: ReadonlySet<CardId>): boolean {
   if (a.size !== b.size) return false;
@@ -408,14 +767,18 @@ function useDrawnCards(cards: PlacedCard[]): PlacedCard[] {
     }
   }
 
+  let deckTotal = 0;
+  for (const placed of cards) if (placed.zone.kind === 'deck') deckTotal++;
+
   const drawn: PlacedCard[] = [];
-  let deckRank = 0;
+  let deckSeen = 0;
   for (const placed of cards) {
     if (placed.zone.kind !== 'deck') {
       drawn.push(placed);
       continue;
     }
-    const rank = deckRank++;
+    /* Distance from the top of the deck, which is the end of the array. */
+    const rank = deckTotal - 1 - deckSeen++;
     if (rank < DECK_VISIBLE || elsewhere.has(placed.id) || lingering.has(placed.id)) {
       drawn.push(placed);
     }
