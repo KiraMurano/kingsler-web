@@ -68,6 +68,21 @@ const CARD_BASE_WIDTH = 'calc(min(32vh, 258px) * 2 / 3)';
 /** Above the table and its badges, below backdrops, sheets and dialogs. */
 const CARD_LAYER_Z = 75;
 
+/**
+ * How many deck cards are worth a DOM node. `deriveCardZones` honestly emits
+ * every card in the deck — around forty-seven of them — all stacked on one
+ * invisible corner anchor where at most the top one is ever seen. Only the
+ * few that a draw could plausibly pull are drawn.
+ */
+const DECK_VISIBLE = 3;
+
+/**
+ * How long a card that has just flown *into* the deck keeps its node after
+ * arriving. A reshuffle sends cards home; they need to finish the flight
+ * before they are allowed to vanish into the culled remainder.
+ */
+const DECK_SETTLE_MS = 900;
+
 /* -------------------------------------------------------------------------
    Interaction
    ------------------------------------------------------------------------- */
@@ -301,29 +316,13 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
         onClick={interactive ? onClick : undefined}
         title={info ? `«${info.name}» — ${info.shortDescription}` : undefined}
       >
-        {/* `.flip` normally sizes and animates itself; here the layer owns
-            both, so its height, entrance and hover transform are neutralised
-            inline and only its perspective and art treatment are kept. */}
-        <div
-          className="flip"
-          style={{
-            width: '100%',
-            height: '100%',
-            aspectRatio: 'auto',
-            animation: 'none',
-            transition: 'none',
-            transform: 'none',
-            pointerEvents: 'none',
-            cursor: 'inherit'
-          }}
-        >
+        {/* `.flip` is pure art treatment now — perspective, radius, border,
+            shadow and `backface-visibility`. Size, entrance and the turn all
+            belong to this layer; see `styles/layout.css`. */}
+        <div className="flip">
           <motion.div
             className="flip__inner"
-            style={{
-              transformStyle: reduce ? 'flat' : 'preserve-3d',
-              transition: 'none',
-              rotateY
-            }}
+            style={{ transformStyle: reduce ? 'flat' : 'preserve-3d', rotateY }}
           >
             <div className="flip__face" style={{ backgroundImage: `url(${CARD_BACK})` }} />
             <div
@@ -353,10 +352,92 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
 };
 
 /* -------------------------------------------------------------------------
+   Deck culling
+   ------------------------------------------------------------------------- */
+
+/**
+ * Which of `cards` actually get a node.
+ *
+ * Everything outside the deck is always drawn — culling a card that is on
+ * the table or in a hand would be a card disappearing. Inside the deck only
+ * the top `DECK_VISIBLE` are drawn, plus any card that was somewhere else a
+ * moment ago and is still flying home, so a reshuffle animates instead of
+ * popping. `wasElsewhere` holds the zones as of the *previous commit*, which
+ * is what lets the very render where a card enters the deck still recognise
+ * it as an arrival rather than as one of the anonymous forty-seven.
+ *
+ * The deck's own order is the order `deriveCardZones` emitted it in, which is
+ * the order of `GameState.deck` — the top of the deck first.
+ */
+function sameIds(a: ReadonlySet<CardId>, b: ReadonlySet<CardId>): boolean {
+  if (a.size !== b.size) return false;
+  for (const id of a) if (!b.has(id)) return false;
+  return true;
+}
+
+function nonDeckIds(cards: PlacedCard[]): Set<CardId> {
+  const ids = new Set<CardId>();
+  for (const placed of cards) if (placed.zone.kind !== 'deck') ids.add(placed.id);
+  return ids;
+}
+
+function useDrawnCards(cards: PlacedCard[]): PlacedCard[] {
+  /* Where every card was as of the previous `cards` array. Remembering a
+     previous prop by adjusting state during render is the React-sanctioned
+     pattern (the same one `LayerCard` uses for the last readable face); an
+     effect would be a commit too late, and by then the arriving card would
+     already have been culled and its node thrown away. */
+  const [seen, setSeen] = useState<PlacedCard[]>(cards);
+  const [elsewhere, setElsewhere] = useState<ReadonlySet<CardId>>(() => new Set());
+  /* Cards that have just flown into the deck and are still settling there. */
+  const [lingering, setLingering] = useState<ReadonlySet<CardId>>(() => new Set());
+
+  if (seen !== cards) {
+    const wasElsewhere = nonDeckIds(seen);
+    const arrived = cards.filter(
+      placed => placed.zone.kind === 'deck' && wasElsewhere.has(placed.id)
+    );
+    setSeen(cards);
+    setElsewhere(prev => (sameIds(prev, wasElsewhere) ? prev : wasElsewhere));
+    if (arrived.length > 0) {
+      setLingering(prev => {
+        const merged = new Set(prev);
+        for (const placed of arrived) merged.add(placed.id);
+        return merged;
+      });
+    }
+  }
+
+  const drawn: PlacedCard[] = [];
+  let deckRank = 0;
+  for (const placed of cards) {
+    if (placed.zone.kind !== 'deck') {
+      drawn.push(placed);
+      continue;
+    }
+    const rank = deckRank++;
+    if (rank < DECK_VISIBLE || elsewhere.has(placed.id) || lingering.has(placed.id)) {
+      drawn.push(placed);
+    }
+  }
+
+  /* Keyed on `lingering` itself, so an unrelated re-render never restarts the
+     window; a fresh arrival does, which is the behaviour we want. */
+  useEffect(() => {
+    if (lingering.size === 0) return;
+    const handle = setTimeout(() => setLingering(new Set()), DECK_SETTLE_MS);
+    return () => clearTimeout(handle);
+  }, [lingering]);
+
+  return drawn;
+}
+
+/* -------------------------------------------------------------------------
    The layer
    ------------------------------------------------------------------------- */
 
 export const CardLayer: React.FC<{ cards: PlacedCard[] }> = ({ cards }) => {
+  const drawn = useDrawnCards(cards);
   const baseRef = useRef<HTMLDivElement | null>(null);
   const baseSize = useRef<BaseSize>({ width: 0, height: 0 });
   const getBase = useCallback(() => baseSize.current, []);
@@ -401,7 +482,7 @@ export const CardLayer: React.FC<{ cards: PlacedCard[] }> = ({ cards }) => {
         }}
         ref={baseRef}
       />
-      {cards.map(placed => (
+      {drawn.map(placed => (
         <LayerCard key={placed.id} placed={placed} getBase={getBase} />
       ))}
     </div>

@@ -769,19 +769,17 @@
   z-index: var(--z-tabled);
 }
 
+/* The flip belongs to the card layer, which owns the card's position, size,
+   entrance and the `rotateY` of the turn itself. What is left here is art
+   treatment only: the perspective the turn needs, and the frame the two
+   faces share. Nothing in this block may set a size, a transition or a
+   transform — the layer would have to fight it back out again. */
 .flip {
   position: relative;
-  height: clamp(152px, 27vh, 216px);
-  aspect-ratio: 2 / 3;
+  width: 100%;
+  height: 100%;
   perspective: 1000px;
-  pointer-events: auto;
-  cursor: pointer;
-  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
-  animation: card-deal 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-}
-
-.flip:hover {
-  transform: translateY(-6px) scale(1.03);
+  pointer-events: none;
 }
 
 .staked__pile {
@@ -792,9 +790,31 @@
   overflow: visible;
 }
 
-.staked__pile .flip {
-  height: 100%;
-  z-index: 1;
+/* ---- Anchors ------------------------------------------------------------
+   A `CardAnchor` is an empty, card-shaped hole. It holds the layout and the
+   size; the card that belongs in it is drawn by `CardLayer` and springs to
+   the hole's measured rect. Anchors must therefore never be rotated: the
+   layer reads `getBoundingClientRect()`, and a rotated box measures bigger
+   than the card it describes. Translation is safe — the rect follows it. */
+.cardanchor {
+  position: relative;
+  pointer-events: none;
+}
+
+.staked__pile .cardanchor {
+  position: absolute;
+  inset: 0;
+}
+
+/* An instant laid on top of the current action sits off to one side, so the
+   two cards read as two objects. The layer adds the tilt. */
+.staked__pile .cardanchor--overlay {
+  transform: translate(16%, -6%);
+}
+
+.duel__side .cardanchor {
+  height: clamp(140px, 24vh, 188px);
+  aspect-ratio: 2 / 3;
 }
 
 .tablecard {
@@ -855,13 +875,8 @@
   height: 100%;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.75s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 9px;
   box-shadow: var(--shadow-card);
-}
-
-.flip.is-flipped .flip__inner {
-  transform: rotateY(180deg);
 }
 
 .flip__face {
@@ -1049,10 +1064,6 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-}
-
-.duel__side .flip {
-  height: clamp(140px, 24vh, 188px);
 }
 
 .duel__vs {
@@ -1334,6 +1345,16 @@
   height: min(32vh, 258px);
   width: calc(min(32vh, 258px) * 2 / 3);
   flex: 0 0 auto;
+}
+
+/* The hole a hand card rests in. Both slots are always rendered, so a card
+   leaving slot 0 does not drag slot 1 across the table. */
+.hand__frame {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  border: 1px dashed var(--line-cold);
+  background: rgba(8, 16, 12, 0.28);
 }
 
 .hand__slot > .handcard {

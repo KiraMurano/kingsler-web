@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { pickViewer } from './lib/viewer';
 import { idOf } from '@kinglier/engine/cardInstance';
 import { useToast } from './lib/toast';
@@ -18,6 +18,11 @@ import { CardDetailModal } from './components/CardDetailModal';
 import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
 import { Button } from './components/ui/Button';
+import { AnchorProvider } from './motion/AnchorRegistry.tsx';
+import { CardInteractionProvider, CardLayer } from './motion/CardLayer.tsx';
+import { deriveCardZones } from './lib/cardZones.ts';
+import type { CardInteraction } from './motion/CardLayer.tsx';
+import type { PlacedCard } from './motion/zones.ts';
 import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
 import type { CardId, GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
@@ -40,9 +45,15 @@ export default function App({
 }) {
   const {
     players,
+    deck,
+    discardPile,
     activePlayerId,
     turnPhase,
     pendingAction,
+    pendingDuelDefenderCardId,
+    overlayInstant,
+    revealOutcome,
+    duelOutcome,
     coronationCandidateId,
     coronationOriginId,
     viewerId,
@@ -95,6 +106,39 @@ export default function App({
   const activePlayer = players.find(p => p.id === activePlayerId);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
 
+  /* Every card at the table, placed by state alone. Memoised on the exact
+     slice placement depends on, so opening a modal does not hand `CardLayer`
+     a fresh array and make it reconcile fifty nodes for nothing. */
+  const placedCards = useMemo(
+    () =>
+      deriveCardZones(
+        {
+          players,
+          deck,
+          discardPile,
+          pendingAction,
+          pendingDuelDefenderCardId,
+          overlayInstant,
+          revealOutcome,
+          duelOutcome,
+          turnPhase
+        },
+        human?.id ?? ''
+      ),
+    [
+      players,
+      deck,
+      discardPile,
+      pendingAction,
+      pendingDuelDefenderCardId,
+      overlayInstant,
+      revealOutcome,
+      duelOutcome,
+      turnPhase,
+      human
+    ]
+  );
+
   const confirmTarget = (targetId: string) => {
     if (!pendingTarget || !human) return;
 
@@ -122,8 +166,10 @@ export default function App({
     setPendingTarget(null);
   };
 
-  const handleCardClick = (card: GameCard, cardId: CardId) => {
+  const handleCardClick = (cardId: CardId) => {
     if (!human) return;
+    const card = human.hand.find(held => held.id === cardId)?.card;
+    if (!card) return;
 
     if (turnPhase === 'VETO_WINDOW' && card === 'Право вето') {
       playInstant(human.id, 'Право вето', cardId);
@@ -261,6 +307,25 @@ export default function App({
     turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
   const isVetoWindow = turnPhase === 'VETO_WINDOW';
 
+  /* What a card in the layer may do. Only the viewer's own hand cards are
+     ever playable; everything else is inspectable at most. */
+  const vetoReady = (card: GameCard | null) => isVetoWindow && card === 'Право вето';
+  const isOwnHandCard = (placed: PlacedCard) =>
+    placed.zone.kind === 'hand' && placed.zone.playerId === human.id;
+
+  const cardInteraction: CardInteraction = {
+    onActivate: handleCardClick,
+    onInspect: setInspectedCard,
+    isPlayable: placed =>
+      isOwnHandCard(placed) && (isMyTurn || isTargetReaction || vetoReady(placed.face.known)),
+    hintFor: placed => {
+      if (!isOwnHandCard(placed)) return undefined;
+      if (vetoReady(placed.face.known)) return 'вето';
+      if (isTargetReaction) return 'на дуэль';
+      return undefined;
+    }
+  };
+
   return (
     <div className="app">
       <TopBar
@@ -275,43 +340,39 @@ export default function App({
         onExit={onExit}
       />
 
-      <main className="app__stage">
-        <div className="table">
-          <div className="table__rim" />
-          <SeatsRow
-            pendingTargetAction={pendingTarget}
-            onSelectTarget={confirmTarget}
-            onInspectCard={setInspectedCard}
-          />
-          <Arena
-            pendingTargetAction={pendingTarget}
-            onCancelTarget={() => setPendingTarget(null)}
-            onInspectCard={setInspectedCard}
-          />
-        </div>
+      <AnchorProvider>
+        <CardInteractionProvider value={cardInteraction}>
+          <main className="app__stage">
+            <div className="table">
+              <div className="table__rim" />
+              <SeatsRow
+                pendingTargetAction={pendingTarget}
+                onSelectTarget={confirmTarget}
+                onInspectCard={setInspectedCard}
+              />
+              <Arena
+                pendingTargetAction={pendingTarget}
+                onCancelTarget={() => setPendingTarget(null)}
+                onInspectCard={setInspectedCard}
+              />
+            </div>
 
-        <div className="hero">
-          <PlayerCrest
-            player={human}
-            isActive={activePlayerId === human.id}
-            onInspectCard={setInspectedCard}
-          />
+            <div className="hero">
+              <PlayerCrest
+                player={human}
+                isActive={activePlayerId === human.id}
+                onInspectCard={setInspectedCard}
+              />
 
-          <Hand
-            player={human}
-            pendingAction={pendingAction}
-            isMyTurn={isMyTurn}
-            isTargetReaction={isTargetReaction}
-            isVetoWindow={isVetoWindow}
-            roleClaimOpen={roleClaimOpen}
-            stakedCardId={stakedCardId}
-            onCardClick={handleCardClick}
-            onInspectStaked={setInspectedCard}
-          />
+              <Hand player={human} />
 
-          <ActionControls onOpenNormalActions={() => setNormalActionsOpen(true)} />
-        </div>
-      </main>
+              <ActionControls onOpenNormalActions={() => setNormalActionsOpen(true)} />
+            </div>
+
+            <CardLayer cards={placedCards} />
+          </main>
+        </CardInteractionProvider>
+      </AnchorProvider>
 
       <Chronicle
         open={chronicleOpen}
