@@ -1,6 +1,6 @@
 import type { Action, GameState, RevealOutcome } from '../types';
 import { isRole } from '../cards';
-import { holds } from '../cardInstance';
+import { byId, holds, pluck } from '../cardInstance';
 import { declineAcc, verbDoubted, verbCaught } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
 import { triggerResourceFloat, triggerSingleCardFlight } from '../utils/visualEffects';
@@ -139,11 +139,7 @@ export function executeRevealOutcome(
   if (!actor || !doubter) return;
 
   const claimedRole = pendingAction.roleClaim;
-  const actorHand = [...actor.hand];
-  let stakedIndex = pendingAction.stakedCardIndex ?? 0;
-  if (stakedIndex < 0 || stakedIndex >= actorHand.length) stakedIndex = 0;
-
-  const staked = actorHand[stakedIndex] ?? actorHand[0];
+  const staked = byId(actor.hand, pendingAction.stakedCardId) ?? actor.hand[0];
   const revealedRole = staked?.card ?? 'Наследник';
   const wasTruth = revealedRole === claimedRole;
 
@@ -237,9 +233,12 @@ export function executeRevealOutcome(
     }
   }
 
-  // Remove revealed card from hand to discard — the very instance that was
-  // staked, so the card keeps its identity all the way into the graveyard.
-  actorHand.splice(stakedIndex, 1);
+  // Remove the revealed card from hand to discard — addressed by id, so the
+  // card that leaves is exactly the one that was staked and the neighbour in
+  // hand is never touched.
+  const { rest: actorHand } = staked
+    ? pluck(actor.hand, staked.id)
+    : { rest: [...actor.hand] };
   newPlayers[actorIdx] = { ...newPlayers[actorIdx], hand: actorHand };
   const newDiscard = staked ? [...get().discardPile, staked] : [...get().discardPile];
 
@@ -356,11 +355,18 @@ export function closeRevealOutcome(
  * staked card never just vanishes off the arena.
  */
 function flightHomeOrDiscard(
+  get: StateGetter,
   set: StateSetter,
   action: Action,
   isAfterTruthChallenge: boolean
 ): void {
-  if (action.cardAlreadyResolved || !action.roleClaim) return;
+  if (!action.roleClaim) return;
+  // A card that is no longer in its owner's hand and was never revealed by a
+  // challenge has already left the table on its own (the duel clash) — flying
+  // it home would resurrect a card that no longer exists.
+  const actor = get().players.find(p => p.id === action.actorId);
+  const stillHeld = !action.stakedCardId || !!byId(actor?.hand ?? [], action.stakedCardId);
+  if (!isAfterTruthChallenge && !stillHeld) return;
   if (isAfterTruthChallenge) {
     triggerSingleCardFlight(set, 'to_discard', action.actorId, action.roleClaim);
   } else {
@@ -398,7 +404,7 @@ export function triggerVetoWindowOrResolveEffect(
   }
 
   if (isVetoed) {
-    flightHomeOrDiscard(set, action, isAfterTruthChallenge);
+    flightHomeOrDiscard(get, set, action, isAfterTruthChallenge);
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
@@ -440,7 +446,7 @@ export function triggerVetoWindowOrResolveEffect(
       }
     }, 2200);
   } else {
-    flightHomeOrDiscard(set, action, isAfterTruthChallenge);
+    flightHomeOrDiscard(get, set, action, isAfterTruthChallenge);
     set({
       turnPhase: 'IDLE'
     });
@@ -516,7 +522,7 @@ export function proceedAfterVetoWindow(
   }
 
   if (isVetoed) {
-    flightHomeOrDiscard(set, pendingAction, !!isPendingActionAfterTruthChallenge);
+    flightHomeOrDiscard(get, set, pendingAction, !!isPendingActionAfterTruthChallenge);
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${pendingAction.roleClaim || pendingAction.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
@@ -536,7 +542,7 @@ export function proceedAfterVetoWindow(
     return;
   }
 
-  flightHomeOrDiscard(set, pendingAction, !!isPendingActionAfterTruthChallenge);
+  flightHomeOrDiscard(get, set, pendingAction, !!isPendingActionAfterTruthChallenge);
 
   get()._resolvePendingActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
 }

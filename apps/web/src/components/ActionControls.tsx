@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import type { Role } from '@kinglier/engine/types';
 import { pickViewer } from '../lib/viewer';
-import { faces } from '@kinglier/engine/cardInstance';
+import { idOf } from '@kinglier/engine/cardInstance';
 import { Button } from './ui/Button';
 import { UiIcon } from './ui/Icon';
 
@@ -84,7 +84,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   const isActor = pendingAction?.actorId === human.id;
   const isTarget = pendingAction?.targetId === human.id;
   const hasTokens = human.actionTokens >= 1;
-  const redirectIndex = faces(human.hand).indexOf('Перенаправление');
+  const redirectId = idOf(human.hand, 'Перенаправление');
   const pendingDoubter = pendingDoubtDoubterId
     ? players.find(p => p.id === pendingDoubtDoubterId)
     : null;
@@ -127,7 +127,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
               block
               onClick={act('Перенаправляем атаку…', () => {
                 setRedirectPicker(false);
-                playInstant(human.id, 'Перенаправление', redirectIndex, p.id);
+                if (redirectId) playInstant(human.id, 'Перенаправление', redirectId, p.id);
               })}
             >
               {p.name}
@@ -148,17 +148,17 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
           alert
           busy={busy}
         >
-          {human.hand.map(({ card }, idx) => {
+          {human.hand.map(({ card, id }) => {
             const truthful = card === shieldRole;
             return (
               <Button
-                key={idx}
+                key={id}
                 tone={truthful ? 'good' : 'gold'}
                 block
                 sub={truthful ? 'Правда — щит настоящий' : 'Блеф — рискованно'}
                 onClick={act('Готовим дуэль…', () => {
                   setDuelPicker(false);
-                  targetDeclareDuel(human.id, idx);
+                  targetDeclareDuel(human.id, id);
                 })}
               >
                 {card}
@@ -224,7 +224,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
         >
           Дуэль
         </Button>
-        {redirectIndex !== -1 && redirectOptions.length > 0 && (
+        {redirectId && redirectOptions.length > 0 && (
           <Button
             tone="arcane"
             block
@@ -305,8 +305,8 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
   /* 4. Veto window before the effect lands. Closes immediately on click,
      same as every other action popup — no lingering panel. */
   if (turnPhase === 'VETO_WINDOW' && !vetoDismissed) {
-    const vetoIndex = faces(human.hand).indexOf('Право вето');
-    const canVeto = vetoIndex !== -1 && !isVetoed;
+    const vetoId = idOf(human.hand, 'Право вето');
+    const canVeto = !!vetoId && !isVetoed;
     return (
       <Panel
         title="Окно вето"
@@ -320,7 +320,7 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
             sub={<>Отменить действие • 0 <UiIcon kind="move" size="xs" /></>}
             onClick={() => {
               setVetoDismissed(true);
-              playInstant(human.id, 'Право вето', vetoIndex);
+              if (vetoId) playInstant(human.id, 'Право вето', vetoId);
             }}
           >
             Наложить вето

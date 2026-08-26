@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Action, GameCard } from '@kinglier/engine/types';
+import type { Action, CardId, GameCard } from '@kinglier/engine/types';
 
 export type HandSlots = [GameCard | null, GameCard | null];
 
@@ -32,24 +32,6 @@ export function reconcileHandSlots(prev: HandSlots, compact: GameCard[]): HandSl
   return next;
 }
 
-/** Compact-hand index for a visual slot, counting duplicate names from the left. */
-export function compactIndex(hand: GameCard[], slots: HandSlots, slot: number): number {
-  const card = slots[slot];
-  if (!card) return -1;
-  let ordinal = 0;
-  for (let i = 0; i <= slot; i++) {
-    if (slots[i] === card) ordinal++;
-  }
-  let seen = 0;
-  for (let i = 0; i < hand.length; i++) {
-    if (hand[i] === card) {
-      seen++;
-      if (seen === ordinal) return i;
-    }
-  }
-  return hand.indexOf(card);
-}
-
 /**
  * A staked role card stays hidden behind the "на кону" placeholder for as
  * long as `pendingAction` still references it — from the claim all the way
@@ -60,15 +42,14 @@ export function compactIndex(hand: GameCard[], slots: HandSlots, slot: number): 
  * duplicate.
  */
 export function isCardStaked(
-  pendingAction: Pick<Action, 'type' | 'actorId' | 'stakedCardIndex'> | null | undefined,
+  pendingAction: Pick<Action, 'type' | 'actorId' | 'stakedCardId'> | null | undefined,
   playerId: string,
-  engineIndex: number
+  cardId: CardId
 ): boolean {
   return (
     pendingAction?.type === 'role' &&
     pendingAction.actorId === playerId &&
-    engineIndex >= 0 &&
-    pendingAction.stakedCardIndex === engineIndex
+    pendingAction.stakedCardId === cardId
   );
 }
 

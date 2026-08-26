@@ -79,7 +79,7 @@ useGameStore.getState().performAction({
   name: 'Наследник',
   roleClaim: 'Наследник',
   actorId: 'p1',
-  stakedCardIndex: 0,
+  stakedCardId: useGameStore.getState().players.find(p => p.id === 'p1')!.hand[0].id,
   costGold: 0,
   costTokens: 1,
   description: ''

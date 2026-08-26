@@ -47,7 +47,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     duelOutcome: null,
     informantPeekData: null,
     conspiracyPrompt: null,
-    pendingDuelDefenderCardIndex: null,
+    pendingDuelDefenderCardId: null,
     pendingDuelDefenderRoleClaim: null,
     activeSpeechReactions: {},
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],

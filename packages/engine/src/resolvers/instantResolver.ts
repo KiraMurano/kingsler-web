@@ -1,5 +1,6 @@
 import type { Action, GameState, InstantType, CardId } from '../types';
 import { CARD_INFO, drawCardsFromDeck } from '../cards';
+import { pluck } from '../cardInstance';
 import { botMemory } from '../Bot';
 import { declineGen } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
@@ -38,7 +39,7 @@ export function playInstant(
   set: StateSetter,
   playerId: string,
   instantType: InstantType,
-  cardIndex: number,
+  cardId: CardId,
   targetPlayerId?: string
 ): void {
   const { players, pendingAction, discardPile } = get();
@@ -48,11 +49,9 @@ export function playInstant(
   const isFreeInstant = instantType === 'Право вето' || instantType === 'Перенаправление';
   if (!isFreeInstant && actor.actionTokens < 1) return;
 
-  const card = actor.hand[cardIndex];
+  const { taken: card, rest: newHand } = pluck(actor.hand, cardId);
   if (card?.card !== instantType) return;
 
-  const newHand = [...actor.hand];
-  newHand.splice(cardIndex, 1);
   const updatedDiscard = [...discardPile, card];
 
   const tokenCost = isFreeInstant ? 0 : 1;

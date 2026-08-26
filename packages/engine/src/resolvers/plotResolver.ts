@@ -1,4 +1,5 @@
-import type { Action, GameState, PlotType, Player, CardInstance } from '../types';
+import type { Action, CardId, GameState, PlotType, Player, CardInstance } from '../types';
+import { pluck } from '../cardInstance';
 import { CARD_INFO } from '../cards';
 import { declineGen } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
@@ -39,7 +40,7 @@ export function playPlotAction(
   get: StateGetter,
   set: StateSetter,
   plotType: PlotType,
-  cardIndex: number,
+  cardId: CardId,
   targetPlayerId?: string
 ): void {
   timerManager.clearAll();
@@ -47,11 +48,8 @@ export function playPlotAction(
   const actor = players.find(p => p.id === activePlayerId);
   if (!actor || actor.actionTokens < 1) return;
 
-  const playedCard = actor.hand[cardIndex];
+  const { taken: playedCard, rest: newHand } = pluck(actor.hand, cardId);
   if (playedCard?.card !== plotType) return;
-
-  const newHand = [...actor.hand];
-  newHand.splice(cardIndex, 1);
 
   const newPlayers = players.map(p => p.id === actor.id ? {
     ...p,

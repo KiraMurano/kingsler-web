@@ -1,4 +1,4 @@
-import type { Role, PlotType, InstantType } from '@kinglier/engine/types';
+import type { Role, PlotType, InstantType, CardId } from '@kinglier/engine/types';
 
 /** An action that has been chosen but still needs a victim picked at the table. */
 export interface PendingTargetAction {
@@ -11,7 +11,7 @@ export interface PendingTargetAction {
   instantType?: InstantType;
   isPlotDirect?: boolean;
   isInstantDirect?: boolean;
-  stakedCardIndex?: number;
+  stakedCardId?: CardId;
   withVaBanque?: boolean;
 }
 

@@ -1,7 +1,6 @@
 import React from 'react';
-import type { Action, GameCard, Player } from '@kinglier/engine/types';
-import { compactIndex, isCardStaked, useHandSlots } from '../lib/handSlots';
-import { faces } from '@kinglier/engine/cardInstance';
+import type { Action, CardId, GameCard, Player } from '@kinglier/engine/types';
+import { isCardStaked } from '../lib/handSlots';
 import { Card } from './Card';
 
 interface HandProps {
@@ -11,8 +10,8 @@ interface HandProps {
   isTargetReaction: boolean;
   isVetoWindow: boolean;
   roleClaimOpen: boolean;
-  stakedCardIndex: number;
-  onCardClick: (card: GameCard, compactIndex: number) => void;
+  stakedCardId: CardId | null;
+  onCardClick: (card: GameCard, cardId: CardId) => void;
   onInspectStaked?: (card: GameCard) => void;
 }
 
@@ -23,37 +22,28 @@ export const Hand: React.FC<HandProps> = ({
   isTargetReaction,
   isVetoWindow,
   roleClaimOpen,
-  stakedCardIndex,
+  stakedCardId,
   onCardClick
-}) => {
-  const handFaces = faces(player.hand);
-  const { slots, leaving } = useHandSlots(handFaces);
+}) => (
+  <div className="hand">
+    {([0, 1] as const).map(slot => {
+      const held = player.hand[slot];
+      const staked = !!held && isCardStaked(pendingAction, player.id, held.id);
+      const vetoReady = !!held && isVetoWindow && held.card === 'Право вето';
 
-  return (
-    <div className="hand">
-      {([0, 1] as const).map(index => {
-        const live = slots[index];
-        const gone = leaving[index];
-        const engineIndex = compactIndex(handFaces, slots, index);
-        const staked = isCardStaked(pendingAction, player.id, engineIndex);
-        const vetoReady = !!live && isVetoWindow && live === 'Право вето';
-        const card = gone ?? live;
-
-        return (
-          <div key={index} className="hand__slot">
-            {!gone && live && !staked && (
-              <Card
-                card={live}
-                isPlayable={isMyTurn || isTargetReaction || vetoReady}
-                isSelected={roleClaimOpen && stakedCardIndex === engineIndex}
-                hint={vetoReady ? 'вето' : isTargetReaction ? 'на дуэль' : undefined}
-                onClick={() => onCardClick(live, engineIndex)}
-              />
-            )}
-            {gone && card && <Card card={card} className="handcard--out" />}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+      return (
+        <div key={slot} className="hand__slot">
+          {held && !staked && (
+            <Card
+              card={held.card}
+              isPlayable={isMyTurn || isTargetReaction || vetoReady}
+              isSelected={roleClaimOpen && stakedCardId === held.id}
+              hint={vetoReady ? 'вето' : isTargetReaction ? 'на дуэль' : undefined}
+              onClick={() => onCardClick(held.card, held.id)}
+            />
+          )}
+        </div>
+      );
+    })}
+  </div>
+);

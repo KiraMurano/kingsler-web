@@ -53,19 +53,17 @@ export interface Action {
   roleClaim?: Role;
   plotType?: PlotType;
   instantType?: InstantType;
-  stakedCardIndex?: number; // Face-down staked card from hand (0 or 1)
-  stakedCardIndices?: number[]; // For exchanging 1 or 2 cards in normal action
   /** The card instance this action put on the table — staked role card, laid
    *  plot or played instant. Identity survives hand → table → discard. */
   stakedCardId?: CardId;
+  /** For exchanging 1 or 2 cards in a normal action. */
+  stakedCardIds?: CardId[];
   costGold: number;
   costTokens: number;
   withVaBanque?: boolean;   // Played together with Va-banque instant modifier (x2 on challenge)
   isMorningTrigger?: boolean;
   conspiracyEffect?: 'gold' | 'crown';
   cannotBeVetoed?: boolean;
-  /** Set once a duel's cards have already flown to discard — the table must not re-stage them. */
-  cardAlreadyResolved?: boolean;
   description: string;
 }
 
@@ -193,7 +191,7 @@ export interface GameState {
   conspiracyPrompt: ConspiracyPromptData | null;
 
   // Duel Specific Pending Cards
-  pendingDuelDefenderCardIndex: number | null;
+  pendingDuelDefenderCardId: CardId | null;
   pendingDuelDefenderRoleClaim: Role | null;
   
   // Animation & Visual Feedback States
@@ -212,8 +210,8 @@ export interface GameState {
   performAction: (action: Omit<Action, 'id'>) => void;
   skipNormalActionPhase: () => void;
   endTurnManually: () => void;
-  playPlotAction: (plotType: PlotType, cardIndex: number, targetPlayerId?: string) => void;
-  playInstant: (playerId: string, instantType: InstantType, cardIndex: number, targetPlayerId?: string) => void;
+  playPlotAction: (plotType: PlotType, cardId: CardId, targetPlayerId?: string) => void;
+  playInstant: (playerId: string, instantType: InstantType, cardId: CardId, targetPlayerId?: string) => void;
   doubtAction: (doubterId: string) => void;
   passDoubt: (playerId: string) => void;
   passVetoWindow: (playerId: string) => void;
@@ -222,7 +220,7 @@ export interface GameState {
   // Duel methods for targeted attacks
   targetAcceptAttack: (targetId: string) => void;
   targetDoubtAttack: (targetId: string) => void;
-  targetDeclareDuel: (targetId: string, stakedCardIndex?: number) => void;
+  targetDeclareDuel: (targetId: string, cardId: CardId) => void;
   attackerRetreatDuel: (attackerId: string) => void;
   attackerAcceptDuel: (attackerId: string) => void;
   closeDuelOutcome: () => void;

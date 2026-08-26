@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { pickViewer } from './lib/viewer';
-import { faces } from '@kinglier/engine/cardInstance';
+import { idOf } from '@kinglier/engine/cardInstance';
 import { useToast } from './lib/toast';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
@@ -19,7 +19,7 @@ import { RoleClaimPopup } from './components/RoleClaimPopup';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
 import { Button } from './components/ui/Button';
 import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
-import type { GameCard } from '@kinglier/engine/types';
+import type { CardId, GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
 import type { Account } from './auth/AuthClient';
 
@@ -68,8 +68,8 @@ export default function App({
   const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
   const [vaBanqueCombo, setVaBanqueCombo] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
-  const [stakedCardIndex, setStakedCardIndex] = useState(0);
-  const [redirectCardIndex, setRedirectCardIndex] = useState<number | null>(null);
+  const [stakedCardId, setStakedCardId] = useState<CardId | null>(null);
+  const [redirectCardId, setRedirectCardId] = useState<CardId | null>(null);
   const showToast = useToast();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
@@ -98,16 +98,18 @@ export default function App({
   const confirmTarget = (targetId: string) => {
     if (!pendingTarget || !human) return;
 
-    if (pendingTarget.isPlotDirect && pendingTarget.plotType) {
-      playPlotAction(pendingTarget.plotType, pendingTarget.stakedCardIndex ?? 0, targetId);
-    } else if (pendingTarget.isInstantDirect && pendingTarget.instantType) {
-      playInstant(human.id, pendingTarget.instantType, pendingTarget.stakedCardIndex ?? 0, targetId);
+    const cardId = pendingTarget.stakedCardId ?? human.hand[0]?.id;
+
+    if (pendingTarget.isPlotDirect && pendingTarget.plotType && cardId) {
+      playPlotAction(pendingTarget.plotType, cardId, targetId);
+    } else if (pendingTarget.isInstantDirect && pendingTarget.instantType && cardId) {
+      playInstant(human.id, pendingTarget.instantType, cardId, targetId);
     } else {
       performAction({
         type: pendingTarget.type,
         name: pendingTarget.name,
         roleClaim: pendingTarget.roleClaim,
-        stakedCardIndex: pendingTarget.stakedCardIndex,
+        stakedCardId: pendingTarget.stakedCardId,
         actorId: human.id,
         targetId,
         targetCardIndex: 0,
@@ -120,23 +122,23 @@ export default function App({
     setPendingTarget(null);
   };
 
-  const handleCardClick = (card: GameCard, index: number) => {
+  const handleCardClick = (card: GameCard, cardId: CardId) => {
     if (!human) return;
 
     if (turnPhase === 'VETO_WINDOW' && card === 'Право вето') {
-      playInstant(human.id, 'Право вето', index);
+      playInstant(human.id, 'Право вето', cardId);
       return;
     }
 
     if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
-      if (card === 'Перенаправление') setRedirectCardIndex(index);
-      else targetDeclareDuel(human.id, index);
+      if (card === 'Перенаправление') setRedirectCardId(cardId);
+      else targetDeclareDuel(human.id, cardId);
       return;
     }
 
     if (isMyTurn) {
       setVaBanqueCombo(false);
-      setStakedCardIndex(index);
+      setStakedCardId(cardId);
       setRoleClaimOpen(true);
       return;
     }
@@ -156,7 +158,7 @@ export default function App({
         setChronicleOpen(false);
         setInspectedCard(null);
         setPendingTarget(null);
-        setRedirectCardIndex(null);
+        setRedirectCardId(null);
         return;
       }
 
@@ -165,7 +167,7 @@ export default function App({
       if (isMyTurn && !overlayOpen) {
         if (e.key === '1') setNormalActionsOpen(true);
         else if (e.key === '2') {
-          setStakedCardIndex(0);
+          setStakedCardId(human?.hand[0]?.id ?? null);
           setRoleClaimOpen(true);
         } else if (e.code === 'Space') {
           e.preventDefault();
@@ -186,8 +188,8 @@ export default function App({
         else if (e.key === '2') targetDoubtAttack(human.id);
         else if (e.key === '3') {
           const shield = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-          const index = faces(human.hand).indexOf(shield);
-          targetDeclareDuel(human.id, index === -1 ? 0 : index);
+          const shieldId = idOf(human.hand, shield) ?? human.hand[0]?.id;
+          if (shieldId) targetDeclareDuel(human.id, shieldId);
         }
       }
 
@@ -302,7 +304,7 @@ export default function App({
             isTargetReaction={isTargetReaction}
             isVetoWindow={isVetoWindow}
             roleClaimOpen={roleClaimOpen}
-            stakedCardIndex={stakedCardIndex}
+            stakedCardId={stakedCardId}
             onCardClick={handleCardClick}
             onInspectStaked={setInspectedCard}
           />
@@ -325,9 +327,9 @@ export default function App({
 
       <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
 
-      {roleClaimOpen && (
+      {roleClaimOpen && stakedCardId && (
         <RoleClaimPopup
-          stakedCardIndex={stakedCardIndex}
+          stakedCardId={stakedCardId}
           initialWithVaBanque={vaBanqueCombo}
           onClose={() => {
             setRoleClaimOpen(false);
@@ -342,22 +344,22 @@ export default function App({
       <Modals
         showRules={rulesOpen}
         onCloseRules={() => setRulesOpen(false)}
-        redirectCardIndex={redirectCardIndex}
-        onCloseRedirect={() => setRedirectCardIndex(null)}
-        onRedirectAsInstant={cardIndex => {
-          setRedirectCardIndex(null);
+        redirectCardId={redirectCardId}
+        onCloseRedirect={() => setRedirectCardId(null)}
+        onRedirectAsInstant={cardId => {
+          setRedirectCardId(null);
           setPendingTarget({
             type: 'instant',
             name: 'Перенаправление',
             instantType: 'Перенаправление',
             isInstantDirect: true,
-            stakedCardIndex: cardIndex,
+            stakedCardId: cardId,
             cost: 0
           });
         }}
-        onRedirectAsDuelBluff={cardIndex => {
-          setRedirectCardIndex(null);
-          targetDeclareDuel(human.id, cardIndex);
+        onRedirectAsDuelBluff={cardId => {
+          setRedirectCardId(null);
+          targetDeclareDuel(human.id, cardId);
         }}
       />
 

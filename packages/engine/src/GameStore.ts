@@ -5,7 +5,7 @@ import type {
   Action,
   CardInstance
 } from './types';
-import { idOf, pluck } from './cardInstance';
+import { byId, idOf, pluck } from './cardInstance';
 import {
   createInitialDeck,
   drawCardsFromDeck,
@@ -76,7 +76,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   isVetoed: false,
   isPendingActionAfterTruthChallenge: false,
 
-  pendingDuelDefenderCardIndex: null,
+  pendingDuelDefenderCardId: null,
   pendingDuelDefenderRoleClaim: null,
   duelOutcome: null,
 
@@ -163,7 +163,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       isVaBanqueActive: false,
       isVetoed: false,
       isPendingActionAfterTruthChallenge: false,
-      pendingDuelDefenderCardIndex: null,
+      pendingDuelDefenderCardId: null,
       pendingDuelDefenderRoleClaim: null,
       duelOutcome: null,
       timerSeconds: 0,
@@ -261,9 +261,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     let actorHand = [...actor.hand];
     const newDiscard = [...get().discardPile];
-    let stakedCardIndex = actionData.stakedCardIndex !== undefined
-      ? actionData.stakedCardIndex
-      : 0;
+    let stakedCardId = actionData.stakedCardId;
 
     if (withVaBanque) {
       const vbId = idOf(actorHand, 'Ва-банк');
@@ -271,15 +269,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         const { taken, rest } = pluck(actorHand, vbId);
         actorHand = rest;
         if (taken) newDiscard.push(taken);
-        stakedCardIndex = 0;
       }
+    }
+
+    // The stake must name a card the actor still holds — playing Ва-банк can
+    // have just spent the very card that was picked.
+    if (!byId(actorHand, stakedCardId)) {
+      stakedCardId = actorHand[0]?.id;
     }
 
     const action: Action = {
       ...actionData,
       id: Math.random().toString(36).substring(7),
       costTokens: tokensRequired,
-      stakedCardIndex,
+      stakedCardId,
       withVaBanque
     };
 
@@ -316,7 +319,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const vbNotice = withVaBanque ? ' 🎲 [ВА-БАНК x2 при проверке!]' : '';
 
     const isCardExchange = action.type === 'normal' && action.name.includes('Сменить');
-    const exchangesTwoCards = (action.stakedCardIndices?.length ?? 1) >= 2;
+    const exchangesTwoCards = (action.stakedCardIds?.length ?? 1) >= 2;
     const speechText = isCardExchange
       ? `«Меняю карт${exchangesTwoCards ? 'ы' : 'у'}»`
       : action.type === 'normal'
@@ -364,12 +367,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   // PLOTS & INSTANTS
   // --------------------------------------------------------------------------
 
-  playPlotAction: (plotType, cardIndex, targetPlayerId) => {
-    playPlotAction(get, set, plotType, cardIndex, targetPlayerId);
+  playPlotAction: (plotType, cardId, targetPlayerId) => {
+    playPlotAction(get, set, plotType, cardId, targetPlayerId);
   },
 
-  playInstant: (playerId, instantType, cardIndex, targetPlayerId) => {
-    playInstant(get, set, playerId, instantType, cardIndex, targetPlayerId);
+  playInstant: (playerId, instantType, cardId, targetPlayerId) => {
+    playInstant(get, set, playerId, instantType, cardId, targetPlayerId);
   },
 
   openConspiracyDialog: (isImmediateReaction = false) => {
@@ -421,8 +424,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().doubtAction(targetId);
   },
 
-  targetDeclareDuel: (targetId, stakedCardIndex = 0) => {
-    targetDeclareDuel(get, set, targetId, stakedCardIndex);
+  targetDeclareDuel: (targetId, cardId) => {
+    targetDeclareDuel(get, set, targetId, cardId);
   },
 
   attackerRetreatDuel: (attackerId) => {

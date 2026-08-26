@@ -3,7 +3,7 @@ import type { GameState, Role } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { evaluateBotDoubt } from './botEvaluator';
 import { selectBestRedirectionTarget } from './botTargeting';
-import { faces, holds } from '../cardInstance';
+import { holds, idOf } from '../cardInstance';
 import {
   ACTION_HOLD_MS,
   BOT_REACTION_MS,
@@ -83,15 +83,15 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   if (!target || !target.isBot || !attacker) return;
 
   // 1. Возможность сыграть инстант ⚡ «Перенаправление» (0 ⚡)
-  const redirectIdx = faces(target.hand).indexOf('Перенаправление');
-  if (redirectIdx !== -1 && Math.random() < 0.70) {
+  const redirectId = idOf(target.hand, 'Перенаправление');
+  if (redirectId && Math.random() < 0.70) {
     const otherOpponents = players.filter(p => p.id !== attacker.id && p.id !== target.id);
     const newTarget = selectBestRedirectionTarget(attacker, target, otherOpponents, pendingAction.roleClaim);
     if (newTarget) {
       schedule('target_block', () => {
         const curState = useGameStore.getState();
         if (curState.turnPhase === 'TARGET_REACTION_WINDOW') {
-          curState.playInstant(target.id, 'Перенаправление', redirectIdx, newTarget.id);
+          curState.playInstant(target.id, 'Перенаправление', redirectId, newTarget.id);
         }
       }, ACTION_HOLD_MS);
       return;
@@ -101,7 +101,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   const blockingRole: Role = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
   const hasCard = holds(target.hand, blockingRole);
   const archetype = getBotArchetype(target.id);
-  const cardIndex = hasCard ? faces(target.hand).indexOf(blockingRole) : 0;
+  const shieldId = (hasCard ? idOf(target.hand, blockingRole) : null) ?? target.hand[0]?.id;
 
   const doubtEval = evaluateBotDoubt(
     target,
@@ -142,8 +142,8 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   schedule('target_block', () => {
     const curState = useGameStore.getState();
     if (curState.turnPhase === 'TARGET_REACTION_WINDOW') {
-      if (chosenAction === 'duel') {
-        curState.targetDeclareDuel(target.id, cardIndex);
+      if (chosenAction === 'duel' && shieldId) {
+        curState.targetDeclareDuel(target.id, shieldId);
       } else if (chosenAction === 'doubt') {
         curState.targetDoubtAttack(target.id);
       } else {
@@ -218,11 +218,12 @@ export function handleVetoPhase(state: GameState, schedule: BotScheduler): void 
     }
 
     if (shouldVeto || Math.random() < 0.40) {
-      const vetoIdx = faces(bot.hand).indexOf('Право вето');
+      const vetoId = idOf(bot.hand, 'Право вето');
+      if (!vetoId) continue;
       schedule('veto', () => {
         const cur = useGameStore.getState();
         if (cur.turnPhase === 'VETO_WINDOW' && !cur.isVetoed) {
-          cur.playInstant(bot.id, 'Право вето', vetoIdx);
+          cur.playInstant(bot.id, 'Право вето', vetoId);
         }
       }, BOT_VETO_MS + Math.random() * BOT_VETO_JITTER_MS);
       break;

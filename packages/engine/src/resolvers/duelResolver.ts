@@ -1,4 +1,5 @@
-import type { GameState, DuelOutcome, DuelResultType } from '../types';
+import type { CardId, GameState, DuelOutcome, DuelResultType } from '../types';
+import { byId, pluck } from '../cardInstance';
 import { triggerSingleCardFlight, triggerDuelCardFlight, triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
@@ -13,7 +14,7 @@ export function targetDeclareDuel(
   get: StateGetter,
   set: StateSetter,
   targetId: string,
-  stakedCardIndex = 0
+  cardId: CardId
 ): void {
   timerManager.clearAll();
   const { pendingAction, turnPhase, players } = get();
@@ -25,6 +26,8 @@ export function targetDeclareDuel(
   if (target.actionTokens < 1) return;
 
   const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+  const staked = byId(target.hand, cardId) ?? target.hand[0];
+  if (!staked) return;
 
   triggerResourceFloat(set, target.id, '-1 ⚡', false);
 
@@ -33,7 +36,7 @@ export function targetDeclareDuel(
       p.id === target.id ? { ...p, actionTokens: p.actionTokens - 1 } : p
     ),
     turnPhase: 'DUEL_ATTACKER_WINDOW',
-    pendingDuelDefenderCardIndex: stakedCardIndex,
+    pendingDuelDefenderCardId: staked.id,
     pendingDuelDefenderRoleClaim: blockingRole,
     timerSeconds: 0,
     timerMaxSeconds: 0,
@@ -61,10 +64,10 @@ export function attackerRetreatDuel(
   const defender = players.find(p => p.id === pendingAction.targetId);
   if (!actor || !defender) return;
 
-  const actorHand = [...actor.hand];
-  const stakedIdx = pendingAction.stakedCardIndex ?? 0;
-  const discarded = actorHand[stakedIdx] ?? actorHand[0];
-  if (discarded) actorHand.splice(actorHand.indexOf(discarded), 1);
+  const discarded = byId(actor.hand, pendingAction.stakedCardId) ?? actor.hand[0];
+  const { rest: actorHand } = discarded
+    ? pluck(actor.hand, discarded.id)
+    : { rest: [...actor.hand] };
 
   const newPlayers = players.map(p => p.id === actor.id ? { ...p, hand: actorHand } : p);
   const newDiscard = discarded ? [...get().discardPile, discarded] : [...get().discardPile];
@@ -96,27 +99,27 @@ export function attackerAcceptDuel(
   attackerId: string
 ): void {
   timerManager.clearAll();
-  const { pendingAction, pendingDuelDefenderCardIndex, pendingDuelDefenderRoleClaim, turnPhase, players } = get();
+  const { pendingAction, pendingDuelDefenderCardId, pendingDuelDefenderRoleClaim, turnPhase, players } = get();
   if (turnPhase !== 'DUEL_ATTACKER_WINDOW' || !pendingAction || pendingAction.actorId !== attackerId || !pendingDuelDefenderRoleClaim) return;
 
   const actor = players.find(p => p.id === attackerId);
   const defender = players.find(p => p.id === pendingAction.targetId);
   if (!actor || !defender) return;
 
-  const actorHand = [...actor.hand];
-  const actorStakedIdx = pendingAction.stakedCardIndex ?? 0;
-  const actorStaked = actorHand[actorStakedIdx] ?? actorHand[0];
+  const actorStaked = byId(actor.hand, pendingAction.stakedCardId) ?? actor.hand[0];
   const actorRevealedRole = actorStaked?.card ?? 'Наследник';
   const actorWasTruth = actorRevealedRole === pendingAction.roleClaim;
 
-  const defenderHand = [...defender.hand];
-  const defStakedIdx = pendingDuelDefenderCardIndex ?? 0;
-  const defenderStaked = defenderHand[defStakedIdx] ?? defenderHand[0];
+  const defenderStaked = byId(defender.hand, pendingDuelDefenderCardId ?? undefined) ?? defender.hand[0];
   const defenderRevealedRole = defenderStaked?.card ?? 'Наследник';
   const defenderWasTruth = defenderRevealedRole === pendingDuelDefenderRoleClaim;
 
-  if (actorStaked) actorHand.splice(actorHand.indexOf(actorStaked), 1);
-  if (defenderStaked) defenderHand.splice(defenderHand.indexOf(defenderStaked), 1);
+  const { rest: actorHand } = actorStaked
+    ? pluck(actor.hand, actorStaked.id)
+    : { rest: [...actor.hand] };
+  const { rest: defenderHand } = defenderStaked
+    ? pluck(defender.hand, defenderStaked.id)
+    : { rest: [...defender.hand] };
 
   const newPlayers = players.map(p => {
     if (p.id === actor.id) return { ...p, hand: actorHand };
@@ -209,9 +212,7 @@ export function closeDuelOutcome(
   set({ duelOutcome: null });
 
   if (breakthrough) {
-    const resolvedAction = { ...pendingAction, cardAlreadyResolved: true };
-    set({ pendingAction: resolvedAction });
-    get()._triggerVetoWindowOrResolveEffect(resolvedAction);
+    get()._triggerVetoWindowOrResolveEffect(pendingAction);
   } else {
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();

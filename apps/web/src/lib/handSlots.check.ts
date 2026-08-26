@@ -3,7 +3,7 @@
  * Run: node --experimental-strip-types src/lib/handSlots.check.ts
  */
 import assert from 'node:assert/strict';
-import { compactIndex, isCardStaked, reconcileHandSlots, type HandSlots } from './handSlots.ts';
+import { isCardStaked, reconcileHandSlots, type HandSlots } from './handSlots.ts';
 import type { Action, GameState, Player } from '@kinglier/engine/types';
 import { triggerVetoWindowOrResolveEffect } from '@kinglier/engine/resolvers/doubtResolver';
 import { timerManager } from '@kinglier/engine/utils/timerManager';
@@ -24,9 +24,6 @@ assert.deepEqual(reconcileHandSlots([null, 'Казначей'], ['Обыск п�
 assert.deepEqual(reconcileHandSlots(['Вор', 'Вор'], ['Вор']), ['Вор', null]);
 assert.deepEqual(reconcileHandSlots([null, null], []), [null, null]);
 assert.deepEqual(reconcileHandSlots(['Вор', 'Казначей'], []), [null, null]);
-
-assert.equal(compactIndex(['Казначей'], [null, 'Казначей'], 1), 0);
-assert.equal(compactIndex(['Вор', 'Вор'], ['Вор', 'Вор'], 1), 1);
 
 /**
  * A staked role card must stay hidden in Hand (the "на кону" placeholder)
@@ -92,20 +89,29 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
+  const hand = api.players.find(p => p.id === 'p1')!.hand;
+  const stakedId = hand[0].id;
+  const survivorId = hand[1].id;
+
   const action: Action = {
     id: 'a1',
     type: 'role',
     name: 'Наследник',
     actorId: 'p1',
     roleClaim: 'Наследник',
-    stakedCardIndex: 0,
+    stakedCardId: stakedId,
     costGold: 0,
     costTokens: 1,
     description: ''
   };
   api.pendingAction = action;
 
-  assert.equal(isCardStaked(api.pendingAction, 'p1', 0), true, 'staked before resolution starts');
+  assert.equal(isCardStaked(api.pendingAction, 'p1', stakedId), true, 'staked before resolution starts');
+  assert.equal(
+    isCardStaked(api.pendingAction, 'p1', survivorId),
+    false,
+    'the OTHER card in hand is never staked — this is the bug that used to hide it'
+  );
 
   triggerVetoWindowOrResolveEffect(get, set, action, false);
 
@@ -114,7 +120,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   assert.equal(api.turnPhase, 'IDLE', 'turnPhase already flips back to IDLE here');
   assert.equal(api.cardFlightEvent?.flightType, 'to_hand', 'the card is mid-flight home');
   assert.equal(
-    isCardStaked(api.pendingAction, 'p1', 0),
+    isCardStaked(api.pendingAction, 'p1', stakedId),
     true,
     'must still read as staked while turnPhase is IDLE and the card is mid-flight — otherwise the real card and the flying card render at once'
   );
@@ -123,7 +129,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
   // Once the action is actually done, the slot must stop reading as staked.
   api.pendingAction = null;
-  assert.equal(isCardStaked(api.pendingAction, 'p1', 0), false, 'no longer staked once pendingAction clears');
+  assert.equal(isCardStaked(api.pendingAction, 'p1', stakedId), false, 'no longer staked once pendingAction clears');
 }
 
 // A different player's staked card must never read as staked for someone else.
@@ -134,12 +140,12 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     name: 'Казначей',
     actorId: 'p2',
     roleClaim: 'Казначей',
-    stakedCardIndex: 0,
+    stakedCardId: 'c0',
     costGold: 0,
     costTokens: 1,
     description: ''
   };
-  assert.equal(isCardStaked(action, 'p1', 0), false, 'wrong actor must not read as staked');
+  assert.equal(isCardStaked(action, 'p1', 'c0'), false, 'wrong actor must not read as staked');
 }
 
 console.log('handSlots.check: ok');

@@ -110,6 +110,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
     revealOutcome,
     duelOutcome,
     pendingDuelDefenderRoleClaim,
+    pendingDuelDefenderCardId,
     cardFlightEvent,
     hasCardDeparted,
     overlayInstant,
@@ -151,7 +152,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
   if (pendingAction?.type === 'normal') {
     const isCardExchange = pendingAction.name.includes('Сменить');
     const actorName = players.find(p => p.id === pendingAction.actorId)?.name ?? '';
-    const exchangesTwoCards = (pendingAction.stakedCardIndices?.length ?? 1) >= 2;
+    const exchangesTwoCards = (pendingAction.stakedCardIds?.length ?? 1) >= 2;
     const label = isCardExchange
       ? `${actorName} меняет карт${exchangesTwoCards ? 'ы' : 'у'}`
       : courtly(pendingAction.name);
@@ -293,8 +294,18 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = ({ onInspectCard 
 
   // Once the staked card has actually departed (its flight finished), it must
   // never pop back — a lingering overlayInstant (e.g. the veto stamp) is not
-  // a reason to redraw a card that already flew off the table.
-  const showPile = !pendingAction?.cardAlreadyResolved && (!hasCardDeparted || isSingleFlight);
+  // a reason to redraw a card that already flew off the table. A duel that has
+  // already been fought is the same story told by identity: neither staked
+  // instance is in its owner's hand any more, so there is nothing to stage.
+  const attacker = players.find(p => p.id === pendingAction?.actorId);
+  const duelCardsSpent =
+    !!pendingAction?.stakedCardId &&
+    !!pendingDuelDefenderCardId &&
+    !!attacker &&
+    !!target &&
+    !attacker.hand.some(c => c.id === pendingAction.stakedCardId) &&
+    !target.hand.some(c => c.id === pendingDuelDefenderCardId);
+  const showPile = !duelCardsSpent && (!hasCardDeparted || isSingleFlight);
 
   const badge = overlayInstant
     ? overlayInstant.card === 'Перенаправление'

@@ -3,7 +3,7 @@
  * Run: node --experimental-strip-types src/engine/resolvers/courtRules.check.ts
  */
 import assert from 'node:assert/strict';
-import type { Action, GameState, Player } from '../types.ts';
+import type { Action, CardId, GameCard, GameState, Player } from '../types.ts';
 import { playPlotAction, disruptPlayerPlotsOnLoss, chargeActiveConspiracies, applyConspiracyEffect } from './plotResolver.ts';
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import { playInstant } from './instantResolver.ts';
@@ -13,7 +13,7 @@ import {
   proceedAfterVetoWindow,
   resolvePendingActionEffect
 } from './doubtResolver.ts';
-import { faces, mintDeck } from '../cardInstance.ts';
+import { faces, idOf, mintDeck } from '../cardInstance.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
   (globalThis as { window: typeof globalThis }).window = globalThis;
@@ -69,7 +69,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     duelOutcome: null,
     informantPeekData: null,
     conspiracyPrompt: null,
-    pendingDuelDefenderCardIndex: null as number | null,
+    pendingDuelDefenderCardId: null as string | null,
     pendingDuelDefenderRoleClaim: null,
     activeSpeechReactions: {} as Record<string, string>,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
@@ -101,10 +101,16 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     api.isPendingActionAfterTruthChallenge = false;
   };
   state.addSealsToPlayer = () => {};
-  state.playInstant = (id, type, index, target) => playInstant(get, set, id, type, index, target);
+  state.playInstant = (id, type, cardId, target) => playInstant(get, set, id, type, cardId, target);
   state.proceedAfterVetoWindow = () => proceedAfterVetoWindow(get, set);
 
   return { get, set, api };
+}
+
+/** The id of the first `card` in a seat's hand — the check files address cards
+ *  the way the UI does now: by identity, not by position. */
+function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard): CardId {
+  return idOf(api.players.find(p => p.id === playerId)!.hand, card)!;
 }
 
 {
@@ -179,11 +185,11 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  playInstant(get, set, 'p2', 'Обвинение в измене', 0, 'p1');
+  playInstant(get, set, 'p2', 'Обвинение в измене', cardIdOf(api, 'p2', 'Обвинение в измене'), 'p1');
   assert.equal(api.turnPhase, 'VETO_WINDOW');
   assert.equal(api.players.find(p => p.id === 'p1')!.favor, 2);
 
-  playInstant(get, set, 'p1', 'Право вето', 0);
+  playInstant(get, set, 'p1', 'Право вето', cardIdOf(api, 'p1', 'Право вето'));
   assert.equal(api.isVetoed, true);
   proceedAfterVetoWindow(get, set);
   assert.equal(api.players.find(p => p.id === 'p1')!.favor, 2);
@@ -204,7 +210,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  playInstant(get, set, 'p2', 'Обвинение в измене', 0, 'p1');
+  playInstant(get, set, 'p2', 'Обвинение в измене', cardIdOf(api, 'p2', 'Обвинение в измене'), 'p1');
   proceedAfterVetoWindow(get, set);
   assert.equal(api.players.find(p => p.id === 'p1')!.favor, 1);
 }
@@ -224,7 +230,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  playPlotAction(get, set, 'Королевский приём', 0);
+  playPlotAction(get, set, 'Королевский приём', cardIdOf(api, 'p2', 'Королевский приём'));
   assert.equal(api.turnPhase, 'VETO_WINDOW');
   assert.equal(api.players.find(p => p.id === 'p2')!.activePlot, null);
 
@@ -255,7 +261,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  targetDeclareDuel(get, set, 'p2', 0);
+  targetDeclareDuel(get, set, 'p2', cardIdOf(api, 'p2', 'Казначей'));
   assert.equal(api.players.find(p => p.id === 'p2')!.actionTokens, 1);
   assert.equal(api.turnPhase, 'DUEL_ATTACKER_WINDOW');
 }
@@ -283,7 +289,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  targetDeclareDuel(get, set, 'p2', 0);
+  targetDeclareDuel(get, set, 'p2', cardIdOf(api, 'p2', 'Казначей'));
   assert.equal(api.turnPhase, 'TARGET_REACTION_WINDOW');
   assert.equal(api.players.find(p => p.id === 'p2')!.actionTokens, 0);
 }
@@ -328,7 +334,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  playInstant(get, set, 'p2', 'Обыск покоев', 0, 'p1');
+  playInstant(get, set, 'p2', 'Обыск покоев', cardIdOf(api, 'p2', 'Обыск покоев'), 'p1');
   assert.equal(api.turnPhase, 'VETO_WINDOW');
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot?.type, 'Королевский приём');
 

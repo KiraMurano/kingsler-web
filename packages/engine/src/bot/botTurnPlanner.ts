@@ -1,7 +1,7 @@
 import { useGameStore } from '../GameStore';
-import type { Role, PlotType } from '../types';
+import type { CardId, CardInstance, Role, PlotType } from '../types';
 import { isPlot } from '../cards';
-import { faces, holds } from '../cardInstance';
+import { faces, holds, idOf } from '../cardInstance';
 import { getBotArchetype } from '../botsConfig';
 import {
   selectBestThiefTarget,
@@ -14,9 +14,9 @@ import {
   selectBestDossierTarget
 } from './botTargeting';
 
-function bluffStakeIndex(hand: string[]): number {
-  const i = hand.indexOf('Обыск покоев');
-  return i < 0 ? 0 : i;
+/** Which card a bluffing bot puts on the table: the most useless one it holds. */
+function bluffStakeId(hand: CardInstance[]): CardId | undefined {
+  return idOf(hand, 'Обыск покоев') ?? hand[0]?.id;
 }
 
 /**
@@ -107,21 +107,20 @@ export function makeBotMove(botId: string): void {
 
     // 5. Бесплатная смена 1 или 2 карт при наличии мертвых/неподходящих карт
     if (bot.hand.length > 0 && Math.random() < 0.25) {
-      const badIndices = bot.hand
-        .map((c, i) => ({ c, i }))
-        .filter(({ c }) => c.card === 'Дворцовый переполох' || c.card === 'Право вето' || c.card === 'Перенаправление')
-        .map(({ i }) => i);
+      const badIds = bot.hand
+        .filter(c => c.card === 'Дворцовый переполох' || c.card === 'Право вето' || c.card === 'Перенаправление')
+        .map(c => c.id);
 
-      if (badIndices.length > 0) {
+      if (badIds.length > 0) {
         useGameStore.getState().performAction({
           type: 'normal',
-          name: badIndices.length >= 2 ? 'Сменить 2 карты' : 'Сменить карту',
+          name: badIds.length >= 2 ? 'Сменить 2 карты' : 'Сменить карту',
           actorId: bot.id,
-          stakedCardIndex: badIndices[0],
-          stakedCardIndices: badIndices,
+          stakedCardId: badIds[0],
+          stakedCardIds: badIds,
           costGold: 0,
           costTokens: 1,
-          description: badIndices.length >= 2
+          description: badIds.length >= 2
             ? 'Сбросил 2 карты и бесплатно взял новые из колоды.'
             : 'Сбросил карту и бесплатно взял новую из колоды.'
         });
@@ -158,47 +157,48 @@ export function makeBotMove(botId: string): void {
     const plotIdx = faces(bot.hand).findIndex(isPlot);
     if (plotIdx !== -1) {
       const plotCard = bot.hand[plotIdx].card as PlotType;
+      const plotId = bot.hand[plotIdx].id;
 
       if (plotCard === 'Королевский приём') {
         if (bot.gold >= 2 || holds(bot.hand, 'Казначей') || holds(bot.hand, 'Рыцарь') || Math.random() < 0.7) {
-          useGameStore.getState().playPlotAction('Королевский приём', plotIdx);
+          useGameStore.getState().playPlotAction('Королевский приём', plotId);
           return;
         }
       } else if (plotCard === 'Досье') {
         const target = selectBestDossierTarget(bot, opponents) || opponents[0];
-        useGameStore.getState().playPlotAction('Досье', plotIdx, target.id);
+        useGameStore.getState().playPlotAction('Досье', plotId, target.id);
         return;
       } else if (plotCard === 'Чёрная книга') {
-        useGameStore.getState().playPlotAction('Чёрная книга', plotIdx);
+        useGameStore.getState().playPlotAction('Чёрная книга', plotId);
         return;
       } else if (plotCard === 'Сеть информаторов') {
-        useGameStore.getState().playPlotAction('Сеть информаторов', plotIdx);
+        useGameStore.getState().playPlotAction('Сеть информаторов', plotId);
         return;
       } else if (plotCard === 'Золотая булла') {
-        useGameStore.getState().playPlotAction('Золотая булла', plotIdx);
+        useGameStore.getState().playPlotAction('Золотая булла', plotId);
         return;
       } else if (plotCard === 'Тайный заговор') {
-        useGameStore.getState().playPlotAction('Тайный заговор', plotIdx);
+        useGameStore.getState().playPlotAction('Тайный заговор', plotId);
         return;
       }
     }
   }
 
   // Приоритет 2: Розыгрыш Инстантов ⚡ (Обвинение в измене, Обыск покоев, Дворцовый переполох)
-  const treasonIdx = faces(bot.hand).indexOf('Обвинение в измене');
-  if (treasonIdx !== -1) {
+  const treasonId = idOf(bot.hand, 'Обвинение в измене');
+  if (treasonId) {
     const target = leader && leader.favor >= 1
       ? leader
       : opponents.filter(p => p.favor >= 1).sort((a, b) => b.favor - a.favor)[0];
 
     if (target && (target.favor >= 2 || state.coronationCandidateId === target.id || Math.random() < 0.75)) {
-      useGameStore.getState().playInstant(bot.id, 'Обвинение в измене', treasonIdx, target.id);
+      useGameStore.getState().playInstant(bot.id, 'Обвинение в измене', treasonId, target.id);
       return;
     }
   }
 
-  const searchIdx = faces(bot.hand).indexOf('Обыск покоев');
-  if (searchIdx !== -1) {
+  const searchId = idOf(bot.hand, 'Обыск покоев');
+  if (searchId) {
     const target = selectBestSearchTarget(bot, opponents);
     if (
       target &&
@@ -208,14 +208,14 @@ export function makeBotMove(botId: string): void {
         coronationCandidateId: state.coronationCandidateId
       })
     ) {
-      useGameStore.getState().playInstant(bot.id, 'Обыск покоев', searchIdx, target.id);
+      useGameStore.getState().playInstant(bot.id, 'Обыск покоев', searchId, target.id);
       return;
     }
   }
 
-  const upheavalIdx = faces(bot.hand).indexOf('Дворцовый переполох');
-  if (upheavalIdx !== -1 && leader && leader.favor >= 3 && Math.random() < 0.65) {
-    useGameStore.getState().playInstant(bot.id, 'Дворцовый переполох', upheavalIdx, leader.id);
+  const upheavalId = idOf(bot.hand, 'Дворцовый переполох');
+  if (upheavalId && leader && leader.favor >= 3 && Math.random() < 0.65) {
+    useGameStore.getState().playInstant(bot.id, 'Дворцовый переполох', upheavalId, leader.id);
     return;
   }
 
@@ -237,7 +237,7 @@ export function makeBotMove(botId: string): void {
           name: 'Наследник',
           roleClaim: 'Наследник',
           actorId: bot.id,
-          stakedCardIndex: faces(bot.hand).indexOf('Наследник'),
+          stakedCardId: idOf(bot.hand, 'Наследник') ?? undefined,
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -255,7 +255,7 @@ export function makeBotMove(botId: string): void {
             roleClaim: 'Шантажист',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: faces(bot.hand).indexOf('Шантажист'),
+            stakedCardId: idOf(bot.hand, 'Шантажист') ?? undefined,
             withVaBanque: withVB,
             costGold: 0,
             costTokens: vbTokens,
@@ -273,7 +273,7 @@ export function makeBotMove(botId: string): void {
           name: 'Наследник',
           roleClaim: 'Наследник',
           actorId: bot.id,
-          stakedCardIndex: bluffStakeIndex(faces(bot.hand)),
+          stakedCardId: bluffStakeId(bot.hand),
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -287,13 +287,13 @@ export function makeBotMove(botId: string): void {
     const playFromHandRate = 1.0 - archetype.bluffRate * 0.6;
     if (Math.random() < playFromHandRate) {
       if (holds(bot.hand, 'Наследник')) {
-        const handIdx = faces(bot.hand).indexOf('Наследник');
+        const handId = idOf(bot.hand, 'Наследник') ?? undefined;
         useGameStore.getState().performAction({
           type: 'role',
           name: 'Наследник',
           roleClaim: 'Наследник',
           actorId: bot.id,
-          stakedCardIndex: handIdx,
+          stakedCardId: handId,
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -305,14 +305,14 @@ export function makeBotMove(botId: string): void {
       if (holds(bot.hand, 'Шантажист')) {
         const target = selectBestBlackmailerTarget(bot, opponents);
         if (target) {
-          const handIdx = faces(bot.hand).indexOf('Шантажист');
+          const handId = idOf(bot.hand, 'Шантажист') ?? undefined;
           useGameStore.getState().performAction({
             type: 'role',
             name: 'Шантажист',
             roleClaim: 'Шантажист',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: handIdx,
+            stakedCardId: handId,
             withVaBanque: withVB,
             costGold: 0,
             costTokens: vbTokens,
@@ -323,13 +323,13 @@ export function makeBotMove(botId: string): void {
       }
 
       if (holds(bot.hand, 'Казначей')) {
-        const handIdx = faces(bot.hand).indexOf('Казначей');
+        const handId = idOf(bot.hand, 'Казначей') ?? undefined;
         useGameStore.getState().performAction({
           type: 'role',
           name: 'Казначей',
           roleClaim: 'Казначей',
           actorId: bot.id,
-          stakedCardIndex: handIdx,
+          stakedCardId: handId,
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -341,14 +341,14 @@ export function makeBotMove(botId: string): void {
       if (holds(bot.hand, 'Вор')) {
         const target = selectBestThiefTarget(bot, opponents);
         if (target && target.gold > 0) {
-          const handIdx = faces(bot.hand).indexOf('Вор');
+          const handId = idOf(bot.hand, 'Вор') ?? undefined;
           useGameStore.getState().performAction({
             type: 'role',
             name: 'Вор',
             roleClaim: 'Вор',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: handIdx,
+            stakedCardId: handId,
             withVaBanque: withVB,
             costGold: 0,
             costTokens: vbTokens,
@@ -359,13 +359,13 @@ export function makeBotMove(botId: string): void {
       }
 
       if (holds(bot.hand, 'Шут')) {
-        const handIdx = faces(bot.hand).indexOf('Шут');
+        const handId = idOf(bot.hand, 'Шут') ?? undefined;
         useGameStore.getState().performAction({
           type: 'role',
           name: 'Шут',
           roleClaim: 'Шут',
           actorId: bot.id,
-          stakedCardIndex: handIdx,
+          stakedCardId: handId,
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -375,13 +375,13 @@ export function makeBotMove(botId: string): void {
       }
 
       if (holds(bot.hand, 'Рыцарь')) {
-        const handIdx = faces(bot.hand).indexOf('Рыцарь');
+        const handId = idOf(bot.hand, 'Рыцарь') ?? undefined;
         useGameStore.getState().performAction({
           type: 'role',
           name: 'Рыцарь',
           roleClaim: 'Рыцарь',
           actorId: bot.id,
-          stakedCardIndex: handIdx,
+          stakedCardId: handId,
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
@@ -415,7 +415,7 @@ export function makeBotMove(botId: string): void {
             roleClaim: 'Вор',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: bluffStakeIndex(faces(bot.hand)),
+            stakedCardId: bluffStakeId(bot.hand),
             withVaBanque: withVB,
             costGold: 0,
             costTokens: vbTokens,
@@ -434,7 +434,7 @@ export function makeBotMove(botId: string): void {
             roleClaim: 'Шантажист',
             actorId: bot.id,
             targetId: target.id,
-            stakedCardIndex: bluffStakeIndex(faces(bot.hand)),
+            stakedCardId: bluffStakeId(bot.hand),
             costGold: 0,
             costTokens: 1,
             description: `Заявляет «Шантажист» против ${target.name}.`
@@ -450,7 +450,7 @@ export function makeBotMove(botId: string): void {
         name: safeClaim,
         roleClaim: safeClaim,
         actorId: bot.id,
-        stakedCardIndex: bluffStakeIndex(faces(bot.hand)),
+        stakedCardId: bluffStakeId(bot.hand),
         costGold: 0,
         costTokens: 1,
         description: `Заявляет «${safeClaim}».`

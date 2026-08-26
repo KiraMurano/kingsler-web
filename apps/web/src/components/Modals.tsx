@@ -7,7 +7,7 @@ import {
   TOTAL_INSTANTS_COUNT,
   TOTAL_DECK_SIZE
 } from '@kinglier/engine/cards';
-import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
+import type { CardId, ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
 import { courtly } from '../lib/text';
 import { pickViewer } from '../lib/viewer';
 import { Dialog } from './ui/Overlay';
@@ -223,16 +223,16 @@ function RedirectChoiceDialog({
 interface ModalsProps {
   showRules: boolean;
   onCloseRules: () => void;
-  redirectCardIndex: number | null;
+  redirectCardId: CardId | null;
   onCloseRedirect: () => void;
-  onRedirectAsInstant: (cardIndex: number) => void;
-  onRedirectAsDuelBluff: (cardIndex: number) => void;
+  onRedirectAsInstant: (cardId: CardId) => void;
+  onRedirectAsDuelBluff: (cardId: CardId) => void;
 }
 
 export const Modals: React.FC<ModalsProps> = ({
   showRules,
   onCloseRules,
-  redirectCardIndex,
+  redirectCardId,
   onCloseRedirect,
   onRedirectAsInstant,
   onRedirectAsDuelBluff
@@ -254,14 +254,14 @@ export const Modals: React.FC<ModalsProps> = ({
   const human = pickViewer(players, viewerId);
   if (!human) return null;
 
-  if (redirectCardIndex !== null && pendingAction) {
+  if (redirectCardId !== null && pendingAction) {
     const attacker = players.find(p => p.id === pendingAction.actorId);
     return (
       <RedirectChoiceDialog
         attackerName={attacker?.name ?? 'Нападающий'}
         roleClaim={pendingAction.roleClaim ?? 'атака'}
-        onRedirect={() => onRedirectAsInstant(redirectCardIndex)}
-        onBluffDuel={() => onRedirectAsDuelBluff(redirectCardIndex)}
+        onRedirect={() => onRedirectAsInstant(redirectCardId)}
+        onBluffDuel={() => onRedirectAsDuelBluff(redirectCardId)}
         onClose={onCloseRedirect}
       />
     );
