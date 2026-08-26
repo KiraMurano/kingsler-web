@@ -2,9 +2,8 @@ import React from 'react';
 import type { GameCard, Player } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { courtly } from '../lib/text';
-import { useHandSlots } from '../lib/handSlots';
-import { faces } from '@kinglier/engine/cardInstance';
 import { usePresence } from '../lib/presence';
+import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import { Bolts, Deltas, Res, Seals } from './ui/Res';
 import { Portrait } from './Portrait';
 import { PlotSlot } from './PlotSlot';
@@ -19,6 +18,10 @@ interface OpponentSeatProps {
   isTargetable?: boolean;
   isDimmed?: boolean;
   onTarget?: () => void;
+  /**
+   * Vestigial: card inspection moved to the card layer along with the cards
+   * themselves. Kept so `SeatsRow` still typechecks until it stops passing it.
+   */
   onInspectCard?: (card: GameCard) => void;
 }
 
@@ -61,14 +64,12 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   isActive,
   isTargetable,
   isDimmed,
-  onTarget,
-  onInspectCard
+  onTarget
 }) => {
   const { floatingResourceEvents } = useGameStore();
 
   const speech = useSeatSpeech(player);
   const { shown: spoken, exiting: speechOut } = usePresence(speech);
-  const { slots, leaving } = useHandSlots(faces(player.hand));
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
 
   return (
@@ -84,12 +85,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         .join(' ')}
     >
       <div className="seat__plot">
-        <PlotSlot
-          plot={player.activePlot}
-          ownerId={player.id}
-          ownerName={player.name}
-          onInspect={onInspectCard}
-        />
+        <PlotSlot plot={player.activePlot} ownerId={player.id} ownerName={player.name} />
       </div>
 
       <div
@@ -144,26 +140,19 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         )}
       </div>
 
+      {/* Holes, not cards. Both slots are always rendered so a card leaving
+          slot 0 does not slide slot 1 across, and the card that fills one is
+          drawn — back or face — by `CardLayer`. */}
       <div className="seat__hand" title="Карты в руке">
-        {([0, 1] as const).map(i => {
-          const live = slots[i];
-          const gone = leaving[i];
-          return (
-            <span key={i} className="minislot">
-              <span className="minicard minicard--empty" />
-              {live && !gone && (
-                <img className="minicard" src="/assets/cards/back-dual-face.webp" alt="" />
-              )}
-              {gone && (
-                <img
-                  className="minicard minicard--out"
-                  src="/assets/cards/back-dual-face.webp"
-                  alt=""
-                />
-              )}
-            </span>
-          );
-        })}
+        {([0, 1] as const).map(slot => (
+          <CardAnchor
+            key={slot}
+            className="minislot"
+            zone={{ kind: 'hand', playerId: player.id, slot }}
+          >
+            <span className="minicard minicard--empty" />
+          </CardAnchor>
+        ))}
       </div>
     </div>
   );

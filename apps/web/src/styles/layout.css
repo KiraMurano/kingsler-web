@@ -670,40 +670,30 @@
   justify-content: center;
 }
 
+/* The plot slot is a `CardAnchor`: a card-shaped hole that is always present,
+   whether or not a plot is resting in it. The card art belongs to `CardLayer`,
+   so nothing here draws a frame — only the label sitting over it. */
 .feltplot {
-  position: relative;
   width: 72px;
   aspect-ratio: 2 / 3;
   box-sizing: border-box;
-  border-radius: 7px;
-  overflow: hidden;
-  border: 1px solid var(--line-mid);
-  background: var(--ink-900);
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  padding: 0;
-  color: inherit;
-  transition: transform 0.18s var(--ease-out), border-color 0.18s ease;
 }
 
-.feltplot:not(.feltplot--out) {
+/* Name, target and charge pip, laid over wherever the card has landed. */
+.feltplot__label {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.feltplot__label:not(.feltplot__label--out) {
   animation: hand-in var(--dur-move) var(--ease-out);
 }
 
-.feltplot--out {
-  pointer-events: none;
+.feltplot__label--out {
   animation: hand-out var(--dur-move) var(--ease-out) forwards;
-}
-
-.feltplot:hover {
-  transform: translateY(-4px) scale(1.04);
-  border-color: var(--frame-bright, var(--gold));
-}
-
-.feltplot__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .feltplot__name,
@@ -815,6 +805,31 @@
 .duel__side .cardanchor {
   height: clamp(140px, 24vh, 188px);
   aspect-ratio: 2 / 3;
+}
+
+/* Deck and discard are anchors and nothing more — the felt has no room for
+   visible piles, and the user does not want them. `.arena` is `inset: 0` on
+   the round table, so its square corners lie outside the felt; 16% in puts
+   these boxes just inside the rim on the diagonal (the circle crosses the
+   diagonal at 14.6%). A card leaving for the discard therefore reads as
+   crossing the table towards its top-right, not as flying off-screen.
+   Sized at 40% of a hand card so the shrink on approach is visible. */
+.arena .cardanchor--deck,
+.arena .cardanchor--discard {
+  position: absolute;
+  top: 16%;
+  width: calc(min(32vh, 258px) * 2 / 3 * 0.4);
+  aspect-ratio: 2 / 3;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.arena .cardanchor--deck {
+  left: 16%;
+}
+
+.arena .cardanchor--discard {
+  right: 16%;
 }
 
 .tablecard {
