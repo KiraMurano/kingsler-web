@@ -75,6 +75,12 @@
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --dur-move: 280ms;
+
+  /* Mirrors of `motion/tokens.ts` — the same numbers, in milliseconds, for
+     the handful of effects that stay on CSS. Change them in both places. */
+  --dur-flip: 500ms;
+  --dur-fade: 180ms;
+  --dur-panel: 260ms;
 }
 
 *,
