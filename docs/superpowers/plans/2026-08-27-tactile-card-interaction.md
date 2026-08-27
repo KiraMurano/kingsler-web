@@ -937,6 +937,13 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
  * панелью над картами. `AnimatePresence` ключуется на `view.phase`, а не на
  * `view.id`: смена фазы — это смена вида, а смена, скажем, состава ожидающих
  * должна анимироваться внутри вида, а не пересоздавать его.
+ *
+ * `mode="wait"`, а не `popLayout`. `popLayout` кладёт уходящий вид в
+ * `position: absolute` и печатает его поверх приходящего: два разных текста
+ * накладываются друг на друга на всё время кроссфейда, и это читается как
+ * грязь, а не как переход. Замер на живой партии показал до семи таких слоёв
+ * одновременно. `wait` даёт уходящему уйти целиком, и только потом приводит
+ * следующий; высоту ведёт `layout` на рамке, поэтому рывка всё равно нет.
  */
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -964,7 +971,7 @@ export const PhasePanel: React.FC<{ view: TableView }> = ({ view }) => {
       layout={reduce ? false : 'size'}
       transition={{ layout: { duration: fade, ease: EASE } }}
     >
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="wait">
         <motion.div
           key={view.phase}
           className="phase__view"
@@ -1269,7 +1276,9 @@ export const HandBar: React.FC<{
 
   return (
     <div className="handbar">
-      <AnimatePresence mode="popLayout">
+      {/* `wait`, а не `popLayout`: см. комментарий в `PhasePanel` — наложенные
+          друг на друга наборы кнопок читаются как грязь. */}
+      <AnimatePresence mode="wait">
         {content && (
           <motion.div
             key={view.phase}
