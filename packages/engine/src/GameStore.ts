@@ -237,8 +237,26 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --------------------------------------------------------------------------
 
   performAction: (actionData) => {
+    const { players, activePlayerId, turnPhase, pendingAction: alreadyPending } = get();
+
+    /*
+     * Действие принадлежит тому, чей сейчас ход, — и никому больше.
+     *
+     * Раньше актор брался из `activePlayerId`, а `actionData.actorId`
+     * игнорировался. Интерфейс держит выбор цели в собственном состоянии, и
+     * оно переживало передачу хода: выбрав «Шантажиста» и нажав «Завершить
+     * ход», игрок сохранял висящий прицел и мог ткнуть в жертву посреди
+     * чужого хода. Действие не просто проходило — оно проходило ОТ ЛИЦА
+     * того, чей был ход. В онлайне это ещё и чужой ход чужими руками, так
+     * что проверка обязана жить здесь, а не только в интерфейсе.
+     */
+    if (actionData.actorId && actionData.actorId !== activePlayerId) return;
+
+    /* И не посреди уже начатого: пока висит заявка или открыто окно реакции,
+       новое действие начинать нечем. */
+    if (turnPhase !== 'IDLE' || alreadyPending) return;
+
     timerManager.clearAll();
-    const { players, activePlayerId } = get();
     const actor = players.find(p => p.id === activePlayerId);
     if (!actor) return;
 
