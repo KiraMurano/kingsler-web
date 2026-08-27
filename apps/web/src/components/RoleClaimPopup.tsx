@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { ALL_ROLES, CARD_DESCRIPTIONS, isPlot, isInstant } from '@kinglier/engine/data/cardDescriptions';
-import type { PlotType, InstantType } from '@kinglier/engine/types';
+import type { CardId, PlotType, InstantType } from '@kinglier/engine/types';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';
 import { UiIcon, renderWithIcons } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
+import { byId, holds } from '@kinglier/engine/cardInstance';
 
 /** Instants that need a victim before they resolve. */
 const TARGETED_INSTANTS: InstantType[] = [
@@ -34,13 +35,13 @@ const VA_BANQUE_EFFECT: Record<string, string> = {
 };
 
 interface RoleClaimPopupProps {
-  stakedCardIndex: number;
+  stakedCardId: CardId;
   initialWithVaBanque?: boolean;
   onClose: () => void;
 }
 
 export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
-  stakedCardIndex,
+  stakedCardId,
   initialWithVaBanque = false,
   onClose
 }) => {
@@ -55,13 +56,17 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
   } = useGameStore();
   const human = pickViewer(players, viewerId);
 
-  const hasVaBanque = !!human?.hand.includes('Ва-банк');
+  const hasVaBanque = !!human && holds(human.hand, 'Ва-банк');
   const canUseVaBanque = hasVaBanque && (human?.actionTokens ?? 0) >= 1 && !hasPlayedRoleThisTurn;
   const [withVaBanque, setWithVaBanque] = useState(initialWithVaBanque && canUseVaBanque);
 
   if (!human) return null;
 
-  const card = human.hand[stakedCardIndex] ?? human.hand[0];
+  const staked = byId(human.hand, stakedCardId) ?? human.hand[0];
+  if (!staked) return null;
+
+  const card = staked.card;
+  const stakedSlot = human.hand.findIndex(h => h.id === staked.id);
   const info = CARD_DESCRIPTIONS[card];
   const hasTokens = human.actionTokens >= 1;
 
@@ -75,10 +80,10 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
         cost: 0,
         isPlotDirect: true,
         plotType: 'Досье',
-        stakedCardIndex
+        stakedCardId: staked.id
       });
     } else {
-      playPlotAction(card as PlotType, stakedCardIndex);
+      playPlotAction(card as PlotType, staked.id);
     }
   };
 
@@ -92,10 +97,10 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
         cost: 0,
         isInstantDirect: true,
         instantType: card as InstantType,
-        stakedCardIndex
+        stakedCardId: staked.id
       });
     } else {
-      playInstant(human.id, card as InstantType, stakedCardIndex);
+      playInstant(human.id, card as InstantType, staked.id);
     }
   };
 
@@ -108,7 +113,7 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
       title={withVaBanque ? 'Розыгрыш под Ва-банком' : 'Розыгрыш или блеф'}
       description={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          Карта {stakedCardIndex + 1}: <Tag tone="gold">{card}</Tag>
+          Карта {stakedSlot + 1}: <Tag tone="gold">{card}</Tag>
         </span>
       }
     >
@@ -227,7 +232,7 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
                     type: 'role',
                     name: role,
                     roleClaim: role,
-                    stakedCardIndex,
+                    stakedCardId: staked.id,
                     withVaBanque,
                     cost: roleInfo.cost
                   });
@@ -236,7 +241,7 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
                     type: 'role',
                     name: role,
                     roleClaim: role,
-                    stakedCardIndex,
+                    stakedCardId: staked.id,
                     actorId: human.id,
                     withVaBanque,
                     costGold: roleInfo.cost,

@@ -6,11 +6,12 @@
  *   npx tsx src/engine/GameStore.check.ts
  */
 import assert from 'node:assert/strict';
-import type { Player } from './types.ts';
+import type { GameCard, Player } from './types.ts';
+import { mintDeck } from './cardInstance.ts';
 import { useGameStore } from './GameStore.ts';
 import { ACTION_HOLD_MS } from './timing.ts';
 
-function bot(id: string, hand: Player['hand']): Player {
+function bot(id: string, hand: GameCard[]): Player {
   return {
     id,
     name: id,
@@ -21,7 +22,7 @@ function bot(id: string, hand: Player['hand']): Player {
     favor: 0,
     seals: 0,
     actionTokens: 0, // can't doubt/veto — keeps this check deterministic
-    hand,
+    hand: mintDeck(hand),
     activePlot: null
   };
 }
@@ -67,7 +68,7 @@ assert.notEqual(useGameStore.getState().activePlayerId, humanId, 'end turn shoul
 useGameStore.getState().startGame();
 useGameStore.setState({
   players: [
-    ...useGameStore.getState().players.filter(p => !p.isBot).map(p => ({ ...p, hand: ['Наследник', 'Шут'] as Player['hand'], favor: 0 })),
+    ...useGameStore.getState().players.filter(p => !p.isBot).map(p => ({ ...p, hand: mintDeck(['Наследник', 'Шут']), favor: 0 })),
     bot('b1', ['Казначей', 'Рыцарь'])
   ],
   activePlayerId: 'p1'
@@ -78,7 +79,7 @@ useGameStore.getState().performAction({
   name: 'Наследник',
   roleClaim: 'Наследник',
   actorId: 'p1',
-  stakedCardIndex: 0,
+  stakedCardId: useGameStore.getState().players.find(p => p.id === 'p1')!.hand[0].id,
   costGold: 0,
   costTokens: 1,
   description: ''

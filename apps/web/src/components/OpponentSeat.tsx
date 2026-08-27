@@ -1,15 +1,25 @@
 import React from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { GameCard, Player } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { courtly } from '../lib/text';
-import { useHandSlots } from '../lib/handSlots';
-import { usePresence } from '../lib/presence';
+import { CardAnchor } from '../motion/AnchorRegistry.tsx';
+import { dur } from '../motion/tokens.ts';
 import { Bolts, Deltas, Res, Seals } from './ui/Res';
 import { Portrait } from './Portrait';
 import { PlotSlot } from './PlotSlot';
 import { CrownsTrack } from './PlayerCrest';
 
 export type SeatSide = 'left' | 'top' | 'right';
+
+/**
+ * How long a line of speech takes to fade away. Inherited from the hand-rolled
+ * presence hook this component used to call — an exit that got shorter when it
+ * moved onto `AnimatePresence` would read as the bubble being cut off.
+ */
+const SPEECH_OUT_S = 0.28;
+
+const EASE = [0.4, 0, 0.2, 1] as const;
 
 interface OpponentSeatProps {
   player: Player;
@@ -18,6 +28,10 @@ interface OpponentSeatProps {
   isTargetable?: boolean;
   isDimmed?: boolean;
   onTarget?: () => void;
+  /**
+   * Vestigial: card inspection moved to the card layer along with the cards
+   * themselves. Kept so `SeatsRow` still typechecks until it stops passing it.
+   */
   onInspectCard?: (card: GameCard) => void;
 }
 
@@ -60,14 +74,12 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   isActive,
   isTargetable,
   isDimmed,
-  onTarget,
-  onInspectCard
+  onTarget
 }) => {
   const { floatingResourceEvents } = useGameStore();
 
   const speech = useSeatSpeech(player);
-  const { shown: spoken, exiting: speechOut } = usePresence(speech);
-  const { slots, leaving } = useHandSlots(player.hand);
+  const reduce = !!useReducedMotion();
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
 
   return (
@@ -83,12 +95,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         .join(' ')}
     >
       <div className="seat__plot">
-        <PlotSlot
-          plot={player.activePlot}
-          ownerId={player.id}
-          ownerName={player.name}
-          onInspect={onInspectCard}
-        />
+        <PlotSlot plot={player.activePlot} ownerId={player.id} ownerName={player.name} />
       </div>
 
       <div
@@ -136,33 +143,45 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           </div>
         </div>
 
-        {spoken && (
-          <div key={spoken} className={`bubble${speechOut ? ' bubble--out' : ''}`}>
-            {spoken}
-          </div>
-        )}
+        {/* One line at a time: the bubble is absolutely positioned under the
+            chip, so `mode="wait"` lets the old line sink away before the new
+            one rises instead of printing the two on top of each other. */}
+        <AnimatePresence mode="wait">
+          {speech && (
+            <motion.div
+              key={speech}
+              className="bubble"
+              initial={{ opacity: 0, y: reduce ? 0 : 6 }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                transition: { duration: reduce ? 0.12 : dur.fade, ease: EASE }
+              }}
+              exit={{
+                opacity: 0,
+                y: reduce ? 0 : 8,
+                transition: { duration: reduce ? 0.12 : SPEECH_OUT_S, ease: EASE }
+              }}
+            >
+              {speech}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
+      {/* Holes, not cards. Both slots are always rendered so a card leaving
+          slot 0 does not slide slot 1 across, and the card that fills one is
+          drawn — back or face — by `CardLayer`. */}
       <div className="seat__hand" title="Карты в руке">
-        {([0, 1] as const).map(i => {
-          const live = slots[i];
-          const gone = leaving[i];
-          return (
-            <span key={i} className="minislot">
-              <span className="minicard minicard--empty" />
-              {live && !gone && (
-                <img className="minicard" src="/assets/cards/back-dual-face.webp" alt="" />
-              )}
-              {gone && (
-                <img
-                  className="minicard minicard--out"
-                  src="/assets/cards/back-dual-face.webp"
-                  alt=""
-                />
-              )}
-            </span>
-          );
-        })}
+        {([0, 1] as const).map(slot => (
+          <CardAnchor
+            key={slot}
+            className="minislot"
+            zone={{ kind: 'hand', playerId: player.id, slot }}
+          >
+            <span className="minicard minicard--empty" />
+          </CardAnchor>
+        ))}
       </div>
     </div>
   );

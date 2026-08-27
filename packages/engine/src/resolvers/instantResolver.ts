@@ -1,5 +1,6 @@
-import type { Action, GameState, InstantType } from '../types';
+import type { Action, GameState, InstantType, CardId } from '../types';
 import { CARD_INFO, drawCardsFromDeck } from '../cards';
+import { pluck } from '../cardInstance';
 import { botMemory } from '../Bot';
 import { declineGen } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
@@ -16,7 +17,8 @@ function instantAction(
   actorId: string,
   instantType: InstantType,
   targetPlayerId: string | undefined,
-  tokenCost: number
+  tokenCost: number,
+  cardId: CardId
 ): Action {
   return {
     id: Math.random().toString(36).substring(7),
@@ -25,6 +27,7 @@ function instantAction(
     instantType,
     actorId,
     targetId: targetPlayerId,
+    stakedCardId: cardId,
     costGold: 0,
     costTokens: tokenCost,
     description: CARD_INFO[instantType]?.shortDescription ?? ''
@@ -36,7 +39,7 @@ export function playInstant(
   set: StateSetter,
   playerId: string,
   instantType: InstantType,
-  cardIndex: number,
+  cardId: CardId,
   targetPlayerId?: string
 ): void {
   const { players, pendingAction, discardPile } = get();
@@ -46,12 +49,10 @@ export function playInstant(
   const isFreeInstant = instantType === 'Право вето' || instantType === 'Перенаправление';
   if (!isFreeInstant && actor.actionTokens < 1) return;
 
-  const card = actor.hand[cardIndex];
-  if (card !== instantType) return;
+  const { taken: card, rest: newHand } = pluck(actor.hand, cardId);
+  if (card?.card !== instantType) return;
 
-  const newHand = [...actor.hand];
-  newHand.splice(cardIndex, 1);
-  const updatedDiscard = [...discardPile, instantType];
+  const updatedDiscard = [...discardPile, card];
 
   const tokenCost = isFreeInstant ? 0 : 1;
   const updatedPlayers = players.map(p =>
@@ -67,7 +68,7 @@ export function playInstant(
     triggerResourceFloat(set, actor.id, '-1 ⚡', false);
   }
 
-  const laid = instantAction(actor.id, instantType, targetPlayerId, tokenCost);
+  const laid = instantAction(actor.id, instantType, targetPlayerId, tokenCost, card.id);
   const speech = `«${instantType}!»`;
 
   if (instantType === 'Ва-банк') {
@@ -229,12 +230,13 @@ export function resolveInstantEffect(
     const victim = players.find(p => p.id === action.targetId);
     if (victim?.activePlot) {
       const plotType = victim.activePlot.type;
+      const searched = { id: victim.activePlot.cardId, card: plotType };
       const newPlayers = players.map(p =>
         p.id === victim.id ? { ...p, activePlot: null } : p
       );
       set(state => ({
         players: newPlayers,
-        discardPile: [...state.discardPile, plotType],
+        discardPile: [...state.discardPile, searched],
         history: [
           `🔍 «Обыск покоев»: интрига ${declineGen(victim.name)} («${plotType}») сброшена!`,
           ...state.history

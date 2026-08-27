@@ -1,4 +1,5 @@
-import type { Action, GameState, PlotType, Player, GameCard } from '../types';
+import type { Action, CardId, GameState, PlotType, Player, CardInstance } from '../types';
+import { pluck } from '../cardInstance';
 import { CARD_INFO } from '../cards';
 import { declineGen } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
@@ -23,11 +24,12 @@ export function disruptPlayerPlotsOnLoss(
 
   const victim = players[vIdx];
   if (victim.activePlot && victim.activePlot.type === 'Королевский приём') {
+    const burned: CardInstance = { id: victim.activePlot.cardId, card: 'Королевский приём' };
     const newPlayers = [...players];
     newPlayers[vIdx] = { ...victim, activePlot: null };
     set(state => ({
       players: newPlayers,
-      discardPile: [...state.discardPile, 'Королевский приём'],
+      discardPile: [...state.discardPile, burned],
       history: [`💥 «Королевский приём» ${declineGen(victim.name)} сорван из-за ${reason}! Интрига сгорела.`, ...state.history].slice(0, 50)
     }));
     triggerResourceFloat(set, victim.id, '💥 Интрига сорвана', false);
@@ -38,7 +40,7 @@ export function playPlotAction(
   get: StateGetter,
   set: StateSetter,
   plotType: PlotType,
-  cardIndex: number,
+  cardId: CardId,
   targetPlayerId?: string
 ): void {
   timerManager.clearAll();
@@ -46,11 +48,8 @@ export function playPlotAction(
   const actor = players.find(p => p.id === activePlayerId);
   if (!actor || actor.actionTokens < 1) return;
 
-  const playedCard = actor.hand[cardIndex];
-  if (playedCard !== plotType) return;
-
-  const newHand = [...actor.hand];
-  newHand.splice(cardIndex, 1);
+  const { taken: playedCard, rest: newHand } = pluck(actor.hand, cardId);
+  if (playedCard?.card !== plotType) return;
 
   const newPlayers = players.map(p => p.id === actor.id ? {
     ...p,
@@ -70,6 +69,7 @@ export function playPlotAction(
     plotType,
     actorId: actor.id,
     targetId: targetPlayerId,
+    stakedCardId: playedCard.id,
     costGold: 0,
     costTokens: 1,
     description: CARD_INFO[plotType]?.shortDescription ?? ''
@@ -99,9 +99,12 @@ export function landPlot(get: StateGetter, set: StateSetter, action: Action): vo
   }
 
   const oldPlot = actor.activePlot;
-  const updatedDiscard = oldPlot ? [...discardPile, oldPlot.type] : discardPile;
+  const updatedDiscard = oldPlot
+    ? [...discardPile, { id: oldPlot.cardId, card: oldPlot.type }]
+    : discardPile;
   const newPlotData = {
     id: action.id,
+    cardId: action.stakedCardId ?? action.id,
     type: plotType,
     targetPlayerId: action.targetId,
     charges: plotType === 'Тайный заговор' ? 0 : undefined
@@ -233,6 +236,7 @@ export function activateConspiracy(
     targetId: target.id,
     costGold: 0,
     costTokens: tokenCost,
+    stakedCardId: player.activePlot.cardId,
     conspiracyEffect: effect,
     cannotBeVetoed,
     description: CARD_INFO['Тайный заговор']?.shortDescription ?? ''
@@ -270,7 +274,10 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
 
   const charges = player.activePlot.charges ?? 0;
   const effect = action.conspiracyEffect ?? 'gold';
-  const newDiscard: GameCard[] = [...discardPile, 'Тайный заговор'];
+  const newDiscard: CardInstance[] = [
+    ...discardPile,
+    { id: player.activePlot.cardId, card: 'Тайный заговор' }
+  ];
 
   if (effect === 'gold') {
     const goldLoss = Math.min(charges, target.gold);
@@ -359,14 +366,15 @@ export function applyMorningPlotReward(get: StateGetter, set: StateSetter, actio
 export function discardMorningPlot(get: StateGetter, set: StateSetter, actorId: string): void {
   const { players, discardPile } = get();
   const player = players.find(p => p.id === actorId);
-  const plotType = player?.activePlot?.type;
-  if (!player || !plotType) {
+  const plot = player?.activePlot;
+  const plotType = plot?.type;
+  if (!player || !plot || !plotType) {
     set({ pendingAction: null, turnPhase: 'IDLE', turnSubPhase: 'NORMAL_ACTION_PHASE' });
     return;
   }
   set(state => ({
     players: state.players.map(p => p.id === actorId ? { ...p, activePlot: null } : p),
-    discardPile: [...discardPile, plotType],
+    discardPile: [...discardPile, { id: plot.cardId, card: plotType }],
     pendingAction: null,
     turnPhase: 'IDLE',
     turnSubPhase: 'NORMAL_ACTION_PHASE',
@@ -377,12 +385,12 @@ export function discardMorningPlot(get: StateGetter, set: StateSetter, actorId: 
 export function resolveMorningPlots(
   updatedPlayers: Player[],
   nextIndex: number,
-  curDiscard: GameCard[],
+  curDiscard: CardInstance[],
   coronationCandidateId: string | null,
   set: StateSetter
 ): {
   updatedPlayers: Player[];
-  curDiscard: GameCard[];
+  curDiscard: CardInstance[];
   coronationTriggeredByReception: boolean;
   nextPlayerUpdated: Player;
 } {
@@ -391,6 +399,7 @@ export function resolveMorningPlots(
   let newDiscard = [...curDiscard];
 
   if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Королевский приём') {
+    const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Королевский приём' };
     const newFavor = Math.min(6, nextPlayerUpdated.favor + 1);
     nextPlayerUpdated = {
       ...nextPlayerUpdated,
@@ -400,7 +409,7 @@ export function resolveMorningPlots(
     updatedPlayers[nextIndex] = nextPlayerUpdated;
     triggerResourceFloat(set, nextPlayerUpdated.id, '+1 👑 Бал удался!', true);
 
-    newDiscard = [...newDiscard, 'Королевский приём'];
+    newDiscard = [...newDiscard, spentPlot];
     set(state => ({
       history: [`👑 Королевский приём ${declineGen(nextPlayerUpdated.name)} успешно состоялся! Получено +1 👑!`, ...state.history].slice(0, 50)
     }));
@@ -409,6 +418,7 @@ export function resolveMorningPlots(
       coronationTriggeredByReception = true;
     }
   } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Золотая булла') {
+    const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Золотая булла' };
     const totalSeals = nextPlayerUpdated.seals + 1;
     const gainedCrowns = Math.floor(totalSeals / 2);
     const newFavor = Math.min(6, nextPlayerUpdated.favor + gainedCrowns);
@@ -428,7 +438,7 @@ export function resolveMorningPlots(
       }, 350);
     }
 
-    newDiscard = [...newDiscard, 'Золотая булла'];
+    newDiscard = [...newDiscard, spentPlot];
     const convNotice = gainedCrowns > 0 ? ` (2 печати дали +${gainedCrowns} 👑)` : '';
     set(state => ({
       history: [`📜 «Золотая булла» ${declineGen(nextPlayerUpdated.name)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
@@ -438,12 +448,13 @@ export function resolveMorningPlots(
       coronationTriggeredByReception = true;
     }
   } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Сеть информаторов') {
+    const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Сеть информаторов' };
     nextPlayerUpdated = {
       ...nextPlayerUpdated,
       activePlot: null
     };
     updatedPlayers[nextIndex] = nextPlayerUpdated;
-    newDiscard = [...newDiscard, 'Сеть информаторов'];
+    newDiscard = [...newDiscard, spentPlot];
     set(state => ({
       history: [`👁️ Действие «Сети информаторов» ${declineGen(nextPlayerUpdated.name)} завершилось после полного круга.`, ...state.history].slice(0, 50)
     }));

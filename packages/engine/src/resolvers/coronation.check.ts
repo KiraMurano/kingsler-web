@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import type { GameState, Player } from '../types.ts';
 import { beginCoronationIfNeeded, resolveCoronationAtTurnStart } from './coronation.ts';
+import { mintDeck } from '../cardInstance.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -15,7 +16,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     favor: 3,
     seals: 0,
     actionTokens: 2,
-    hand: ['Наследник', 'Казначей'],
+    hand: mintDeck(['Наследник', 'Казначей']),
     activePlot: null,
     ...partial
   };
@@ -46,12 +47,10 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     duelOutcome: null,
     informantPeekData: null,
     conspiracyPrompt: null,
-    pendingDuelDefenderCardIndex: null,
+    pendingDuelDefenderCardId: null,
     pendingDuelDefenderRoleClaim: null,
     activeSpeechReactions: {},
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
-    cardFlightEvent: null,
-    hasCardDeparted: false,
     overlayInstant: null,
     winnerId: null as string | null,
     history: [] as string[],

@@ -1,4 +1,5 @@
-import type { Action, GameState } from '../types';
+import type { Action, CardId, GameState } from '../types';
+import { byId } from '../cardInstance';
 import { drawCardsFromDeck } from '../cards';
 import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
@@ -50,32 +51,41 @@ export function executeNormalAction(
       }
     }
   } else if (action.name.includes('Сменить') || action.name.includes('сменить')) {
-    const rawIndices: number[] = (action.stakedCardIndices && action.stakedCardIndices.length > 0)
-      ? action.stakedCardIndices
-      : [action.stakedCardIndex ?? 0];
+    const rawIds: CardId[] = (action.stakedCardIds && action.stakedCardIds.length > 0)
+      ? action.stakedCardIds
+      : (action.stakedCardId ? [action.stakedCardId] : []);
 
-    // Filter valid indices within actor.hand and ensure uniqueness
-    const uniqueIndices = Array.from(new Set(rawIndices.filter(idx => idx >= 0 && idx < actor.hand.length)));
-    const finalIndices = uniqueIndices.length > 0 ? uniqueIndices : (actor.hand.length > 0 ? [0] : []);
+    // Keep only ids the actor really holds, without repeats.
+    const uniqueIds = Array.from(new Set(rawIds)).filter(id => byId(actor.hand, id));
+    const finalIds = uniqueIds.length > 0
+      ? uniqueIds
+      : (actor.hand.length > 0 ? [actor.hand[0].id] : []);
 
-    if (finalIndices.length > 0) {
-      const returnedCards = finalIndices.map(idx => actor.hand[idx]);
+    if (finalIds.length > 0) {
+      // Exchanged cards keep their slot: each id is plucked and the drawn
+      // instance takes its place, so the untouched card never shifts.
+      const returnedCards = finalIds
+        .map(id => byId(actor.hand, id))
+        .filter((c): c is NonNullable<typeof c> => !!c);
       const newDiscard = [...get().discardPile, ...returnedCards];
 
-      const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(finalIndices.length, get().deck, newDiscard);
+      const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(finalIds.length, get().deck, newDiscard);
 
-      const newHand = [...actor.hand];
-      finalIndices.forEach((idx, i) => {
-        newHand[idx] = drawn[i] || 'Наследник';
+      let newHand = [...actor.hand];
+      finalIds.forEach((id, i) => {
+        const slot = newHand.findIndex(c => c.id === id);
+        if (slot === -1) return;
+        if (drawn[i]) newHand[slot] = drawn[i];
+        else newHand = [...newHand.slice(0, slot), ...newHand.slice(slot + 1)];
       });
 
       actor = { ...actor, hand: newHand };
       newPlayers[actorIdx] = actor;
       botMemory.invalidatePlayerHand(actor.id);
 
-      const count = finalIndices.length;
+      const count = finalIds.length;
       const countStr = count === 1 ? '1 карту' : '2 карты';
-      const drawnCardsStr = drawn.map(c => `«${c}»`).join(', ');
+      const drawnCardsStr = drawn.map(c => `«${c.card}»`).join(', ');
       const drawNotice = actor.id === 'p1' ? ` (получено: ${drawnCardsStr})` : '';
       const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
 

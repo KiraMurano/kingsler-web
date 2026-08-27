@@ -1,8 +1,9 @@
 import type { Action, GameState, RevealOutcome } from '../types';
 import { isRole } from '../cards';
+import { byId, holds, pluck } from '../cardInstance';
 import { declineAcc, verbDoubted, verbCaught } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
-import { triggerResourceFloat, triggerSingleCardFlight } from '../utils/visualEffects';
+import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
@@ -138,11 +139,8 @@ export function executeRevealOutcome(
   if (!actor || !doubter) return;
 
   const claimedRole = pendingAction.roleClaim;
-  const actorHand = [...actor.hand];
-  let stakedIndex = pendingAction.stakedCardIndex ?? 0;
-  if (stakedIndex < 0 || stakedIndex >= actorHand.length) stakedIndex = 0;
-
-  const revealedRole = actorHand[stakedIndex] || actorHand[0] || 'Наследник';
+  const staked = byId(actor.hand, pendingAction.stakedCardId) ?? actor.hand[0];
+  const revealedRole = staked?.card ?? 'Наследник';
   const wasTruth = revealedRole === claimedRole;
 
   const newPlayers = [...players];
@@ -160,7 +158,7 @@ export function executeRevealOutcome(
     // Failed check: Black Book is discarded without reward
     if (doubterPlot && doubterPlot.type === 'Чёрная книга') {
       newPlayers[doubterIdx] = { ...newPlayers[doubterIdx], activePlot: null };
-      set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
+      set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
     }
 
     if (claimedRole === 'Шут') {
@@ -202,7 +200,7 @@ export function executeRevealOutcome(
           activePlot: null
         };
       }
-      set(state => ({ discardPile: [...state.discardPile, 'Чёрная книга'] }));
+      set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
 
       if (newPlayers[doubterIdx].favor >= 6) {
         beginCoronationIfNeeded(get, set, doubter.id);
@@ -216,6 +214,7 @@ export function executeRevealOutcome(
     // Check Dossier (Досье) on the accused actor: awards +1 👑 directly!
     const dossierOwner = newPlayers.find(p => p.activePlot?.type === 'Досье' && p.activePlot.targetPlayerId === actor.id);
     if (dossierOwner) {
+      const dossierCardId = dossierOwner.activePlot!.cardId;
       dossierBonusPlayerId = dossierOwner.id;
       const dIdx = newPlayers.findIndex(p => p.id === dossierOwner.id);
       const dNextFavor = Math.min(6, dossierOwner.favor + 1);
@@ -226,7 +225,7 @@ export function executeRevealOutcome(
         activePlot: null
       };
       triggerResourceFloat(set, dossierOwner.id, `+${dGained} 👑 Досье!`, true);
-      set(state => ({ discardPile: [...state.discardPile, 'Досье'] }));
+      set(state => ({ discardPile: [...state.discardPile, { id: dossierCardId, card: 'Досье' as const }] }));
 
       if (newPlayers[dIdx].favor >= 6) {
         beginCoronationIfNeeded(get, set, dossierOwner.id);
@@ -234,10 +233,14 @@ export function executeRevealOutcome(
     }
   }
 
-  // Remove revealed card from hand to discard
-  actorHand.splice(stakedIndex, 1);
+  // Remove the revealed card from hand to discard — addressed by id, so the
+  // card that leaves is exactly the one that was staked and the neighbour in
+  // hand is never touched.
+  const { rest: actorHand } = staked
+    ? pluck(actor.hand, staked.id)
+    : { rest: [...actor.hand] };
   newPlayers[actorIdx] = { ...newPlayers[actorIdx], hand: actorHand };
-  const newDiscard = [...get().discardPile, revealedRole];
+  const newDiscard = staked ? [...get().discardPile, staked] : [...get().discardPile];
 
   if (isRole(revealedRole)) botMemory.recordRevealedCard(actor.id, revealedRole);
 
@@ -323,45 +326,16 @@ export function closeRevealOutcome(
   if (goesToVeto) {
     set({
       revealOutcome: null,
-      hasCardDeparted: false,
       isPendingActionAfterTruthChallenge: true
     });
     get()._triggerVetoWindowOrResolveEffect(pendingAction, true);
     return;
   }
 
-  triggerSingleCardFlight(
-    set,
-    'to_discard',
-    revealOutcome.accusedId,
-    revealOutcome.claimedRole,
-    revealOutcome.revealedRole,
-    revealOutcome.wasTruth
-  );
   set({ revealOutcome: null });
   timerManager.scheduleDelay(() => {
     get()._checkEndgameAndAdvanceTurn();
   }, 800);
-}
-
-/**
- * A staked role card that never got revealed by a challenge flies back to its
- * owner's hand; one that was already shown (truth-challenge path) flies to
- * the discard. Shared by every place a pending role action stops being
- * "on the table" — resolved, vetoed, or vetoed-after-truth-reveal — so the
- * staked card never just vanishes off the arena.
- */
-function flightHomeOrDiscard(
-  set: StateSetter,
-  action: Action,
-  isAfterTruthChallenge: boolean
-): void {
-  if (action.cardAlreadyResolved || !action.roleClaim) return;
-  if (isAfterTruthChallenge) {
-    triggerSingleCardFlight(set, 'to_discard', action.actorId, action.roleClaim);
-  } else {
-    triggerSingleCardFlight(set, 'to_hand', action.actorId, action.roleClaim);
-  }
 }
 
 export function proceedAfterDoubtPassed(
@@ -372,7 +346,6 @@ export function proceedAfterDoubtPassed(
   timerManager.clearAll();
 
   set(state => ({
-    hasCardDeparted: false,
     history: [`🂠 Действие «${action.roleClaim}» от ${state.players.find(p => p.id === action.actorId)?.name || 'игрока'} не оспорено двором (карта остаётся в руке).`, ...state.history].slice(0, 50)
   }));
 
@@ -394,7 +367,6 @@ export function triggerVetoWindowOrResolveEffect(
   }
 
   if (isVetoed) {
-    flightHomeOrDiscard(set, action, isAfterTruthChallenge);
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
@@ -409,13 +381,12 @@ export function triggerVetoWindowOrResolveEffect(
   // human needs the manual VETO_WINDOW to react in — not just "the first
   // non-bot player" (with 2+ humans, that used to skip straight to the
   // bot-timer path whenever the *other* human, not the first one, held it).
-  const humanHoldsVeto = players.some(p => !p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
-  const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && p.hand.includes('Право вето'));
+  const humanHoldsVeto = players.some(p => !p.isBot && p.id !== action.actorId && holds(p.hand, 'Право вето'));
+  const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && holds(p.hand, 'Право вето'));
 
   if (humanHoldsVeto) {
     set({
       turnPhase: 'VETO_WINDOW',
-      hasCardDeparted: false,
       pendingVetoPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0,
@@ -424,7 +395,6 @@ export function triggerVetoWindowOrResolveEffect(
   } else if (botHoldsVeto) {
     set({
       turnPhase: 'VETO_WINDOW',
-      hasCardDeparted: false,
       pendingVetoPassedIds: [],
       timerSeconds: 0,
       timerMaxSeconds: 0,
@@ -436,7 +406,6 @@ export function triggerVetoWindowOrResolveEffect(
       }
     }, 2200);
   } else {
-    flightHomeOrDiscard(set, action, isAfterTruthChallenge);
     set({
       turnPhase: 'IDLE'
     });
@@ -505,14 +474,24 @@ export function proceedAfterVetoWindow(
   set: StateSetter
 ): void {
   timerManager.clearAll();
-  const { pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
+  const { turnPhase, pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
   if (!pendingAction) {
     get()._checkEndgameAndAdvanceTurn();
     return;
   }
 
+  // The veto window is single-entry. `turnPhase` is the window itself, so it
+  // is consumed synchronously here — before the effect lands and before the
+  // ACTION_HOLD_MS hold that follows it. Otherwise the phase stayed
+  // 'VETO_WINDOW' for that whole hold and a bot's veto timer (which only
+  // checks `turnPhase === 'VETO_WINDOW' && !isVetoed`) could still fire after
+  // everyone had already passed: it spent a «Право вето» for nothing and
+  // re-entered here, pushing an already-landed plot card into the discard
+  // while its instance also sat in the plot slot.
+  if (turnPhase !== 'VETO_WINDOW') return;
+  set({ turnPhase: 'IDLE' });
+
   if (isVetoed) {
-    flightHomeOrDiscard(set, pendingAction, !!isPendingActionAfterTruthChallenge);
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${pendingAction.roleClaim || pendingAction.name}» отменено Правом вето!`, ...state.history].slice(0, 50)
@@ -521,9 +500,9 @@ export function proceedAfterVetoWindow(
       discardMorningPlot(get, set, pendingAction.actorId);
       return;
     }
-    if (pendingAction.type === 'plot' && !pendingAction.conspiracyEffect && pendingAction.plotType) {
+    if (pendingAction.type === 'plot' && !pendingAction.conspiracyEffect && pendingAction.plotType && pendingAction.stakedCardId) {
       set(state => ({
-        discardPile: [...state.discardPile, pendingAction.plotType!]
+        discardPile: [...state.discardPile, { id: pendingAction.stakedCardId!, card: pendingAction.plotType! }]
       }));
     }
     timerManager.scheduleDelay(() => {
@@ -531,8 +510,6 @@ export function proceedAfterVetoWindow(
     }, ACTION_HOLD_MS);
     return;
   }
-
-  flightHomeOrDiscard(set, pendingAction, !!isPendingActionAfterTruthChallenge);
 
   get()._resolvePendingActionEffect(pendingAction, isPendingActionAfterTruthChallenge ?? false);
 }

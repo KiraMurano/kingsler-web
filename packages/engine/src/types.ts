@@ -1,5 +1,7 @@
 import type { Role, PlotType, InstantType, GameCard } from './cards';
+import type { CardId, CardInstance } from './cardInstance';
 export type { Role, PlotType, InstantType, GameCard } from './cards';
+export type { CardId, CardInstance } from './cardInstance';
 
 export type BotPersonalityType = 'gambler' | 'cautious' | 'pragmatic' | 'provocateur' | 'opportunist';
 
@@ -16,6 +18,8 @@ export interface BotArchetype {
 
 export interface ActivePlotData {
   id: string;
+  /** The card instance resting in the slot — the same one that left the hand. */
+  cardId: CardId;
   type: PlotType;
   targetPlayerId?: string;
   charges?: number; // Тайный заговор: 0–4
@@ -33,7 +37,7 @@ export interface Player {
   favor: number;       // Crowns 👑 (0 to 6, 6 = win condition)
   seals: number;       // Royal Seals ⚜️ (0 or 1, 2 seals = 1 crown)
   actionTokens: number;// Action tokens (0 to 2, refilled to 2 at turn start)
-  hand: GameCard[];
+  hand: CardInstance[];
   activePlot: ActivePlotData | null;
 }
 
@@ -49,16 +53,17 @@ export interface Action {
   roleClaim?: Role;
   plotType?: PlotType;
   instantType?: InstantType;
-  stakedCardIndex?: number; // Face-down staked card from hand (0 or 1)
-  stakedCardIndices?: number[]; // For exchanging 1 or 2 cards in normal action
+  /** The card instance this action put on the table — staked role card, laid
+   *  plot or played instant. Identity survives hand → table → discard. */
+  stakedCardId?: CardId;
+  /** For exchanging 1 or 2 cards in a normal action. */
+  stakedCardIds?: CardId[];
   costGold: number;
   costTokens: number;
   withVaBanque?: boolean;   // Played together with Va-banque instant modifier (x2 on challenge)
   isMorningTrigger?: boolean;
   conspiracyEffect?: 'gold' | 'crown';
   cannotBeVetoed?: boolean;
-  /** Set once a duel's cards have already flown to discard — the table must not re-stage them. */
-  cardAlreadyResolved?: boolean;
   description: string;
 }
 
@@ -121,26 +126,6 @@ export interface FloatingResourceEvent {
   isGain: boolean;
 }
 
-export interface CardFlightEvent {
-  id: string;
-  isDuel?: boolean;
-  flightType?: 'to_discard' | 'to_hand' | 'to_plot';
-  actorId?: string;
-  roleClaim?: Role;
-  revealedRole?: GameCard;
-  wasTruth?: boolean;
-  /** Instant/plot cards that are already face-up — no flip reveal, just a flight. */
-  card?: GameCard;
-  attackerFlight?: 'to_discard' | 'to_hand';
-  attackerId?: string;
-  attackerRevealedRole?: GameCard;
-  attackerWasTruth?: boolean;
-  defenderFlight?: 'to_discard' | 'to_hand';
-  defenderId?: string;
-  defenderRevealedRole?: GameCard;
-  defenderWasTruth?: boolean;
-}
-
 export interface ConspiracyPromptData {
   playerId: string;
   charges: number;
@@ -154,8 +139,8 @@ export interface GameState {
   activePlayerId: string;
   /** Only set in online mode: which seat this browser's connection is. Undefined offline. */
   viewerId?: string;
-  deck: GameCard[];
-  discardPile: GameCard[];
+  deck: CardInstance[];
+  discardPile: CardInstance[];
   turnPhase: TurnPhase;
   turnSubPhase: TurnSubPhase;
   timerSeconds: number;
@@ -186,14 +171,12 @@ export interface GameState {
   conspiracyPrompt: ConspiracyPromptData | null;
 
   // Duel Specific Pending Cards
-  pendingDuelDefenderCardIndex: number | null;
+  pendingDuelDefenderCardId: CardId | null;
   pendingDuelDefenderRoleClaim: Role | null;
   
   // Animation & Visual Feedback States
   activeSpeechReactions: Record<string, string>;
   floatingResourceEvents: FloatingResourceEvent[];
-  cardFlightEvent: CardFlightEvent | null;
-  hasCardDeparted: boolean;
   /** Instant laid on the table on top of the current action (veto / redirect). */
   overlayInstant: { card: InstantType; actorId: string } | null;
   
@@ -205,8 +188,8 @@ export interface GameState {
   performAction: (action: Omit<Action, 'id'>) => void;
   skipNormalActionPhase: () => void;
   endTurnManually: () => void;
-  playPlotAction: (plotType: PlotType, cardIndex: number, targetPlayerId?: string) => void;
-  playInstant: (playerId: string, instantType: InstantType, cardIndex: number, targetPlayerId?: string) => void;
+  playPlotAction: (plotType: PlotType, cardId: CardId, targetPlayerId?: string) => void;
+  playInstant: (playerId: string, instantType: InstantType, cardId: CardId, targetPlayerId?: string) => void;
   doubtAction: (doubterId: string) => void;
   passDoubt: (playerId: string) => void;
   passVetoWindow: (playerId: string) => void;
@@ -215,7 +198,7 @@ export interface GameState {
   // Duel methods for targeted attacks
   targetAcceptAttack: (targetId: string) => void;
   targetDoubtAttack: (targetId: string) => void;
-  targetDeclareDuel: (targetId: string, stakedCardIndex?: number) => void;
+  targetDeclareDuel: (targetId: string, cardId: CardId) => void;
   attackerRetreatDuel: (attackerId: string) => void;
   attackerAcceptDuel: (attackerId: string) => void;
   closeDuelOutcome: () => void;
@@ -239,5 +222,5 @@ export interface GameState {
   _resolvePendingActionEffect: (action: Action, isAfterTruthChallenge?: boolean) => void;
   _checkEndgameAndAdvanceTurn: () => void;
   _disruptPlayerPlotsOnLoss: (playerId: string, reason: string) => void;
-  _drawCardForPlayerWithInformantCheck: (playerIndex: number) => GameCard;
+  _drawCardForPlayerWithInformantCheck: (playerIndex: number) => CardInstance;
 }

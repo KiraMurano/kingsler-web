@@ -1,4 +1,4 @@
-import type { GameCard, Role, GameState } from '../types';
+import type { GameState } from '../types';
 
 type StateSetter = (
   partial: Partial<GameState> | ((state: GameState) => Partial<GameState>)
@@ -20,86 +20,4 @@ export function triggerResourceFloat(
       floatingResourceEvents: state.floatingResourceEvents.filter(e => e.id !== id)
     }));
   }, 2400);
-}
-
-export function triggerSingleCardFlight(
-  set: StateSetter,
-  flightType: 'to_discard' | 'to_hand' | 'to_plot',
-  actorId?: string,
-  roleClaim?: Role,
-  revealedRole?: GameCard,
-  wasTruth?: boolean
-): void {
-  const id = Math.random().toString(36).substring(7);
-  set({
-    hasCardDeparted: true,
-    cardFlightEvent: {
-      id,
-      isDuel: false,
-      flightType,
-      actorId,
-      roleClaim,
-      revealedRole,
-      wasTruth
-    }
-  });
-
-  globalThis.setTimeout(() => {
-    set({
-      cardFlightEvent: null
-    });
-  }, 850);
-}
-
-/** Fly an already face-up card (instant/plot) off the table — no flip reveal needed. */
-export function triggerFaceCardFlight(
-  set: StateSetter,
-  flightType: 'to_discard' | 'to_plot',
-  actorId: string,
-  card: GameCard
-): void {
-  const id = Math.random().toString(36).substring(7);
-  set({
-    hasCardDeparted: true,
-    cardFlightEvent: { id, isDuel: false, flightType, actorId, card }
-  });
-
-  globalThis.setTimeout(() => {
-    set({ cardFlightEvent: null });
-  }, 850);
-}
-
-export function triggerDuelCardFlight(
-  set: StateSetter,
-  attackerFlight: 'to_discard' | 'to_hand',
-  attackerId: string,
-  defenderFlight: 'to_discard' | 'to_hand',
-  defenderId: string,
-  attackerRevealedRole?: GameCard,
-  attackerWasTruth?: boolean,
-  defenderRevealedRole?: GameCard,
-  defenderWasTruth?: boolean
-): void {
-  const id = Math.random().toString(36).substring(7);
-  set({
-    hasCardDeparted: true,
-    cardFlightEvent: {
-      id,
-      isDuel: true,
-      attackerFlight,
-      attackerId,
-      attackerRevealedRole,
-      attackerWasTruth,
-      defenderFlight,
-      defenderId,
-      defenderRevealedRole,
-      defenderWasTruth
-    }
-  });
-
-  globalThis.setTimeout(() => {
-    set({
-      cardFlightEvent: null
-    });
-  }, 850);
 }

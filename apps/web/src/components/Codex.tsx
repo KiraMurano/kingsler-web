@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { holds } from '@kinglier/engine/cardInstance';
 import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { getCardMaxCopies, TOTAL_DECK_SIZE } from '@kinglier/engine/cards';
 import type { GameCard } from '@kinglier/engine/types';
@@ -74,7 +75,7 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {visible.map(card => {
             const info = CARD_DESCRIPTIONS[card];
-            const held = human?.hand.includes(card);
+            const held = !!human && holds(human.hand, card);
             return (
               <div
                 key={card}

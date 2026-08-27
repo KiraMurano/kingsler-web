@@ -10,6 +10,7 @@ import {
   selectBestConspiracyTarget,
   selectBestRedirectionTarget
 } from './botTargeting.ts';
+import { mintDeck } from '../cardInstance.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -20,7 +21,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     favor: 3,
     seals: 0,
     actionTokens: 2,
-    hand: ['Обыск покоев', 'Право вето'],
+    hand: mintDeck(['Обыск покоев', 'Право вето']),
     activePlot: null,
     ...partial
   };
@@ -74,7 +75,7 @@ assert.equal(
   true
 );
 
-const withHeir = player({ ...bot, hand: ['Обыск покоев', 'Наследник'] });
+const withHeir = player({ ...bot, hand: mintDeck(['Обыск покоев', 'Наследник']) });
 const weak = player({
   ...rival,
   favor: 2,
@@ -85,12 +86,12 @@ assert.equal(
   false
 );
 
-const noRole = player({ id: 'b1', name: 'Бот', hand: ['Обыск покоев', 'Право вето'] });
+const noRole = player({ id: 'b1', name: 'Бот', hand: mintDeck(['Обыск покоев', 'Право вето']) });
 const rich = player({ id: 'p2', name: 'Анна', gold: 5, favor: 2 });
 assert.equal(shouldActivateConspiracyNow(noRole, rich, 1, null, () => 1), false);
 assert.equal(
   shouldActivateConspiracyNow(
-    player({ ...noRole, hand: ['Наследник', 'Обыск покоев'] }),
+    player({ ...noRole, hand: mintDeck(['Наследник', 'Обыск покоев']) }),
     rich,
     2,
     null,
@@ -108,7 +109,7 @@ assert.equal(
 );
 assert.equal(
   shouldActivateConspiracyNow(
-    player({ ...noRole, hand: ['Наследник', 'Шут'] }),
+    player({ ...noRole, hand: mintDeck(['Наследник', 'Шут']) }),
     player({ ...rich, gold: 4, favor: 1 }),
     4,
     null,
