@@ -857,7 +857,11 @@
   z-index: var(--z-tabled);
   display: flex;
   align-items: flex-end;
-  justify-content: center;
+  /* Прижаты к столу, а не к середине полосы. `right: 0` считается от
+     внутреннего края, а у стола ещё 5px канта — поэтому от видимой кромки
+     остаётся всего 3px, и отступ добирает их до общего для раскладки зазора. */
+  justify-content: flex-start;
+  padding-left: 8px;
   gap: 12px;
   pointer-events: none;
 }
@@ -872,6 +876,12 @@
 .pile__slot {
   width: calc(min(32vh, 258px) * 2 / 3 * 0.45);
   aspect-ratio: 2 / 3;
+}
+
+/* Сброс обесцвечен: колода — это то, что впереди, сброс — то, что уже
+   отыграно. Разница в цвете читается быстрее любой подписи. */
+.pile--discard .pile__back {
+  filter: grayscale(1) brightness(0.85);
 }
 
 /* The stacked edge is box-shadow, never extra boxes: `CardLayer` measures
