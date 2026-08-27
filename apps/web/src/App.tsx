@@ -12,7 +12,7 @@ import { CardPiles } from './components/CardPiles';
 import { Hand } from './components/Hand';
 import { PlayerCrest } from './components/PlayerCrest';
 import { PhasePanel } from './components/PhasePanel';
-import { HandBar } from './components/HandBar';
+import { ActionBar } from './components/ActionBar';
 import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
@@ -76,6 +76,7 @@ export default function App({
     hasPlayedPlotThisTurn,
     isVetoed,
     vetoDeadlineAt,
+    history,
     endTurnManually,
     openConspiracyDialog
   } = useGameStore(
@@ -112,6 +113,7 @@ export default function App({
       hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
       isVetoed: s.isVetoed,
       vetoDeadlineAt: s.vetoDeadlineAt,
+      history: s.history,
       endTurnManually: s.endTurnManually,
       openConspiracyDialog: s.openConspiracyDialog
     }))
@@ -214,7 +216,8 @@ export default function App({
           hasPlayedPlotThisTurn,
           isVetoed,
           vetoDeadlineAt,
-          coronationCandidateId
+          coronationCandidateId,
+          history
         },
         human?.id ?? ''
       ),
@@ -232,6 +235,7 @@ export default function App({
       isVetoed,
       vetoDeadlineAt,
       coronationCandidateId,
+      history,
       human
     ]
   );
@@ -270,7 +274,18 @@ export default function App({
     }
   };
 
+  /* Прицел живёт ровно столько, сколько длится фаза, в которой его открыли.
+     Он — состояние интерфейса, и раньше переживал передачу хода: выбрав
+     «Шантажиста» и нажав «Завершить ход», игрок оставлял висящий прицел и мог
+     ткнуть в жертву посреди чужого хода. Движок такое теперь отвергает (см.
+     `performAction`), но и показывать невозможный выбор незачем. */
+  useEffect(() => {
+    setPendingTarget(null);
+  }, [view.phase, activePlayerId]);
+
   const confirmTarget = (targetId: string) => {
+    /* Вторая застава на случай, если фаза сменилась в тот же кадр, что и клик. */
+    if (view.phase !== 'turn' && view.phase !== 'under-attack') return;
     if (!pendingTarget || !human) return;
 
     const cardId = pendingTarget.stakedCardId ?? human.hand[0]?.id;
@@ -439,12 +454,12 @@ export default function App({
                 onInspectCard={setInspectedCard}
               />
 
-              <div className="handstack">
-                <HandBar view={view} onAct={runBarAction} />
-                <Hand player={human} />
-              </div>
+              <Hand player={human} />
 
-              <PhasePanel view={view} />
+              <div className="sidecol">
+                <PhasePanel view={view} />
+                <ActionBar view={view} onAct={runBarAction} />
+              </div>
             </div>
 
             <CardLayer cards={placedCards} />

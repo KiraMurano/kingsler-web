@@ -51,6 +51,7 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     isVetoed: false,
     vetoDeadlineAt: null,
     coronationCandidateId: null,
+    history: [],
     ...over
   };
 }
@@ -262,6 +263,14 @@ function action(over: Partial<Action> = {}): Action {
   assert.deepEqual(view.viewerHandIds, []);
   assert.deepEqual(view.menus, {});
   assert.ok(view.guidance.length > 0, 'даже на пустом столе есть что сказать');
+  assert.equal(view.latest, '', 'летописи ещё нет');
+}
+
+// 10. Летопись доезжает до панели слово в слово — панель не пересказывает.
+{
+  const строка = '⚜️ P2 разоблачил P1 и получает +1 ⚜️ Королевскую печать.';
+  const view = deriveTableView(input({ history: [строка, 'что-то старое'] }), 'p1');
+  assert.equal(view.latest, строка);
 }
 
 console.log('tableView.check: ok');

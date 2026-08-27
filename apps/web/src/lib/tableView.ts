@@ -91,6 +91,14 @@ export interface TableView {
    * «что сейчас и что мне делать».
    */
   guidance: string;
+  /**
+   * Что только что произошло — верхняя строка летописи, слово в слово.
+   *
+   * Панель не пересказывает событие своими словами: летопись уже пишет их
+   * подробно и единообразно («⚜️ N получает +1 ⚜️ Королевскую печать»), а два
+   * независимых пересказа одного события рано или поздно разойдутся.
+   */
+  latest: string;
   deadlineAt: number | null;
   bar: BarButton[];
   /** Порядок слотов руки зрителя — тесты и `Hand` обходят её по нему. */
@@ -114,6 +122,8 @@ export interface TableViewInput {
   isVetoed: boolean;
   vetoDeadlineAt: number | null;
   coronationCandidateId: string | null;
+  /** Летопись, новейшее первым. Панель показывает верхнюю строку. */
+  history: string[];
 }
 
 const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avatar });
@@ -432,6 +442,7 @@ const EMPTY_VIEW: TableView = {
   phase: 'waiting',
   title: 'Ожидание',
   guidance: 'Двор собирается.',
+  latest: '',
   deadlineAt: null,
   bar: [],
   viewerHandIds: [],
@@ -451,6 +462,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
   );
   const title = titleFor(phase, actorPlayer ? ref(actorPlayer) : null);
   const guidance = guidanceFor(phase, input, viewer);
+  const latest = input.history[0] ?? '';
   const bar = barFor(phase, viewer, input);
 
   const viewerHandIds = viewer.hand.map(h => h.id);
@@ -465,6 +477,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     phase,
     title,
     guidance,
+    latest,
     bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
     viewerHandIds
       .map(cid => menus[cid].map(o => `${o.kind}${o.disabled ? '!' : ''}`).join('.'))
@@ -476,6 +489,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     phase,
     title,
     guidance,
+    latest,
     deadlineAt: phase === 'veto' ? input.vetoDeadlineAt : null,
     bar,
     viewerHandIds,

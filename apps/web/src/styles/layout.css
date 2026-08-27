@@ -1013,13 +1013,11 @@
   color: #fff;
 }
 
-/* Над картой, а не под ней: снизу подпись перекрывалась рядом кнопок,
-   который теперь стоит прямо над рукой. */
 .claimbadge {
   position: absolute;
   left: 50%;
-  bottom: 100%;
-  translate: -50% -8px;
+  top: 100%;
+  translate: -50% 8px;
   z-index: 6;
   width: max-content;
   max-width: min(220px, 60vw);
@@ -1041,7 +1039,7 @@
 .claimbadge--solo {
   position: relative;
   left: auto;
-  bottom: auto;
+  top: auto;
   transform: none;
   translate: none;
   font-size: 0.82rem;
@@ -1358,59 +1356,62 @@
   margin-right: 3px;
 }
 
-/* --- Панель над картами: единственные фазовые кнопки --- */
-.handstack {
+/*
+ * Правая колонка: рассказ сверху, кнопки снизу.
+ *
+ * Кнопки прижаты к низу (`justify-content: flex-end`), потому что рассказ над
+ * ними то короче, то длиннее — а рука должна находить кнопку там же, где
+ * нашла её в прошлый раз. Ширина колонки постоянна по той же причине.
+ */
+.sidecol {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  width: 248px;
   flex: 0 0 auto;
 }
 
-/* Высота держится постоянной, даже когда кнопок нет: иначе рука подпрыгивала
-   бы каждый раз, когда ход уходит к соседу. */
-.handbar {
-  min-height: 56px;
+.actionbar {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 100%;
+  flex-direction: column;
 }
 
-/* Ряд кнопок над рукой. Кнопки непрозрачные: на сукне полупрозрачная
-   тонировка растворялась, а блюр делал их стеклянными и мягкими там, где
-   нужна плотная физическая кнопка. */
-.handbar__row {
+.actionbar__col {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  justify-content: center;
 }
 
-.handbar__row .btn {
-  min-width: 156px;
+/* Обёртка подсказки — блочная, иначе кнопка внутри неё теряет ширину. */
+.actionbar__col .tt {
+  display: flex;
+}
+
+.actionbar__col .btn {
   background-color: var(--ink-900, #0a0d14);
   background-image: linear-gradient(180deg, rgba(28, 35, 50, 0.9) 0%, rgba(12, 16, 24, 0.95) 100%);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 
-.handbar__row .btn:hover:not(:disabled) {
+.actionbar__col .btn:hover:not(:disabled) {
   background-image: linear-gradient(180deg, rgba(38, 47, 66, 0.95) 0%, rgba(18, 24, 34, 0.97) 100%);
 }
 
 /* Название и значок стоимости стоят в одну строку — высота кнопки постоянна. */
-.handbar__row .btn__row {
+.actionbar__col .btn__row {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
 }
 
 /* --- Полоска окна вето --- */
 .vetobar {
-  width: min(520px, 100%);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 9px 14px 11px;
+  padding: 9px 12px 11px;
   border-radius: var(--radius);
   border: 1px solid rgba(180, 64, 90, 0.45);
   background: linear-gradient(180deg, rgba(38, 16, 24, 0.9) 0%, rgba(14, 8, 12, 0.92) 100%);
@@ -1528,8 +1529,6 @@
 .phase {
   display: flex;
   flex-direction: column;
-  width: 248px;
-  flex: 0 0 auto;
   padding: 12px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--line-cold);
@@ -1566,10 +1565,18 @@
   color: var(--crimson-soft);
 }
 
+.phase__latest {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--gold-pale);
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line-cold);
+}
+
 .phase__guidance {
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: var(--text-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .phase__actor {

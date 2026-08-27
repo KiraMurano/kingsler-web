@@ -1,19 +1,24 @@
 /**
- * Правая колонка: что происходит и что делать. Ни одной кнопки.
+ * Правая колонка, верхний блок: что происходит. Ни одной кнопки.
  *
- * Она сознательно скупа. Всё, что нарисовано за столом — чьи жетоны, какой у
- * карты арт, кто уже ответил, — колонка не повторяет: это было бы вторым,
- * худшим экземпляром того же самого. Она отвечает на единственный вопрос, на
- * который стол не отвечает: «что сейчас и что мне делать».
+ * Три строки и не больше. Название фазы отвечает «где мы», строка летописи —
+ * «что только что случилось», подсказка — «что делать». Летопись берётся слово
+ * в слово: она уже пишет события подробно и единообразно, а два независимых
+ * пересказа одного события рано или поздно разойдутся.
  *
- * Заголовок меняется через `AnimatePresence` по фазе, а фраза — кроссфейдом
- * внутри постоянного узла: внутри одной фазы она может уточниться (сменился
- * заявитель, пришла новая заявка), и ради этого пересоздавать вид незачем.
+ * Ничего из того, что нарисовано за столом, здесь не повторяется: ни жетоны,
+ * ни арт заявленной карты, ни список ответивших.
+ *
+ * `mode="wait"`, а не `popLayout`: `popLayout` кладёт уходящий вид в
+ * `position: absolute` поверх приходящего, и два разных текста печатаются друг
+ * на друге всё время кроссфейда.
  */
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { dur } from '../motion/tokens.ts';
+import { courtly } from '../lib/text';
 import { CrossfadeText } from './ui/CrossfadeText';
+import { renderWithIcons } from './ui/Icon';
 import type { PhaseKind, TableView } from '../lib/tableView.ts';
 
 const EASE = [0.4, 0, 0.2, 1] as const;
@@ -34,12 +39,11 @@ export const PhasePanel: React.FC<{ view: TableView }> = ({ view }) => {
   const fade = reduce ? 0.12 : dur.panel;
   const travel = reduce ? 0 : SLIDE;
   const alert = ALERT.includes(view.phase);
+  const произошло = view.latest ? courtly(view.latest) : '';
 
   return (
     <motion.aside
       className={`phase ${alert ? 'phase--alert' : ''}`}
-      /* Рамка переживает любую смену вида, поэтому её высоту можно
-         интерполировать, а не переключать скачком. */
       layout={reduce ? false : 'size'}
       transition={{ layout: { duration: fade, ease: EASE } }}
     >
@@ -53,6 +57,25 @@ export const PhasePanel: React.FC<{ view: TableView }> = ({ view }) => {
           transition={{ duration: fade, ease: EASE }}
         >
           <div className="phase__title">{view.title}</div>
+
+          {произошло && (
+            <div className="phase__latest">
+              {/* Ключ по тексту: строка меняется чаще фазы, и менять её надо
+                  кроссфейдом внутри блока, а не пересозданием всего вида. */}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={произошло}
+                  initial={{ opacity: 0, y: reduce ? 0 : 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: reduce ? 0 : -4 }}
+                  transition={{ duration: reduce ? 0.1 : dur.fade, ease: EASE }}
+                >
+                  {renderWithIcons(произошло)}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
+
           <div className="phase__guidance">
             <CrossfadeText>{view.guidance}</CrossfadeText>
           </div>

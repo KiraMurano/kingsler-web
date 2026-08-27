@@ -1,13 +1,13 @@
 /**
- * Единственное место с фазовыми кнопками — прямо над рукой.
+ * Фазовые кнопки — низ правой колонки.
  *
- * Всё, что решается не картой, решается здесь; всё остальное — меню на карте.
- * Набор кнопок берётся из `TableView`, поэтому он всегда согласован с тем, что
- * рассказывает правая колонка.
+ * Стоят под блоком, который рассказывает, что происходит, и прижаты к низу
+ * колонки: рассказ сверху может стать длиннее или короче, а кнопки обязаны
+ * оставаться там, где рука их уже нашла.
  *
- * Глухая кнопка остаётся на месте, а причину рассказывает тултипом. Внутри
- * кнопки подписи больше нет: она меняла её высоту, и ряд дёргался каждый раз,
- * когда действие становилось недоступным.
+ * Набор берётся из `TableView`, поэтому он всегда согласован с тем, что
+ * написано выше. Глухая кнопка остаётся на месте, а причину рассказывает
+ * тултипом: подпись внутри кнопки меняла её высоту и заставляла ряд плясать.
  */
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -21,7 +21,7 @@ import type { BarActionKind, TableView } from '../lib/tableView.ts';
 const EASE = [0.4, 0, 0.2, 1] as const;
 const SLIDE = 8;
 
-export const HandBar: React.FC<{
+export const ActionBar: React.FC<{
   view: TableView;
   onAct: (kind: BarActionKind) => void;
 }> = ({ view, onAct }) => {
@@ -33,12 +33,13 @@ export const HandBar: React.FC<{
     view.phase === 'veto' && view.deadlineAt !== null ? (
       <VetoTimerBar deadlineAt={view.deadlineAt} />
     ) : view.bar.length > 0 ? (
-      <div className="handbar__row">
+      <div className="actionbar__col">
         {view.bar.map(b => (
           <Tooltip key={b.kind} text={b.disabled ? b.reason : b.hint} tapToOpen={b.disabled}>
             <Button
               tone={b.tone}
               size="lg"
+              block
               disabled={b.disabled}
               onClick={() => onAct(b.kind)}
             >
@@ -51,14 +52,14 @@ export const HandBar: React.FC<{
     ) : null;
 
   return (
-    <div className="handbar">
+    <div className="actionbar">
       {/* `wait`, а не `popLayout`: наложенные друг на друга наборы кнопок
           читаются как грязь — см. комментарий в `PhasePanel`. */}
       <AnimatePresence mode="wait" initial={false}>
         {content && (
           <motion.div
             key={view.phase}
-            className="handbar__view"
+            className="actionbar__view"
             initial={{ opacity: 0, y: travel }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: travel }}
