@@ -323,5 +323,4 @@ img {
 
 .res__n {
   display: inline-block;
-  animation: rise-in 0.22s var(--ease-out);
 }

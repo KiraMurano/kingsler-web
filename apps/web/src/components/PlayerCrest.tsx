@@ -5,6 +5,8 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import { Bolts, Deltas, Res, Seals, type DeltaEvent } from './ui/Res';
 import { UiIcon } from './ui/Icon';
 import { Portrait } from './Portrait';
+import { CrossfadeText } from './ui/CrossfadeText';
+import { AnimatedNumber } from './ui/AnimatedNumber';
 import { PlotSlot } from './PlotSlot';
 
 const CROWNS_TO_WIN = 6;
@@ -18,7 +20,7 @@ export const CrownsTrack: React.FC<{
     <div className="crowns__head">
       <span className="eyebrow">До престола</span>
       <span className="crowns__value delta-anchor">
-        <UiIcon kind="crown" size="sm" /> {favor}/{CROWNS_TO_WIN}
+        <UiIcon kind="crown" size="sm" /> <AnimatedNumber value={favor} />/{CROWNS_TO_WIN}
         <Deltas events={events} kind="crown" />
       </span>
     </div>
@@ -67,7 +69,7 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
             <div className="crest__name">{player.name}</div>
           </div>
           <div className={`crest__state ${isActive ? 'crest__state--mine' : ''}`}>
-            <span key={isActive ? 'mine' : 'wait'}>{isActive ? 'ваш ход' : 'ожидание'}</span>
+            <CrossfadeText>{isActive ? 'ваш ход' : 'ожидание'}</CrossfadeText>
           </div>
         </div>
       </div>

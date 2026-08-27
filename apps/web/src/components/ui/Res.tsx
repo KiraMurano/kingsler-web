@@ -1,6 +1,7 @@
 import React from 'react';
 import { courtly, resourceDeltaKind } from '../../lib/text';
 import { UiIcon, renderWithIcons, type UiIconKind } from './Icon';
+import { AnimatedNumber } from './AnimatedNumber';
 
 /**
  * Resource chips. Visualised via crisp WebP resource icons.
@@ -41,8 +42,8 @@ export const Res: React.FC<ResProps> = ({ kind, value, suffix, size = 'sm', mute
       <UiIcon kind={RESOURCE_ICON_KIND[kind]} size={size === 'lg' ? 'md' : 'sm'} />
     </span>
     <span>
-      <span key={String(value)} className="res__n">
-        {value}
+      <span className="res__n">
+        {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
         {suffix ? ` ${suffix}` : ''}
       </span>
     </span>

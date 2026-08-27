@@ -1271,11 +1271,6 @@
   transition: color var(--dur-fade) var(--ease-out);
 }
 
-.crest__state span {
-  display: inline-block;
-  animation: fade-in 0.22s var(--ease-out);
-}
-
 .crest__state--mine {
   color: var(--sage-soft);
 }
