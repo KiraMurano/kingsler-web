@@ -1456,14 +1456,19 @@
   color: #ffe6ec;
 }
 
+/* «Верю» — тот же спокойный синий, что у блока и у «Действий двора». В окне
+   сомнений это читается парой: опасный выбор горит цветом тревоги, спокойный
+   остаётся в цвете панели. */
 .actionbar__col .btn--good {
-  background: linear-gradient(180deg, #2f5fb0 0%, #1d3c73 100%);
-  border-color: #4a80d8;
-  color: #dfe9fb;
+  background: linear-gradient(180deg, var(--calm-top) 0%, var(--calm-bottom) 100%);
+  border-color: var(--calm-line);
+  color: var(--steel-soft);
 }
 
 .actionbar__col .btn--good:hover:not(:disabled) {
-  background: linear-gradient(180deg, #3b71c9 0%, #254a8b 100%);
+  background: linear-gradient(180deg, rgba(32, 42, 60, 0.95) 0%, rgba(18, 24, 34, 0.96) 100%);
+  border-color: rgba(95, 131, 174, 0.7);
+  color: #dbe7f7;
 }
 
 .actionbar__col .btn--calm {
