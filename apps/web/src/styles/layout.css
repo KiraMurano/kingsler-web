@@ -1185,8 +1185,16 @@
    ========================================================================== */
 /* Высота карты в руке названа один раз: её берут и слоты руки, и правая
    колонка, которая по ним выравнивается. */
+/* Тона названы один раз на всю геройскую строку: ими залиты и блок с рассказом,
+   и кнопки под ним, и меню над картой — расходиться им теперь нечем. */
 .hero {
   --hand-h: min(32vh, 258px);
+  --calm-top: rgba(20, 26, 38, 0.92);
+  --calm-bottom: rgba(10, 13, 20, 0.94);
+  --calm-line: var(--line-cold);
+  --alert-top: rgba(38, 16, 24, 0.86);
+  --alert-bottom: rgba(14, 8, 12, 0.9);
+  --alert-line: rgba(180, 64, 90, 0.5);
   position: absolute;
   left: 16px;
   right: 16px;
@@ -1400,12 +1408,6 @@
  * руке, поэтому «верхний край» и «нижний край» — это края карт, а не колонки.
  */
 .sidecol {
-  --calm-top: rgba(20, 26, 38, 0.92);
-  --calm-bottom: rgba(10, 13, 20, 0.94);
-  --calm-line: var(--line-cold);
-  --alert-top: rgba(38, 16, 24, 0.86);
-  --alert-bottom: rgba(14, 8, 12, 0.9);
-  --alert-line: rgba(180, 64, 90, 0.5);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1533,14 +1535,20 @@
 /* --- Меню над картой --- */
 .cardmenu {
   position: absolute;
-  bottom: calc(100% + 14px);
+  /* Запас считает подъём выбранной карты (18px) и её увеличение на hover —
+     иначе карта наезжает на нижний край меню. */
+  bottom: calc(100% + 28px);
   left: 50%;
   translate: -50% 0;
   z-index: calc(var(--z-tabled) + 20);
+  /* Слот руки — это `.cardanchor`, а у якорей `pointer-events: none`, чтобы они
+     не перехватывали карты. Меню обязано вернуть себе клики, иначе указатель
+     проходит сквозь него прямо в стол. */
+  pointer-events: auto;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 176px;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
   padding: 7px;
   border-radius: var(--radius);
   border: 1px solid var(--line-mid);
@@ -1548,55 +1556,76 @@
   box-shadow: 0 22px 44px rgba(0, 0, 0, 0.72);
 }
 
-/* Обёртка подсказки блочная, иначе пункт внутри неё теряет ширину. */
 .cardmenu .tt {
   display: flex;
 }
 
 .cardmenu__item {
-  flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 9px 12px;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 9px 14px;
   border-radius: 8px;
   border: 1px solid var(--line-cold);
-  background: linear-gradient(180deg, rgba(30, 38, 54, 0.95) 0%, rgba(16, 21, 31, 0.96) 100%);
   color: var(--text-soft);
   font-family: var(--font-display);
   font-size: 0.86rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
   cursor: pointer;
   transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
     color 0.16s var(--ease-out);
 }
 
+/* Лупа ничего не меняет в партии, поэтому она квадратная и не тянет на себя
+   место наравне с решениями. */
+.cardmenu__item--icon {
+  padding: 9px 11px;
+}
+
+.cardmenu__item--calm {
+  background: linear-gradient(180deg, var(--calm-top) 0%, var(--calm-bottom) 100%);
+  border-color: var(--calm-line);
+  color: var(--steel-soft);
+}
+
+.cardmenu__item--calm:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(32, 42, 60, 0.95) 0%, rgba(18, 24, 34, 0.96) 100%);
+  border-color: rgba(95, 131, 174, 0.7);
+  color: #dbe7f7;
+}
+
+.cardmenu__item--danger {
+  background: linear-gradient(180deg, var(--alert-top) 0%, var(--alert-bottom) 100%);
+  border-color: var(--alert-line);
+  color: #f0c2cd;
+}
+
+.cardmenu__item--danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(58, 24, 36, 0.92) 0%, rgba(26, 14, 20, 0.94) 100%);
+  border-color: var(--crimson);
+  color: #ffe6ec;
+}
+
+.cardmenu__item--good {
+  background: linear-gradient(180deg, var(--calm-top) 0%, var(--calm-bottom) 100%);
+  border-color: var(--calm-line);
+  color: var(--steel-soft);
+}
+
+.cardmenu__item--arcane,
+.cardmenu__item--gold {
+  background: linear-gradient(180deg, rgba(30, 38, 54, 0.95) 0%, rgba(16, 21, 31, 0.96) 100%);
+}
+
 .cardmenu__item:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(42, 52, 72, 0.96) 0%, rgba(24, 31, 44, 0.97) 100%);
   border-color: var(--gold);
-  color: var(--gold-pale);
 }
 
 .cardmenu__item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.cardmenu__item--danger:hover:not(:disabled) {
-  border-color: var(--crimson);
-  color: #ffc9d5;
-}
-
-.cardmenu__item--good:hover:not(:disabled) {
-  border-color: var(--sage-soft);
-  color: #cdeadf;
-}
-
-.cardmenu__item--arcane:hover:not(:disabled) {
-  border-color: #8b7ad8;
-  color: #d5cdf5;
 }
 
 /* --- Hand: the two hero cards --- */

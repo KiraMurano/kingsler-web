@@ -11,6 +11,7 @@
  */
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Search } from 'lucide-react';
 import { dur, spring } from '../motion/tokens.ts';
 import { Tooltip } from './ui/Tooltip';
 import { TokenCost } from './ui/TokenCost';
@@ -54,7 +55,9 @@ export const CardMenu: React.FC<{
             >
               <motion.button
                 type="button"
-                className={`cardmenu__item cardmenu__item--${o.tone}`}
+                className={`cardmenu__item cardmenu__item--${o.tone}${
+                  o.kind === 'inspect' ? ' cardmenu__item--icon' : ''
+                }`}
                 disabled={o.disabled}
                 initial={{ opacity: 0, y: reduce ? 0 : 6 }}
                 animate={{
@@ -68,8 +71,17 @@ export const CardMenu: React.FC<{
                 }}
                 onClick={() => onPick(o.kind)}
               >
-                <span className="cardmenu__label">{o.label}</span>
-                {o.spendsToken && <TokenCost blocked={o.tokenBlocked} size="xs" />}
+                {/* «Подробнее» — единственный пункт, который ничего не меняет
+                    в партии, поэтому он сжат до лупы и не занимает места в ряду
+                    наравне с решениями. */}
+                {o.kind === 'inspect' ? (
+                  <Search size={17} aria-label={o.label} />
+                ) : (
+                  <>
+                    <span className="cardmenu__label">{o.label}</span>
+                    {o.spendsToken && <TokenCost blocked={o.tokenBlocked} size="xs" />}
+                  </>
+                )}
               </motion.button>
             </Tooltip>
           ))}
