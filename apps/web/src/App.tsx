@@ -16,7 +16,7 @@ import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
 import { CardDetailModal } from './components/CardDetailModal';
-import { RoleClaimPopup } from './components/RoleClaimPopup';
+import { BluffDialog } from './components/BluffDialog';
 import { NormalActionsPopup } from './components/NormalActionsPopup';
 import { Button } from './components/ui/Button';
 import { AnchorProvider } from './motion/AnchorRegistry.tsx';
@@ -551,7 +551,7 @@ export default function App({
       <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
 
       {bluffCardId && (
-        <RoleClaimPopup stakedCardId={bluffCardId} onClose={() => setBluffCardId(null)} />
+        <BluffDialog stakedCardId={bluffCardId} onClose={() => setBluffCardId(null)} />
       )}
       {normalActionsOpen && (
         <NormalActionsPopup onClose={() => setNormalActionsOpen(false)} />

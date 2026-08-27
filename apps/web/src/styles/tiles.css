@@ -1,0 +1,166 @@
+/* Плитка выбора — роли в блефе, действия двора. Одна форма на оба списка. */
+
+.tilegrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 188px;
+  padding: 16px 14px 14px;
+  text-align: left;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-cold);
+  background: var(--ink-800);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.32s var(--ease-out), border-color 0.24s ease, box-shadow 0.32s ease;
+}
+
+/* Арт-плитка: приглушённая иллюстрация, расцветает под курсором. */
+.tile--art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--tile-art);
+  background-size: cover;
+  background-position: center 18%;
+  filter: saturate(0.5) brightness(0.58);
+  transform: scale(1.06);
+  transition: transform 0.5s var(--ease-out), filter 0.32s ease;
+}
+
+.tile--art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 11, 18, 0.08) 0%,
+    rgba(8, 11, 18, 0.44) 44%,
+    rgba(8, 11, 18, 0.94) 78%,
+    var(--ink-800) 100%
+  );
+}
+
+.tile:hover:not(:disabled) {
+  transform: translateY(-6px);
+  border-color: var(--gold);
+  box-shadow: 0 26px 50px rgba(0, 0, 0, 0.6);
+}
+
+.tile--art:hover:not(:disabled)::before {
+  transform: scale(1.12);
+  filter: saturate(1.15) brightness(0.92);
+}
+
+/* Иконочная плитка: градиент вместо арта, теплеет тем же жестом. */
+.tile--icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(200, 160, 74, 0.16) 0%, rgba(10, 13, 20, 0) 70%),
+    linear-gradient(180deg, rgba(24, 30, 44, 0.9) 0%, rgba(10, 13, 20, 0.95) 100%);
+  transition: opacity 0.32s ease;
+}
+
+.tile--icon:hover:not(:disabled)::before {
+  background: radial-gradient(120% 90% at 50% 0%, rgba(200, 160, 74, 0.34) 0%, rgba(10, 13, 20, 0) 70%),
+    linear-gradient(180deg, rgba(30, 37, 54, 0.92) 0%, rgba(12, 16, 24, 0.95) 100%);
+}
+
+.tile__icon {
+  position: relative;
+  z-index: 2;
+  margin-bottom: auto;
+  color: var(--gold-pale);
+  opacity: 0.72;
+  transition: opacity 0.28s ease, transform 0.32s var(--ease-out);
+}
+
+.tile:hover:not(:disabled) .tile__icon {
+  opacity: 1;
+  transform: translateY(-2px) scale(1.06);
+}
+
+.tile__body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tile__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tile__name {
+  font-family: var(--font-display);
+  font-size: 1.04rem;
+  color: var(--gold-pale);
+  letter-spacing: 0.01em;
+}
+
+.tile__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.tile__desc {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.tile--arcane:hover:not(:disabled) {
+  border-color: var(--violet);
+}
+
+/* Подъём — украшение, а не смысл: с выключенной анимацией плитка остаётся на
+   месте, а доступность по-прежнему читается рамкой и цветом. */
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile--art::before,
+  .tile__icon {
+    transition: border-color 0.24s ease;
+  }
+
+  .tile:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .tile--art:hover:not(:disabled)::before {
+    transform: scale(1.06);
+  }
+
+  .tile:hover:not(:disabled) .tile__icon {
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .tilegrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile { min-height: 158px; }
+}
