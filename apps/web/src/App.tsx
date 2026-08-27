@@ -76,7 +76,6 @@ export default function App({
     hasPlayedPlotThisTurn,
     isVetoed,
     vetoDeadlineAt,
-    history,
     endTurnManually,
     openConspiracyDialog
   } = useGameStore(
@@ -113,7 +112,6 @@ export default function App({
       hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
       isVetoed: s.isVetoed,
       vetoDeadlineAt: s.vetoDeadlineAt,
-      history: s.history,
       endTurnManually: s.endTurnManually,
       openConspiracyDialog: s.openConspiracyDialog
     }))
@@ -217,7 +215,8 @@ export default function App({
           isVetoed,
           vetoDeadlineAt,
           coronationCandidateId,
-          history
+          revealOutcome,
+          duelOutcome
         },
         human?.id ?? ''
       ),
@@ -235,7 +234,8 @@ export default function App({
       isVetoed,
       vetoDeadlineAt,
       coronationCandidateId,
-      history,
+      revealOutcome,
+      duelOutcome,
       human
     ]
   );

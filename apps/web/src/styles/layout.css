@@ -1388,14 +1388,68 @@
   display: flex;
 }
 
+/*
+ * Кнопки непрозрачные, но тонировку не теряют.
+ *
+ * Сплошная заливка через `background-image` затирала цвет тона, и «Завершить
+ * ход» переставала быть красной. Плотность даёт непрозрачный слой под кнопкой
+ * — `::before`, — а собственный фон тона остаётся сверху.
+ */
 .actionbar__col .btn {
-  background-color: var(--ink-900, #0a0d14);
-  background-image: linear-gradient(180deg, rgba(28, 35, 50, 0.9) 0%, rgba(12, 16, 24, 0.95) 100%);
+  isolation: isolate;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 
-.actionbar__col .btn:hover:not(:disabled) {
-  background-image: linear-gradient(180deg, rgba(38, 47, 66, 0.95) 0%, rgba(18, 24, 34, 0.97) 100%);
+/*
+ * В колонке тона звучат в полный голос. Общие `.btn--*` держат заливку на
+ * 16–24% альфы — этого хватает на светлой панели диалога, но поверх тёмной
+ * подложки кнопка выходит почти чёрной, и «Завершить ход» переставала читаться
+ * как красная. Здесь у каждого тона своя плотная заливка.
+ */
+.actionbar__col .btn--danger {
+  background: linear-gradient(180deg, rgba(150, 44, 68, 0.95) 0%, rgba(104, 28, 46, 0.97) 100%);
+  border-color: var(--crimson);
+  color: #ffe6ec;
+}
+
+.actionbar__col .btn--danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(178, 56, 84, 0.97) 0%, rgba(126, 34, 56, 0.98) 100%);
+}
+
+.actionbar__col .btn--good {
+  background: linear-gradient(180deg, rgba(58, 112, 94, 0.95) 0%, rgba(34, 74, 62, 0.97) 100%);
+  border-color: var(--sage-soft);
+  color: #e2f5ee;
+}
+
+.actionbar__col .btn--good:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(72, 136, 114, 0.97) 0%, rgba(44, 92, 78, 0.98) 100%);
+}
+
+.actionbar__col .btn--calm {
+  background: linear-gradient(180deg, rgba(46, 66, 94, 0.95) 0%, rgba(26, 38, 56, 0.97) 100%);
+  border-color: rgba(95, 131, 174, 0.75);
+  color: #dbe7f7;
+}
+
+.actionbar__col .btn--calm:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(60, 86, 122, 0.97) 0%, rgba(34, 50, 72, 0.98) 100%);
+}
+
+.actionbar__col .btn--arcane,
+.actionbar__col .btn--gold {
+  background: linear-gradient(180deg, rgba(122, 92, 18, 0.9) 0%, rgba(74, 55, 10, 0.95) 100%);
+  border-color: var(--gold);
+  color: var(--gold-pale);
+}
+
+.actionbar__col .btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(18, 23, 34, 0.97) 0%, rgba(10, 13, 20, 0.98) 100%);
 }
 
 /* Название и значок стоимости стоят в одну строку — высота кнопки постоянна. */
@@ -1565,18 +1619,17 @@
   color: var(--crimson-soft);
 }
 
-.phase__latest {
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--gold-pale);
-  padding-bottom: 9px;
-  border-bottom: 1px solid var(--line-cold);
-}
-
 .phase__guidance {
   font-size: 0.78rem;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--text-muted);
+}
+
+/* Случившееся ярче инструкции, но в том же абзаце: это одна мысль, а не два
+   сообщения. */
+.phase__event {
+  color: var(--gold-pale);
+  font-weight: 600;
 }
 
 .phase__actor {

@@ -51,7 +51,8 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     isVetoed: false,
     vetoDeadlineAt: null,
     coronationCandidateId: null,
-    history: [],
+    revealOutcome: null,
+    duelOutcome: null,
     ...over
   };
 }
@@ -236,7 +237,7 @@ function action(over: Partial<Action> = {}): Action {
     input({ turnPhase: 'VETO_WINDOW', pendingAction: action(), vetoDeadlineAt: 1 })
   ]) {
     const view = deriveTableView(состояние, 'p1');
-    assert.ok(view.guidance.length > 10, `пустая подсказка в фазе ${view.phase}`);
+    assert.ok(view.guidance.length > 0, `пустая подсказка в фазе ${view.phase}`);
   }
 }
 
@@ -263,14 +264,76 @@ function action(over: Partial<Action> = {}): Action {
   assert.deepEqual(view.viewerHandIds, []);
   assert.deepEqual(view.menus, {});
   assert.ok(view.guidance.length > 0, 'даже на пустом столе есть что сказать');
-  assert.equal(view.latest, '', 'летописи ещё нет');
 }
 
-// 10. Летопись доезжает до панели слово в слово — панель не пересказывает.
+// 10. Что произошло — короткой фразой, и только своими словами.
 {
-  const строка = '⚜️ P2 разоблачил P1 и получает +1 ⚜️ Королевскую печать.';
-  const view = deriveTableView(input({ history: [строка, 'что-то старое'] }), 'p1');
-  assert.equal(view.latest, строка);
+  // Чужая заявка.
+  const заявка = deriveTableView(
+    input({ activePlayerId: 'p2', pendingAction: action({ roleClaim: 'Шут' }) }),
+    'p1'
+  );
+  assert.match(заявка.event, /P2 заявляет «Шут»/);
+
+  // Целевая заявка называет жертву.
+  const целевая = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      pendingAction: action({ roleClaim: 'Вор', targetId: 'p3' })
+    }),
+    'p1'
+  );
+  assert.match(целевая.event, /на P3/);
+
+  // Действие двора.
+  const двор = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      pendingAction: action({ type: 'normal', name: 'Устроить пир', roleClaim: undefined })
+    }),
+    'p1'
+  );
+  assert.match(двор.event, /P2: устроить пир/);
+
+  // Разоблачение с печатью — то, ради чего блок и просили вернуть.
+  const блеф = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      revealOutcome: {
+        accuserId: 'p1',
+        accusedId: 'p2',
+        claimedRole: 'Шут',
+        wasTruth: false,
+        revealedRole: 'Вор',
+        sealsWinnerId: 'p1',
+        message: ''
+      }
+    }),
+    'p1'
+  );
+  assert.match(блеф.event, /P1 разоблачил/);
+  assert.match(блеф.event, /блеф/);
+  assert.match(блеф.event, /\+1 ⚜️/, 'печать за разоблачение видна');
+
+  // Правда — другая фраза.
+  const правда = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      revealOutcome: {
+        accuserId: 'p1',
+        accusedId: 'p2',
+        claimedRole: 'Шут',
+        wasTruth: true,
+        revealedRole: 'Шут',
+        message: ''
+      }
+    }),
+    'p1'
+  );
+  assert.match(правда.event, /говорил правду/);
+
+  // Спокойный стол — рассказывать нечего.
+  assert.equal(deriveTableView(input(), 'p1').event, '');
 }
 
 console.log('tableView.check: ok');

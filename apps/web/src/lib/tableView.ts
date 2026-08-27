@@ -14,7 +14,16 @@
  */
 import { CARD_DESCRIPTIONS, isInstant, isPlot } from '@kinglier/engine/data/cardDescriptions';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
-import type { Action, GameCard, GameState, Player, Role } from '@kinglier/engine/types';
+import type {
+  Action,
+  DuelOutcome,
+  GameCard,
+  GameState,
+  Player,
+  RevealOutcome,
+  Role
+} from '@kinglier/engine/types';
+import { declineAcc } from '@kinglier/engine/utils/russianText';
 
 /** Инстанты, которые владелец может выложить открыто в свой ход. */
 const OPENLY_PLAYABLE_INSTANTS: GameCard[] = [
@@ -92,13 +101,13 @@ export interface TableView {
    */
   guidance: string;
   /**
-   * Что только что произошло — верхняя строка летописи, слово в слово.
+   * Что только что случилось — короткой фразой, с эмодзи под иконки.
    *
-   * Панель не пересказывает событие своими словами: летопись уже пишет их
-   * подробно и единообразно («⚜️ N получает +1 ⚜️ Королевскую печать»), а два
-   * независимых пересказа одного события рано или поздно разойдутся.
+   * Не пересказ летописи: та пишет подробно и для разбора партии, а здесь
+   * нужно то, что читается краем глаза, не отрываясь от стола. Пусто, когда
+   * рассказывать нечего.
    */
-  latest: string;
+  event: string;
   deadlineAt: number | null;
   bar: BarButton[];
   /** Порядок слотов руки зрителя — тесты и `Hand` обходят её по нему. */
@@ -122,8 +131,8 @@ export interface TableViewInput {
   isVetoed: boolean;
   vetoDeadlineAt: number | null;
   coronationCandidateId: string | null;
-  /** Летопись, новейшее первым. Панель показывает верхнюю строку. */
-  history: string[];
+  revealOutcome: RevealOutcome | null;
+  duelOutcome: DuelOutcome | null;
 }
 
 const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avatar });
@@ -290,7 +299,9 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         kind: 'end-turn',
         spendsToken: false,
         label: 'Завершить ход',
-        tone: 'gold',
+        /* Красная: это единственная кнопка своего хода, которая необратимо
+           отдаёт ход дальше. */
+        tone: 'danger',
         disabled: false,
         hint: 'Добрать карты и передать ход. Неистраченные ⚡ останутся на защиту'
       });
@@ -410,26 +421,71 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
 
   switch (phase) {
     case 'turn':
-      return 'Нажмите на карту, чтобы разыграть её или сблефовать. Или выберите действие двора.';
+      return 'Выберите действие двора или нажмите на карту, чтобы сыграть её.';
     case 'doubt':
       return `${имя(pendingAction?.actorId)} заявляет «${заявка}». Поверить или проверить?`;
     case 'reveal':
-      return 'Карта вскрывается — сейчас станет видно, был ли это блеф.';
+      return 'Карта вскрывается.';
     case 'under-attack':
-      return `${имя(pendingAction?.actorId)} нападает, заявляя «${заявка}». Примите, проверьте заявление или выставьте карту на дуэль.`;
+      return `${имя(pendingAction?.actorId)} нападает, заявляя «${заявка}». Примите, проверьте или выставьте карту на дуэль.`;
     case 'duel-answer':
       return `${имя(pendingAction?.targetId)} принял вызов. Вскрывать карты или отступить?`;
     case 'veto':
       return holdsVeto(viewer)
-        ? `Готовится «${заявка}». Нажмите «Право вето», чтобы отменить.`
-        : `Готовится «${заявка}». Двор может вмешаться.`;
+        ? `Готовится «${заявка}». Можно наложить вето.`
+        : `Готовится «${заявка}».`;
     case 'coronation':
-      return 'Круг коронации: сбейте влияние претендента, пока круг не замкнулся.';
+      return 'Круг коронации: сбейте влияние претендента.';
     default:
       return activePlayerId === viewer.id
         ? 'Ход завершается.'
-        : `Ходит ${имя(activePlayerId)} — дождитесь своей очереди.`;
+        : `Ходит ${имя(activePlayerId)}.`;
   }
+}
+
+/**
+ * Что только что случилось. Одна фраза, и только та, которую по столу не
+ * прочесть с одного взгляда.
+ */
+function eventFor(input: TableViewInput): string {
+  const { players, revealOutcome, duelOutcome, pendingAction } = input;
+  const имя = (id?: string) => players.find(p => p.id === id)?.name ?? 'придворный';
+  const печать = (id?: string) => (id ? ` ${имя(id)} получает +1 ⚜️.` : '');
+
+  if (revealOutcome) {
+    const r = revealOutcome;
+    return r.wasTruth
+      ? `${имя(r.accusedId)} говорил правду: «${r.revealedRole}».${печать(r.sealsWinnerId)}`
+      : `${имя(r.accuserId)} разоблачил ${declineAcc(имя(r.accusedId))}: блеф.${печать(r.sealsWinnerId)}`;
+  }
+
+  if (duelOutcome) {
+    const d = duelOutcome;
+    if (d.attackerWasTruth && !d.defenderWasTruth) {
+      return `Дуэль: щит ${declineGenSafe(имя(d.defenderId))} оказался блефом.${печать(d.sealsWinnerId)}`;
+    }
+    if (!d.attackerWasTruth && d.defenderWasTruth) {
+      return `Дуэль: нападение ${declineGenSafe(имя(d.attackerId))} оказалось блефом.${печать(d.sealsWinnerId)}`;
+    }
+    return `Дуэль ${имя(d.attackerId)} и ${имя(d.defenderId)} разрешилась.${печать(d.sealsWinnerId)}`;
+  }
+
+  if (pendingAction) {
+    const a = pendingAction;
+    const кто = имя(a.actorId);
+    const цель = a.targetId ? ` на ${declineAcc(имя(a.targetId))}` : '';
+    if (a.type === 'normal') return `${кто}: ${a.name.toLowerCase()}.`;
+    if (a.type === 'plot') return `${кто} выкладывает интригу «${a.plotType}».`;
+    if (a.type === 'instant') return `${кто} играет «${a.instantType}».`;
+    return `${кто} заявляет «${a.roleClaim}»${цель}.`;
+  }
+
+  return '';
+}
+
+/** Родительный падеж имени; отдельной функцией, чтобы не тащить лишний импорт. */
+function declineGenSafe(name: string): string {
+  return name.endsWith('а') ? `${name.slice(0, -1)}ы` : name;
 }
 
 function holdsVeto(viewer: Player): boolean {
@@ -442,7 +498,7 @@ const EMPTY_VIEW: TableView = {
   phase: 'waiting',
   title: 'Ожидание',
   guidance: 'Двор собирается.',
-  latest: '',
+  event: '',
   deadlineAt: null,
   bar: [],
   viewerHandIds: [],
@@ -462,7 +518,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
   );
   const title = titleFor(phase, actorPlayer ? ref(actorPlayer) : null);
   const guidance = guidanceFor(phase, input, viewer);
-  const latest = input.history[0] ?? '';
+  const event = eventFor(input);
   const bar = barFor(phase, viewer, input);
 
   const viewerHandIds = viewer.hand.map(h => h.id);
@@ -477,7 +533,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     phase,
     title,
     guidance,
-    latest,
+    event,
     bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
     viewerHandIds
       .map(cid => menus[cid].map(o => `${o.kind}${o.disabled ? '!' : ''}`).join('.'))
@@ -489,7 +545,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     phase,
     title,
     guidance,
-    latest,
+    event,
     deadlineAt: phase === 'veto' ? input.vetoDeadlineAt : null,
     bar,
     viewerHandIds,
