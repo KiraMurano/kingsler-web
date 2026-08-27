@@ -153,6 +153,7 @@
  * 44% высоты — ровно там же, где он был.
  */
 .table {
+  --chip: 220px;
   --table: round(down, min(72vmin, calc(100% - 150px)), 2px);
   position: absolute;
   width: var(--table);
@@ -197,7 +198,6 @@
 }
 
 .seat {
-  --chip: 220px;
   --plot: 72px;
   position: absolute;
   /* Коробка сиденья тянется во всю высоту стола (см. `.seat--left`), поэтому
@@ -836,23 +836,37 @@
    so an arriving card lands on the picture rather than on the word beneath
    it. Sized at 45% of a hand card: unmistakably furniture, not something you
    could play. */
-.pile {
+/*
+ * Колода и сброс стоят ровно над панелью правого соседа.
+ *
+ * Опора у них та же, что у самого сиденья: правый край стола плюс сдвиг на
+ * ширину панели (`--chip`), — поэтому стопки стоят точно над ней и остаются
+ * над ней при любом размере окна. `bottom: 50%` доводит полосу до
+ * вертикального центра стола, где сиденье и центрируется, а `padding-bottom`
+ * поднимает стопки над верхней половиной панели. Эта половина — единственное
+ * подогнанное число: панель растёт от текста, и вычислить её в CSS нечем.
+ */
+.piles {
   position: absolute;
-  top: 14px;
+  right: 0;
+  top: 0;
+  bottom: 50%;
+  width: var(--chip);
+  transform: translateX(calc(var(--chip) + 8px));
+  padding-bottom: 68px;
   z-index: var(--z-tabled);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.pile {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  pointer-events: none;
-}
-
-.pile--deck {
-  left: 16px;
-}
-
-.pile--discard {
-  right: 16px;
 }
 
 .pile__slot {
@@ -1159,7 +1173,10 @@
 /* ==========================================================================
    HERO — overlays the table edge, never a stretching bottom panel
    ========================================================================== */
+/* Высота карты в руке названа один раз: её берут и слоты руки, и правая
+   колонка, которая по ним выравнивается. */
 .hero {
+  --hand-h: min(32vh, 258px);
   position: absolute;
   left: 16px;
   right: 16px;
@@ -1365,6 +1382,13 @@
  */
 /* Тревожный красный задан один раз: им залит и блок «что происходит», и
    кнопка. Пока значение одно, они не разъедутся. */
+/*
+ * Кнопки прижаты к верхнему краю карт, блок — к нижнему.
+ *
+ * Так они не зависят друг от друга: рассказ снизу может стать длиннее или
+ * короче, и кнопки от этого не сдвинутся. Высота колонки равна высоте карты в
+ * руке, поэтому «верхний край» и «нижний край» — это края карт, а не колонки.
+ */
 .sidecol {
   --calm-top: rgba(20, 26, 38, 0.92);
   --calm-bottom: rgba(10, 13, 20, 0.94);
@@ -1374,9 +1398,10 @@
   --alert-line: rgba(180, 64, 90, 0.5);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   width: 248px;
+  height: var(--hand-h);
   flex: 0 0 auto;
 }
 
@@ -1503,8 +1528,8 @@
 .hand__slot {
   position: relative;
   isolation: isolate;
-  height: min(32vh, 258px);
-  width: calc(min(32vh, 258px) * 2 / 3);
+  height: var(--hand-h);
+  width: calc(var(--hand-h) * 2 / 3);
   flex: 0 0 auto;
 }
 

@@ -441,11 +441,11 @@ export default function App({
                 onCancelTarget={() => setPendingTarget(null)}
                 onInspectCard={setInspectedCard}
               />
-            </div>
 
-            {/* Outside `.table` on purpose: the piles stand beside the felt,
-                clear of every seat panel. */}
-            <CardPiles />
+              {/* Внутри `.table` намеренно: стопки встают над панелью правого
+                  соседа и держатся её опоры — правого края стола. */}
+              <CardPiles />
+            </div>
 
             <div className="hero">
               <PlayerCrest
@@ -457,8 +457,8 @@ export default function App({
               <Hand player={human} />
 
               <div className="sidecol">
-                <PhasePanel view={view} />
                 <ActionBar view={view} onAct={runBarAction} />
+                <PhasePanel view={view} />
               </div>
             </div>
 

@@ -2,9 +2,9 @@
  * The deck and the discard, as two real piles standing beside the table.
  *
  * They used to be invisible points just inside the felt's rim. They are now
- * furniture: a face-down back with a counted caption under it, parked in the
- * top corners of the stage where neither the felt, nor a seat panel, nor the
- * hand can ever reach them.
+ * furniture: a face-down back with a counted caption under it, standing
+ * together above the right-hand seat, where neither the felt, nor a seat
+ * panel, nor the hand can ever reach them.
  *
  * Two things are worth knowing about them:
  *
@@ -58,7 +58,7 @@ export const CardPiles: React.FC = () => {
   const discardCount = useGameStore(s => s.discardPile.length);
 
   return (
-    <>
+    <div className="piles">
       <Pile
         zone={{ kind: 'deck' }}
         className="pile--deck"
@@ -73,6 +73,6 @@ export const CardPiles: React.FC = () => {
         label="Сброс: "
         count={discardCount}
       />
-    </>
+    </div>
   );
 };
