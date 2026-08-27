@@ -12,7 +12,8 @@ import { Arena } from './components/Arena';
 import { CardPiles } from './components/CardPiles';
 import { Hand } from './components/Hand';
 import { PlayerCrest } from './components/PlayerCrest';
-import { ActionControls } from './components/ActionControls';
+import { PhasePanel } from './components/PhasePanel';
+import { HandBar } from './components/HandBar';
 import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
@@ -23,6 +24,8 @@ import { Button } from './components/ui/Button';
 import { AnchorProvider } from './motion/AnchorRegistry.tsx';
 import { CardInteractionProvider, CardLayer } from './motion/CardLayer.tsx';
 import { deriveCardZones } from './lib/cardZones.ts';
+import { deriveTableView } from './lib/tableView.ts';
+import type { BarActionKind } from './lib/tableView.ts';
 import { reconcileSlots } from './lib/handSlotBook.ts';
 import type { SlotBook } from './lib/handSlotBook.ts';
 import type { CardInteraction } from './motion/CardLayer.tsx';
@@ -73,7 +76,17 @@ export default function App({
     targetDeclareDuel,
     attackerRetreatDuel,
     attackerAcceptDuel,
-    endTurn
+    endTurn,
+    turnSubPhase,
+    pendingDoubtDoubterId,
+    pendingDoubtPassedIds,
+    hasUsedNormalActionThisTurn,
+    hasPlayedRoleThisTurn,
+    hasPlayedPlotThisTurn,
+    isVetoed,
+    vetoDeadlineAt,
+    endTurnManually,
+    openConspiracyDialog
   } = useGameStore(
     useShallow(s => ({
       players: s.players,
@@ -101,7 +114,17 @@ export default function App({
       targetDeclareDuel: s.targetDeclareDuel,
       attackerRetreatDuel: s.attackerRetreatDuel,
       attackerAcceptDuel: s.attackerAcceptDuel,
-      endTurn: s.endTurn
+      endTurn: s.endTurn,
+      turnSubPhase: s.turnSubPhase,
+      pendingDoubtDoubterId: s.pendingDoubtDoubterId,
+      pendingDoubtPassedIds: s.pendingDoubtPassedIds,
+      hasUsedNormalActionThisTurn: s.hasUsedNormalActionThisTurn,
+      hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn,
+      hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
+      isVetoed: s.isVetoed,
+      vetoDeadlineAt: s.vetoDeadlineAt,
+      endTurnManually: s.endTurnManually,
+      openConspiracyDialog: s.openConspiracyDialog
     }))
   );
 
@@ -183,6 +206,80 @@ export default function App({
       human
     ]
   );
+
+  /* Единственная производная правда о том, что видно: правая колонка, панель
+     над картами и меню на карте читают её и потому не могут разойтись. */
+  const view = useMemo(
+    () =>
+      deriveTableView(
+        {
+          players,
+          activePlayerId,
+          turnPhase,
+          turnSubPhase,
+          pendingAction,
+          pendingDoubtDoubterId,
+          pendingDoubtPassedIds,
+          hasUsedNormalActionThisTurn,
+          hasPlayedRoleThisTurn,
+          hasPlayedPlotThisTurn,
+          isVetoed,
+          vetoDeadlineAt,
+          coronationCandidateId
+        },
+        human?.id ?? ''
+      ),
+    [
+      players,
+      activePlayerId,
+      turnPhase,
+      turnSubPhase,
+      pendingAction,
+      pendingDoubtDoubterId,
+      pendingDoubtPassedIds,
+      hasUsedNormalActionThisTurn,
+      hasPlayedRoleThisTurn,
+      hasPlayedPlotThisTurn,
+      isVetoed,
+      vetoDeadlineAt,
+      coronationCandidateId,
+      human
+    ]
+  );
+
+  /** Одна кнопка панели над картами — одно действие движка. */
+  const runBarAction = (kind: BarActionKind) => {
+    if (!human) return;
+    switch (kind) {
+      case 'court-actions':
+        setNormalActionsOpen(true);
+        break;
+      case 'conspiracy':
+        openConspiracyDialog(false);
+        break;
+      case 'end-turn':
+        endTurnManually();
+        break;
+      case 'doubt':
+        /* Одна кнопка на две фазы: под атакой сомнение адресное, в общем
+           окне — от лица двора. */
+        if (view.phase === 'under-attack') targetDoubtAttack(human.id);
+        else doubtAction(human.id);
+        break;
+      case 'believe':
+        passDoubt(human.id);
+        break;
+      case 'accept-attack':
+        targetAcceptAttack(human.id);
+        break;
+      case 'duel-accept':
+        attackerAcceptDuel(human.id);
+        break;
+      case 'duel-retreat':
+        attackerRetreatDuel(human.id);
+        break;
+    }
+  };
 
   const confirmTarget = (targetId: string) => {
     if (!pendingTarget || !human) return;
@@ -442,9 +539,12 @@ export default function App({
                 onInspectCard={setInspectedCard}
               />
 
-              <Hand player={human} />
+              <div className="handstack">
+                <HandBar view={view} onAct={runBarAction} />
+                <Hand player={human} />
+              </div>
 
-              <ActionControls onOpenNormalActions={() => setNormalActionsOpen(true)} />
+              <PhasePanel view={view} />
             </div>
 
             <CardLayer cards={placedCards} />

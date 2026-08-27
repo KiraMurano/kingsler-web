@@ -330,8 +330,29 @@ function awaitingFor(phase: PhaseKind, input: TableViewInput): PlayerRef[] {
   return [];
 }
 
+/** Что показывать, когда стола ещё нет: первый кадр партии, до раздачи. */
+const EMPTY_VIEW: TableView = {
+  id: 'empty',
+  phase: 'waiting',
+  title: 'Ожидание',
+  actor: null,
+  claim: null,
+  awaiting: [],
+  deadlineAt: null,
+  tokens: 0,
+  spent: { court: false, plot: false, role: false },
+  bar: [],
+  viewerHandIds: [],
+  menus: {}
+};
+
 export function deriveTableView(input: TableViewInput, viewerId: string): TableView {
   const viewer = input.players.find(p => p.id === viewerId) ?? input.players[0];
+  /* На первом кадре партии игроков ещё нет, а хук уже считается — App
+     отрисовывает заставку «СОЗЫВ ДВОРА» ниже по телу компонента, и до неё
+     дело не дойдёт, если здесь бросить исключение. */
+  if (!viewer) return EMPTY_VIEW;
+
   const phase = phaseOf(input, viewer);
   const actorPlayer = input.players.find(
     p => p.id === (input.pendingAction?.actorId ?? input.activePlayerId)

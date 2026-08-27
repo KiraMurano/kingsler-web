@@ -209,4 +209,16 @@ function action(over: Partial<Action> = {}): Action {
   }
 }
 
+// 9. Пустой стол. На первом кадре партии `players` ещё пуст — модель обязана
+//    пережить это, а не уронить приложение: хук считается до того, как App
+//    успевает отрисовать заставку «СОЗЫВ ДВОРА».
+{
+  const view = deriveTableView(input({ players: [] }), 'p1');
+  assert.equal(view.phase, 'waiting');
+  assert.deepEqual(view.bar, []);
+  assert.deepEqual(view.viewerHandIds, []);
+  assert.deepEqual(view.menus, {});
+  assert.equal(view.actor, null);
+}
+
 console.log('tableView.check: ok');
