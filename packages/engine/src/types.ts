@@ -163,6 +163,8 @@ export interface GameState {
   isPendingActionAfterTruthChallenge?: boolean;
   /** Ids of non-actor players who already clicked "Продолжить" in the current VETO_WINDOW — resolving requires every one of them, not just the first. */
   pendingVetoPassedIds: string[];
+  /** Абсолютный timestamp закрытия окна вето. `null` вне окна. */
+  vetoDeadlineAt: number | null;
   
   // Outcome Modals
   revealOutcome: RevealOutcome | null;

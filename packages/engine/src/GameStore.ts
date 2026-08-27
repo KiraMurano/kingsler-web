@@ -71,6 +71,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   pendingDoubtDoubterId: null,
   pendingDoubtPassedIds: [],
   pendingVetoPassedIds: [],
+  vetoDeadlineAt: null,
 
   isVaBanqueActive: false,
   isVetoed: false,
