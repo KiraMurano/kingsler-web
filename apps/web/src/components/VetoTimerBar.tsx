@@ -14,6 +14,9 @@ import React from 'react';
 import { motion, useAnimationFrame, useMotionValue, useTransform } from 'motion/react';
 import { VETO_WINDOW_MS } from '@kinglier/engine/timing';
 
+/** Сколько последних миллисекунд окна полоска стоит багровой. */
+const WARN_MS = 2000;
+
 export const VetoTimerBar: React.FC<{ deadlineAt: number }> = ({ deadlineAt }) => {
   const progress = useMotionValue(1);
 
@@ -24,8 +27,12 @@ export const VetoTimerBar: React.FC<{ deadlineAt: number }> = ({ deadlineAt }) =
 
   const seconds = useTransform(progress, p => String(Math.ceil(p * (VETO_WINDOW_MS / 1000))));
   /* Последние две секунды полоска уходит в багровый — предупреждение читается
-     цветом раньше, чем цифрой. */
-  const fill = useTransform(progress, [0, 0.29, 0.3, 1], [
+     цветом раньше, чем цифрой. Порог считается из этих двух секунд, а не задан
+     долей: длину окна крутят в `VETO_WINDOW_MS`, и доля уехала бы вместе с ней. */
+  /* Потолок на случай, если окно однажды окажется короче самого предупреждения:
+     стопы `useTransform` обязаны идти строго по возрастанию. */
+  const warn = Math.min(WARN_MS / VETO_WINDOW_MS, 0.9);
+  const fill = useTransform(progress, [0, warn - 0.01, warn, 1], [
     'var(--crimson-soft)',
     'var(--crimson-soft)',
     'var(--gold)',
