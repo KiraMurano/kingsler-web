@@ -1524,6 +1524,31 @@
   color: var(--crimson-soft);
 }
 
+/* Табличные цифры: без них секунда «1» уже «2», и голова полоски дёргается
+   на каждом тике. */
+.vetobar__secs {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--gold-pale);
+}
+
+.vetobar__track {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Убывает через `scaleX` от левого края: ширина заставляла бы браузер
+   раскладывать блок заново каждый кадр, трансформация — нет. */
+.vetobar__fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  border-radius: 999px;
+}
+
 /* --- Меню над картой --- */
 .cardmenu {
   /* `fixed`, а не `absolute`: меню вынесено порталом в `body`, и координаты ему
