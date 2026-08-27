@@ -2,9 +2,6 @@ import React from 'react';
 import { BookOpen, Scale, LogOut, ScrollText } from 'lucide-react';
 
 interface TopBarProps {
-  statusText: string;
-  statusTone: 'idle' | 'mine' | 'alarm';
-  hint?: string;
   onOpenCodex: () => void;
   onOpenChronicle: () => void;
   onOpenRules: () => void;
@@ -14,9 +11,6 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-  statusText,
-  statusTone,
-  hint,
   onOpenCodex,
   onOpenChronicle,
   onOpenRules,
@@ -35,24 +29,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         <ScrollText size={15} />
         Летопись
       </button>
-      <div
-        className={`turnchip ${
-          statusTone === 'mine' ? 'turnchip--mine' : statusTone === 'alarm' ? 'turnchip--alarm' : ''
-        }`}
-      >
-        <span className="turnchip__dot" />
-        <span key={statusText} className="turnchip__copy">
-          {statusText}
-        </span>
-        {hint && (
-          <>
-            <span className="turnchip__sep" />
-            <span key={hint} className="turnchip__copy turnchip__copy--muted">
-              {hint}
-            </span>
-          </>
-        )}
-      </div>
     </div>
 
     <div className="brand">

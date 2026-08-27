@@ -6,7 +6,6 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   tone?: ButtonTone;
   size?: 'sm' | 'md' | 'lg';
   block?: boolean;
-  hotkey?: string;
   sub?: React.ReactNode;
 }
 
@@ -24,7 +23,6 @@ export const Button: React.FC<ButtonProps> = ({
   tone = 'plain',
   size = 'md',
   block,
-  hotkey,
   sub,
   children,
   className = '',
@@ -43,10 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
       .join(' ')}
     {...rest}
   >
-    <span className="btn__row">
-      {children}
-      {hotkey && <span className="btn__key">{hotkey}</span>}
-    </span>
+    <span className="btn__row">{children}</span>
     {sub && <span className="btn__sub">{sub}</span>}
   </button>
 );

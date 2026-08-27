@@ -45,7 +45,7 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
             <span>
               Выберите цель для <strong>«{pendingTargetAction.name}»</strong>
             </span>
-            <Button tone="danger" size="sm" hotkey="Esc" onClick={onCancelTarget}>
+            <Button tone="danger" size="sm" onClick={onCancelTarget}>
               Отмена
             </Button>
           </motion.div>

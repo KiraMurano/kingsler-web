@@ -89,69 +89,6 @@
   color: var(--text-dim);
 }
 
-/* Turn chip */
-.turnchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 13px;
-  border-radius: 999px;
-  border: 1px solid var(--line-cold);
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-soft);
-  transition: border-color var(--dur-fade) var(--ease-out),
-    background-color var(--dur-fade) var(--ease-out), color var(--dur-fade) var(--ease-out);
-}
-
-.turnchip__copy {
-  animation: fade-in 0.22s var(--ease-out);
-}
-
-.turnchip__copy--muted {
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.turnchip__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  flex-shrink: 0;
-}
-
-.turnchip--mine {
-  border-color: rgba(200, 160, 74, 0.4);
-  background: rgba(200, 160, 74, 0.08);
-  color: var(--gold-pale);
-}
-
-.turnchip--mine .turnchip__dot {
-  background: var(--gold-bright);
-  box-shadow: 0 0 0 3px rgba(232, 200, 119, 0.16);
-  animation: beacon 2.4s ease-in-out infinite;
-}
-
-.turnchip--alarm {
-  border-color: rgba(180, 64, 90, 0.5);
-  background: rgba(180, 64, 90, 0.12);
-  color: var(--crimson-soft);
-}
-
-.turnchip--alarm .turnchip__dot {
-  background: var(--crimson-soft);
-  animation: beacon 1.2s ease-in-out infinite;
-}
-
-.turnchip__sep {
-  width: 1px;
-  height: 13px;
-  background: var(--line-cold);
-}
-
 /* Icon buttons in the bar */
 .iconbtn {
   display: inline-flex;
@@ -1438,14 +1375,23 @@
   width: 100%;
 }
 
+/* Кнопки лежат на сукне, а не на панели, поэтому им нужна своя подложка:
+   тонировки кнопок держатся на 16–24% альфы и на светлом зелёном просто
+   растворяются. Заодно ряд читается как физическая планка над рукой — и
+   выглядит роднёй полоске вето, которая встаёт на это же место. */
 .handbar__row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-cold);
+  background: linear-gradient(180deg, rgba(16, 21, 32, 0.94) 0%, rgba(8, 11, 18, 0.96) 100%);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
 }
 
 .handbar__row .btn {
-  min-width: 168px;
+  min-width: 156px;
 }
 
 /* --- Полоска окна вето --- */
@@ -1759,16 +1705,6 @@
   font-weight: 500;
   color: var(--text-dim);
   line-height: 1.25;
-}
-
-.btn__key {
-  padding: 0 5px;
-  border-radius: 3px;
-  border: 1px solid var(--line-cold);
-  background: rgba(0, 0, 0, 0.4);
-  font-size: 0.64rem;
-  font-weight: 700;
-  color: var(--text-muted);
 }
 
 .btn--gold {

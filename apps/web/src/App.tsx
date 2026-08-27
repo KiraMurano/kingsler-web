@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickViewer } from './lib/viewer';
-import { idOf } from '@kinglier/engine/cardInstance';
 import { useToast } from './lib/toast';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -35,12 +34,6 @@ import type { CardId, GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './components/targeting';
 import type { Account } from './auth/AuthClient';
 
-interface Status {
-  text: string;
-  tone: 'idle' | 'mine' | 'alarm';
-  hint?: string;
-}
-
 export default function App({
   mode,
   account,
@@ -63,7 +56,6 @@ export default function App({
     revealOutcome,
     duelOutcome,
     coronationCandidateId,
-    coronationOriginId,
     viewerId,
     startGame,
     performAction,
@@ -76,7 +68,6 @@ export default function App({
     targetDeclareDuel,
     attackerRetreatDuel,
     attackerAcceptDuel,
-    endTurn,
     turnSubPhase,
     pendingDoubtDoubterId,
     pendingDoubtPassedIds,
@@ -101,7 +92,6 @@ export default function App({
       revealOutcome: s.revealOutcome,
       duelOutcome: s.duelOutcome,
       coronationCandidateId: s.coronationCandidateId,
-      coronationOriginId: s.coronationOriginId,
       viewerId: s.viewerId,
       startGame: s.startGame,
       performAction: s.performAction,
@@ -114,7 +104,6 @@ export default function App({
       targetDeclareDuel: s.targetDeclareDuel,
       attackerRetreatDuel: s.attackerRetreatDuel,
       attackerAcceptDuel: s.attackerAcceptDuel,
-      endTurn: s.endTurn,
       turnSubPhase: s.turnSubPhase,
       pendingDoubtDoubterId: s.pendingDoubtDoubterId,
       pendingDoubtPassedIds: s.pendingDoubtPassedIds,
@@ -334,116 +323,30 @@ export default function App({
     showToast(`Сейчас распоряжается ${activePlayer?.name ?? 'другой придворный'}`);
   };
 
+  /* Единственная клавиша, которую знает игра. Всё остальное делается мышью:
+     подсказки клавиш занимали место на каждой кнопке и не использовались. */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if (e.key === 'Escape') {
-        setNormalActionsOpen(false);
-        setRoleClaimOpen(false);
-        setRulesOpen(false);
-        setCodexOpen(false);
-        setChronicleOpen(false);
-        setInspectedCard(null);
-        setPendingTarget(null);
-        setRedirectCardId(null);
-        return;
-      }
-
-      const overlayOpen = normalActionsOpen || roleClaimOpen || codexOpen || chronicleOpen || !!pendingTarget;
-
-      if (isMyTurn && !overlayOpen) {
-        if (e.key === '1') setNormalActionsOpen(true);
-        else if (e.key === '2') {
-          setStakedCardId(human?.hand[0]?.id ?? null);
-          setRoleClaimOpen(true);
-        } else if (e.code === 'Space') {
-          e.preventDefault();
-          endTurn();
-        }
-      }
-
-      if (!human) return;
-
-      if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== human.id) {
-        const key = e.key.toLowerCase();
-        if (key === 'd' || key === 'в') doubtAction(human.id);
-        else if (key === 'v' || key === 'м') passDoubt(human.id);
-      }
-
-      if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
-        if (e.key === '1') targetAcceptAttack(human.id);
-        else if (e.key === '2') targetDoubtAttack(human.id);
-        else if (e.key === '3') {
-          const shield = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-          const shieldId = idOf(human.hand, shield) ?? human.hand[0]?.id;
-          if (shieldId) targetDeclareDuel(human.id, shieldId);
-        }
-      }
-
-      if (turnPhase === 'DUEL_ATTACKER_WINDOW' && pendingAction?.actorId === human.id) {
-        if (e.key === '1') attackerRetreatDuel(human.id);
-        else if (e.key === '2') attackerAcceptDuel(human.id);
-      }
+      setNormalActionsOpen(false);
+      setRoleClaimOpen(false);
+      setRulesOpen(false);
+      setCodexOpen(false);
+      setChronicleOpen(false);
+      setInspectedCard(null);
+      setPendingTarget(null);
+      setRedirectCardId(null);
     };
-
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [
-    isMyTurn,
-    normalActionsOpen,
-    roleClaimOpen,
-    codexOpen,
-    chronicleOpen,
-    pendingTarget,
-    turnPhase,
-    pendingAction,
-    human,
-    endTurn,
-    doubtAction,
-    passDoubt,
-    targetAcceptAttack,
-    targetDoubtAttack,
-    targetDeclareDuel,
-    attackerRetreatDuel,
-    attackerAcceptDuel
-  ]);
+  }, []);
 
   if (players.length === 0 || !human) {
     return <div className="booting">СОЗЫВ ДВОРА</div>;
   }
 
-  const status: Status = (() => {
-    if (coronationCandidateId) {
-      const candidate = players.find(p => p.id === coronationCandidateId);
-      const origin = players.find(p => p.id === coronationOriginId);
-      return {
-        text: `Круг коронации: ${candidate?.name}`,
-        tone: 'alarm',
-        hint: origin ? `до хода ${origin.name}` : 'сбейте влияние до конца круга'
-      };
-    }
-    switch (turnPhase) {
-      case 'TARGET_REACTION_WINDOW': {
-        const victim = players.find(p => p.id === pendingAction?.targetId);
-        return { text: 'Целевая атака', tone: 'alarm', hint: `${victim?.name} выбирает защиту` };
-      }
-      case 'DUEL_ATTACKER_WINDOW':
-        return { text: 'Вызов на дуэль', tone: 'alarm', hint: `${activePlayer?.name} решает судьбу` };
-      case 'DOUBT_WINDOW':
-        return {
-          text: 'Окно сомнений',
-          tone: 'alarm',
-          hint: `заявлено «${pendingAction?.roleClaim}»`
-        };
-      case 'VETO_WINDOW':
-        return { text: 'Окно вето', tone: 'alarm', hint: 'последний шанс остановить эффект' };
-      default:
-        return isMyTurn
-          ? { text: 'Ваш ход', tone: 'mine', hint: 'разыграйте карту или действие' }
-          : { text: `Ход: ${activePlayer?.name ?? '—'}`, tone: 'idle', hint: 'придворный думает' };
-    }
-  })();
+
 
   const isTargetReaction =
     turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id;
@@ -500,9 +403,6 @@ export default function App({
   return (
     <div className="app">
       <TopBar
-        statusText={status.text}
-        statusTone={status.tone}
-        hint={status.hint}
         codexOpen={codexOpen}
         chronicleOpen={chronicleOpen}
         onOpenCodex={() => setCodexOpen(true)}
