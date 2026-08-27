@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import type { GameCard, Player } from './types.ts';
 import { mintDeck } from './cardInstance.ts';
 import { useGameStore } from './GameStore.ts';
-import { ACTION_HOLD_MS } from './timing.ts';
+import { ACTION_HOLD_MS, VETO_WINDOW_MS } from './timing.ts';
 
 function bot(id: string, hand: GameCard[]): Player {
   return {
@@ -64,7 +64,7 @@ useGameStore.getState().endTurnManually();
 assert.notEqual(useGameStore.getState().activePlayerId, humanId, 'end turn should now succeed');
 
 // --- 2. Role action ("Наследник") — same guarantee through DOUBT_WINDOW,
-//     the no-veto-holder fast path, and the deferred effect application. ---
+//     the veto window that follows it, and the deferred effect application. ---
 useGameStore.getState().startGame();
 useGameStore.setState({
   players: [
@@ -86,8 +86,12 @@ useGameStore.getState().performAction({
 });
 assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW');
 
-useGameStore.getState().passDoubt('p1'); // no bot can doubt (0 tokens) -> proceeds to resolve
-assert.equal(useGameStore.getState().turnPhase, 'IDLE', 'no veto holder: back to IDLE while effect is still pending');
+useGameStore.getState().passDoubt('p1'); // no bot can doubt (0 tokens) -> proceeds to the veto window
+assert.equal(
+  useGameStore.getState().turnPhase,
+  'VETO_WINDOW',
+  'the veto window opens even though nobody holds «Право вето»'
+);
 assert.ok(useGameStore.getState().pendingAction, 'pending action must still be in flight');
 
 const favorBeforeRole = useGameStore.getState().players.find(p => p.id === 'p1')!.favor;
@@ -96,7 +100,7 @@ assert.equal(favorBeforeRole, 0, 'the crown has not landed yet — role effect i
 useGameStore.getState().endTurnManually();
 assert.equal(useGameStore.getState().activePlayerId, 'p1', 'end turn must be blocked while the role effect is pending');
 
-await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS * 2 + 400));
+await new Promise(resolve => setTimeout(resolve, VETO_WINDOW_MS + ACTION_HOLD_MS * 2 + 400));
 
 assert.equal(useGameStore.getState().players.find(p => p.id === 'p1')!.favor, 1, 'the role effect must still land once resolved');
 assert.equal(useGameStore.getState().pendingAction, null);

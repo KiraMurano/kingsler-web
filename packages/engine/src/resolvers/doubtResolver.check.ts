@@ -10,7 +10,7 @@ import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
 import { executeRevealOutcome } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { ACTION_HOLD_MS } from '../timing.ts';
+import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing.ts';
 
 function human(id: string, hand: GameCard[]): Player {
   return {
@@ -82,11 +82,14 @@ assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW', 'a repeated pass
 useGameStore.getState().passDoubt('p3');
 assert.equal(
   useGameStore.getState().turnPhase,
-  'IDLE',
-  'every non-actor human has now passed (bot has 0 tokens) — the action resolves'
+  'VETO_WINDOW',
+  'every non-actor human has now passed (bot has 0 tokens) — the check is settled and the veto window opens'
 );
 
-// --- Same fairness fix for VETO_WINDOW's "Продолжить" (passVetoWindow). ---
+// --- The VETO_WINDOW belongs to the clock, not to a click. ---
+// There is no "Продолжить" any more: nobody — not even every non-actor human
+// together — can shorten the window, because a window that closes early is
+// itself a tell about who is holding what.
 useGameStore.getState().startGame();
 useGameStore.setState({
   players: [
@@ -112,22 +115,34 @@ useGameStore.setState({ pendingAction: vetoTestAction });
 useGameStore.getState()._triggerVetoWindowOrResolveEffect(vetoTestAction, false);
 assert.equal(useGameStore.getState().turnPhase, 'VETO_WINDOW');
 
-useGameStore.getState().passVetoWindow('p2');
+const openedDeadline = useGameStore.getState().vetoDeadlineAt;
+assert.ok(
+  openedDeadline !== null && openedDeadline - Date.now() > VETO_WINDOW_MS - 500,
+  'the window carries an absolute deadline roughly VETO_WINDOW_MS away'
+);
+
+await new Promise(resolve => setTimeout(resolve, 2500));
 assert.equal(
   useGameStore.getState().turnPhase,
   'VETO_WINDOW',
-  'p3 (who actually holds "Право вето") has not reacted yet — must not resolve on p2 alone'
+  'the window still runs — the old "a bot holds it" 2.2 s shortcut is gone'
+);
+assert.equal(
+  useGameStore.getState().vetoDeadlineAt,
+  openedDeadline,
+  'the deadline does not move once the window is open'
 );
 
-useGameStore.getState().passVetoWindow('p2'); // repeated click must not double-count
-assert.equal(useGameStore.getState().turnPhase, 'VETO_WINDOW', 'a repeated pass from the same player must not count twice');
-
-useGameStore.getState().passVetoWindow('p3');
-await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS + 200));
+await new Promise(resolve => setTimeout(resolve, VETO_WINDOW_MS - 2500 + ACTION_HOLD_MS + 300));
 assert.equal(
   useGameStore.getState().turnPhase,
   'IDLE',
-  'every non-actor human has passed — the action proceeds'
+  'the window runs out on its own and the action proceeds'
+);
+assert.equal(
+  useGameStore.getState().vetoDeadlineAt,
+  null,
+  'the deadline is cleared together with the window'
 );
 
 /* -------------------------------------------------------------------------

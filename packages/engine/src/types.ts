@@ -161,8 +161,6 @@ export interface GameState {
   isVaBanqueActive: boolean;
   isVetoed: boolean;
   isPendingActionAfterTruthChallenge?: boolean;
-  /** Ids of non-actor players who already clicked "Продолжить" in the current VETO_WINDOW — resolving requires every one of them, not just the first. */
-  pendingVetoPassedIds: string[];
   /** Абсолютный timestamp закрытия окна вето. `null` вне окна. */
   vetoDeadlineAt: number | null;
   
@@ -194,7 +192,6 @@ export interface GameState {
   playInstant: (playerId: string, instantType: InstantType, cardId: CardId, targetPlayerId?: string) => void;
   doubtAction: (doubterId: string) => void;
   passDoubt: (playerId: string) => void;
-  passVetoWindow: (playerId: string) => void;
   proceedAfterVetoWindow: () => void;
   
   // Duel methods for targeted attacks

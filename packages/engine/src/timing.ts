@@ -12,3 +12,13 @@ export const BOT_REACTION_JITTER_MS = 800;
 /** Bot considering a veto on a pending effect. */
 export const BOT_VETO_MS = 1400;
 export const BOT_VETO_JITTER_MS = 600;
+
+/**
+ * Окно вето. Открывается на каждое ветируемое действие, независимо от того,
+ * держит ли кто-то «Право вето»: пауза одинаковой длины предсказуема, а
+ * разная — читается как подсказка о чужих картах.
+ *
+ * Цена — 7 с к каждому действию. Это одно число: если в игре окажется долго,
+ * крутить здесь.
+ */
+export const VETO_WINDOW_MS = 7000;

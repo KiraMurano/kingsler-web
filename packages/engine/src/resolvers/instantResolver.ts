@@ -106,6 +106,9 @@ export function playInstant(
 
     if (get().turnPhase === 'VETO_WINDOW') {
       timerManager.clearAll();
+      /* Полоска обязана исчезнуть в тот же кадр, что и решение: она
+         отсчитывала время на решение, которое уже принято. */
+      set({ vetoDeadlineAt: null });
       timerManager.scheduleDelay(() => {
         get().proceedAfterVetoWindow();
       }, ACTION_HOLD_MS);

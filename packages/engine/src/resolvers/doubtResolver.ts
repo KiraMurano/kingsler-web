@@ -1,11 +1,11 @@
 import type { Action, GameState, RevealOutcome } from '../types';
 import { isRole } from '../cards';
-import { byId, holds, pluck } from '../cardInstance';
+import { byId, pluck } from '../cardInstance';
 import { accOf, verbCaught, verbDoubted } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { ACTION_HOLD_MS } from '../timing';
+import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing';
 import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
 import { resolveInstantEffect } from './instantResolver';
 import { beginCoronationIfNeeded } from './coronation';
@@ -359,7 +359,7 @@ export function triggerVetoWindowOrResolveEffect(
   isAfterTruthChallenge = false
 ): void {
   timerManager.clearAll();
-  const { isVetoed, players } = get();
+  const { isVetoed } = get();
 
   if (action.cannotBeVetoed) {
     get()._resolvePendingActionEffect(action, isAfterTruthChallenge);
@@ -377,42 +377,21 @@ export function triggerVetoWindowOrResolveEffect(
     return;
   }
 
-  // Check if any opponent holds Royal Veto (free instant, 0 ⚡). Any connected
-  // human needs the manual VETO_WINDOW to react in — not just "the first
-  // non-bot player" (with 2+ humans, that used to skip straight to the
-  // bot-timer path whenever the *other* human, not the first one, held it).
-  const humanHoldsVeto = players.some(p => !p.isBot && p.id !== action.actorId && holds(p.hand, 'Право вето'));
-  const botHoldsVeto = players.some(p => p.isBot && p.id !== action.actorId && holds(p.hand, 'Право вето'));
-
-  if (humanHoldsVeto) {
-    set({
-      turnPhase: 'VETO_WINDOW',
-      pendingVetoPassedIds: [],
-      timerSeconds: 0,
-      timerMaxSeconds: 0,
-      isPendingActionAfterTruthChallenge: isAfterTruthChallenge
-    });
-  } else if (botHoldsVeto) {
-    set({
-      turnPhase: 'VETO_WINDOW',
-      pendingVetoPassedIds: [],
-      timerSeconds: 0,
-      timerMaxSeconds: 0,
-      isPendingActionAfterTruthChallenge: isAfterTruthChallenge
-    });
-    timerManager.scheduleDelay(() => {
-      if (get().turnPhase === 'VETO_WINDOW' && !get().isVetoed) {
-        get().proceedAfterVetoWindow();
-      }
-    }, 2200);
-  } else {
-    set({
-      turnPhase: 'IDLE'
-    });
-    timerManager.scheduleDelay(() => {
-      get()._resolvePendingActionEffect(action, isAfterTruthChallenge);
-    }, 800);
-  }
+  // The window opens on every vetoable action, whoever holds «Право вето» and
+  // whether anyone holds it at all. The length of the pause used to depend on
+  // that — instant when nobody had one, 2.2 s for a bot, open-ended for a
+  // human — and a pause of a telling length is a tell: the court could read
+  // the other players' hands off the clock. One fixed window says nothing.
+  set({
+    turnPhase: 'VETO_WINDOW',
+    vetoDeadlineAt: Date.now() + VETO_WINDOW_MS,
+    timerSeconds: 0,
+    timerMaxSeconds: 0,
+    isPendingActionAfterTruthChallenge: isAfterTruthChallenge
+  });
+  timerManager.scheduleDelay(() => {
+    if (get().turnPhase === 'VETO_WINDOW') proceedAfterVetoWindow(get, set);
+  }, VETO_WINDOW_MS);
 }
 
 export function resolvePendingActionEffect(
@@ -440,35 +419,6 @@ export function resolvePendingActionEffect(
   get()._resolveRoleActionEffect(action, isAfterTruthChallenge);
 }
 
-/**
- * UI-facing "Продолжить" click. Online games can seat several real humans
- * in the same VETO_WINDOW, so — same fix as passDoubt — one player's click
- * must not let the effect through on behalf of everyone else who hasn't
- * reacted yet. `proceedAfterVetoWindow` below stays the low-level resolver
- * (also called directly by the bot-only auto-continue timer).
- */
-export function passVetoWindow(
-  get: StateGetter,
-  set: StateSetter,
-  playerId: string
-): void {
-  const { turnPhase, pendingAction, players, pendingVetoPassedIds } = get();
-  if (turnPhase !== 'VETO_WINDOW' || !pendingAction) return;
-
-  const passer = players.find(p => p.id === playerId);
-  if (!passer || pendingVetoPassedIds.includes(playerId)) return;
-
-  const passedIds = [...pendingVetoPassedIds, playerId];
-  set({ pendingVetoPassedIds: passedIds });
-
-  const stillAwaitingHuman = players.some(
-    p => !p.isBot && p.id !== pendingAction.actorId && !passedIds.includes(p.id)
-  );
-  if (stillAwaitingHuman) return;
-
-  proceedAfterVetoWindow(get, set);
-}
-
 export function proceedAfterVetoWindow(
   get: StateGetter,
   set: StateSetter
@@ -476,6 +426,7 @@ export function proceedAfterVetoWindow(
   timerManager.clearAll();
   const { turnPhase, pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
   if (!pendingAction) {
+    set({ vetoDeadlineAt: null });
     get()._checkEndgameAndAdvanceTurn();
     return;
   }
@@ -489,7 +440,7 @@ export function proceedAfterVetoWindow(
   // re-entered here, pushing an already-landed plot card into the discard
   // while its instance also sat in the plot slot.
   if (turnPhase !== 'VETO_WINDOW') return;
-  set({ turnPhase: 'IDLE' });
+  set({ turnPhase: 'IDLE', vetoDeadlineAt: null });
 
   if (isVetoed) {
     set(state => ({

@@ -18,11 +18,11 @@ import { playInstant } from './instantResolver.ts';
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import {
   triggerVetoWindowOrResolveEffect,
-  passVetoWindow,
   proceedAfterVetoWindow,
   resolvePendingActionEffect
 } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
+import { VETO_WINDOW_MS } from '../timing.ts';
 import { assertCardCensus } from './cardCensus.check.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
@@ -67,7 +67,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     pendingAction: null as Action | null,
     pendingDoubtDoubterId: null as string | null,
     pendingDoubtPassedIds: [] as string[],
-    pendingVetoPassedIds: [] as string[],
+    vetoDeadlineAt: null as number | null,
     hasUsedNormalActionThisTurn: false,
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
@@ -145,12 +145,13 @@ function lateBotVetoTimerFires(
   assertCardCensus(api, allIds, 'before the plot is played');
 
   playPlotAction(get, set, 'Королевский приём', plotCardId);
-  assert.equal(api.turnPhase, 'VETO_WINDOW', 'a human holds «Право вето», so the window opens');
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'the window opens on every vetoable action');
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null, 'the plot has not landed yet');
   assertCardCensus(api, allIds, 'while the veto window is open');
 
-  // The only non-actor human passes — the window is settled.
-  passVetoWindow(get, set, 'p2');
+  // The window runs out — exactly what the engine's own timer calls. (Case 4
+  // below waits out the real VETO_WINDOW_MS; here the subject is the late bot.)
+  proceedAfterVetoWindow(get, set);
   assert.equal(
     api.players.find(p => p.id === 'p1')!.activePlot?.type,
     'Королевский приём',
@@ -205,7 +206,7 @@ function lateBotVetoTimerFires(
 
   playPlotAction(get, set, 'Королевский приём', plotCardId);
   assert.equal(api.turnPhase, 'VETO_WINDOW');
-  passVetoWindow(get, set, 'p2');
+  proceedAfterVetoWindow(get, set);
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot?.type, 'Королевский приём');
 
   // A stale timer fires after the window resolved, with `isVetoed` already
@@ -258,6 +259,55 @@ function lateBotVetoTimerFires(
     'the vetoed plot card goes to the discard exactly once'
   );
   assertCardCensus(api, allIds, 'after a successful veto');
+
+  timerManager.clearAll();
+}
+
+// 4. Окно вето открывается ВСЕГДА — даже когда «Права вето» нет ни у кого на
+//    руках — и закрывается само ровно через VETO_WINDOW_MS. Раньше в этом
+//    случае эффект применялся через 800 мс и окна не было вовсе; разная длина
+//    паузы читалась как подсказка о чужих картах.
+{
+  const actorHand = mint(['Королевский приём', 'Наследник']);
+  const humanHand = mint(['Шут', 'Казначей']);
+  const botHand = mint(['Вор', 'Рыцарь']);
+  const deck = mint(['Наследник', 'Казначей']);
+  const plotCardId: CardId = actorHand[0].id;
+  const allIds = [...actorHand, ...humanHand, ...botHand, ...deck].map(c => c.id);
+
+  const { get, set, api } = makeHarness({
+    activePlayerId: 'p1',
+    deck,
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: actorHand }),
+      player({ id: 'p2', name: 'Виктор', hand: humanHand }),
+      player({ id: 'p3', name: 'Борис', isBot: true, hand: botHand })
+    ]
+  });
+
+  playPlotAction(get, set, 'Королевский приём', plotCardId);
+
+  assert.equal(
+    api.turnPhase,
+    'VETO_WINDOW',
+    'окно открывается и без «Права вето» на руках — пауза одинакова всегда'
+  );
+  assert.ok(
+    api.vetoDeadlineAt !== null && api.vetoDeadlineAt - Date.now() > VETO_WINDOW_MS - 500,
+    'дедлайн — абсолютный timestamp примерно через 7 с'
+  );
+  assert.equal(
+    api.players.find(p => p.id === 'p1')!.activePlot,
+    null,
+    'интрига не легла, пока окно открыто'
+  );
+  assertCardCensus(api, allIds, 'пока окно вето открыто');
+
+  await new Promise(r => setTimeout(r, VETO_WINDOW_MS + 300));
+
+  assert.notEqual(api.turnPhase, 'VETO_WINDOW', 'окно закрывается само');
+  assert.equal(api.vetoDeadlineAt, null, 'дедлайн снят вместе с окном');
+  assertCardCensus(api, allIds, 'после закрытия окна вето');
 
   timerManager.clearAll();
 }

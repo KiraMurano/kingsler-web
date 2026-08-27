@@ -13,14 +13,14 @@ const ACTIVE_PLAYER_ONLY_ACTIONS = new Set([
 ]);
 
 const SELF_ONLY_ACTIONS = new Set([
-  'doubtAction', 'passDoubt', 'passVetoWindow', 'targetAcceptAttack', 'targetDoubtAttack',
+  'doubtAction', 'passDoubt', 'targetAcceptAttack', 'targetDoubtAttack',
   'targetDeclareDuel', 'attackerRetreatDuel', 'attackerAcceptDuel',
   'activateConspiracy', 'playInstant'
 ]);
 
 const UNRESTRICTED_ACTIONS = new Set([
   'closeDuelOutcome', 'closeInformantPeek', 'closeRevealOutcome',
-  'proceedAfterVetoWindow', 'closeConspiracyDialog'
+  'closeConspiracyDialog'
 ]);
 
 interface ActionMessage {
