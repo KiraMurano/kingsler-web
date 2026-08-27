@@ -1530,6 +1530,75 @@
   color: var(--crimson-soft);
 }
 
+/* --- Меню над картой --- */
+.cardmenu {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  translate: -50% 0;
+  z-index: calc(var(--z-tabled) + 20);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 176px;
+  padding: 7px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-mid);
+  background: linear-gradient(180deg, rgba(24, 30, 44, 0.97) 0%, rgba(12, 16, 24, 0.98) 100%);
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.72);
+}
+
+/* Обёртка подсказки блочная, иначе пункт внутри неё теряет ширину. */
+.cardmenu .tt {
+  display: flex;
+}
+
+.cardmenu__item {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-cold);
+  background: linear-gradient(180deg, rgba(30, 38, 54, 0.95) 0%, rgba(16, 21, 31, 0.96) 100%);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
+    color 0.16s var(--ease-out);
+}
+
+.cardmenu__item:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(42, 52, 72, 0.96) 0%, rgba(24, 31, 44, 0.97) 100%);
+  border-color: var(--gold);
+  color: var(--gold-pale);
+}
+
+.cardmenu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cardmenu__item--danger:hover:not(:disabled) {
+  border-color: var(--crimson);
+  color: #ffc9d5;
+}
+
+.cardmenu__item--good:hover:not(:disabled) {
+  border-color: var(--sage-soft);
+  color: #cdeadf;
+}
+
+.cardmenu__item--arcane:hover:not(:disabled) {
+  border-color: #8b7ad8;
+  color: #d5cdf5;
+}
+
 /* --- Hand: the two hero cards --- */
 .hand {
   position: relative;
@@ -1605,21 +1674,6 @@
   transform: translateY(-14px);
   border-color: var(--frame-bright, var(--gold-bright));
   box-shadow: 0 26px 48px rgba(0, 0, 0, 0.8), 0 0 30px var(--frame-glow, rgba(232, 200, 119, 0.4));
-}
-
-.handcard__hint {
-  position: absolute;
-  top: 9px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(180, 64, 90, 0.95);
-  color: #fff;
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
 }
 
 /* --- Правая колонка: что происходит --- */

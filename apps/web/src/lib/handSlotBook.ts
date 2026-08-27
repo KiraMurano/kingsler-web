@@ -102,3 +102,24 @@ export function reconcileSlots(prev: SlotBook, players: readonly SlotSeat[]): Sl
 
   return sameBook(prev, next) ? prev : next;
 }
+
+/**
+ * Какая карта держит этот слот.
+ *
+ * Обратный поиск по книге: она хранит «карта → слот», а руке нужно «слот →
+ * карта». Считать по `player.hand[slot]` нельзя ровно по той же причине, по
+ * которой заведена сама книга — движок держит руку сжатой, и индекс в массиве
+ * слотом не является.
+ */
+export function cardInSlot(
+  book: SlotBook,
+  playerId: string,
+  slot: Slot
+): CardId | undefined {
+  const own = book[playerId];
+  if (!own) return undefined;
+  for (const [cardId, held] of Object.entries(own)) {
+    if (held === slot) return cardId;
+  }
+  return undefined;
+}

@@ -8,7 +8,7 @@ import {
   TOTAL_INSTANTS_COUNT,
   TOTAL_DECK_SIZE
 } from '@kinglier/engine/cards';
-import type { CardId, ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
+import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
 import { courtly } from '../lib/text';
 import { pickViewer } from '../lib/viewer';
 import { Dialog } from './ui/Overlay';
@@ -165,83 +165,15 @@ function ConspiracyDialog({
   );
 }
 
-function RedirectChoiceDialog({
-  attackerName,
-  roleClaim,
-  onRedirect,
-  onBluffDuel,
-  onClose
-}: {
-  attackerName: string;
-  roleClaim: string;
-  onRedirect: () => void;
-  onBluffDuel: () => void;
-  onClose: () => void;
-}) {
-  const shield = roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-
-  return (
-    <Dialog
-      open
-      onClose={onClose}
-      width={520}
-      title="Как использовать «Перенаправление»?"
-      description={`${attackerName} атакует вас ролью «${roleClaim}»`}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-        <button type="button" className="opt" onClick={onRedirect}>
-          <div className="opt__row">
-            <span className="opt__name">Разыграть как инстант</span>
-            <Tag tone="gold">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                0 <UiIcon kind="move" size="xs" />
-              </span>
-            </Tag>
-          </div>
-          <div className="opt__desc">
-            Нападение уходит на другого придворного — защищаться будет он.
-          </div>
-        </button>
-
-        <button type="button" className="opt" onClick={onBluffDuel}>
-          <div className="opt__row">
-            <span className="opt__name">Выставить на дуэль как блеф</span>
-            <Tag tone="bluff">щит «{shield}»</Tag>
-          </div>
-          <div className="opt__desc">
-            Карта ляжет взакрытую. Если атакующий примет вызов, блеф раскроется.
-          </div>
-        </button>
-
-        <Button tone="bare" block onClick={onClose}>
-          Вернуться к выбору защиты
-        </Button>
-      </div>
-    </Dialog>
-  );
-}
-
 interface ModalsProps {
   showRules: boolean;
   onCloseRules: () => void;
-  redirectCardId: CardId | null;
-  onCloseRedirect: () => void;
-  onRedirectAsInstant: (cardId: CardId) => void;
-  onRedirectAsDuelBluff: (cardId: CardId) => void;
 }
 
-export const Modals: React.FC<ModalsProps> = ({
-  showRules,
-  onCloseRules,
-  redirectCardId,
-  onCloseRedirect,
-  onRedirectAsInstant,
-  onRedirectAsDuelBluff
-}) => {
+export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
   const {
     players,
     viewerId,
-    pendingAction,
     informantPeekData,
     conspiracyPrompt,
     closeInformantPeek,
@@ -254,7 +186,6 @@ export const Modals: React.FC<ModalsProps> = ({
     useShallow(s => ({
       players: s.players,
       viewerId: s.viewerId,
-      pendingAction: s.pendingAction,
       informantPeekData: s.informantPeekData,
       conspiracyPrompt: s.conspiracyPrompt,
       closeInformantPeek: s.closeInformantPeek,
@@ -268,19 +199,6 @@ export const Modals: React.FC<ModalsProps> = ({
 
   const human = pickViewer(players, viewerId);
   if (!human) return null;
-
-  if (redirectCardId !== null && pendingAction) {
-    const attacker = players.find(p => p.id === pendingAction.actorId);
-    return (
-      <RedirectChoiceDialog
-        attackerName={attacker?.name ?? 'Нападающий'}
-        roleClaim={pendingAction.roleClaim ?? 'атака'}
-        onRedirect={() => onRedirectAsInstant(redirectCardId)}
-        onBluffDuel={() => onRedirectAsDuelBluff(redirectCardId)}
-        onClose={onCloseRedirect}
-      />
-    );
-  }
 
   // conspiracyPrompt isn't redacted per-viewer (unlike informantPeekData) — it's
   // broadcast to everyone, so only render it for the player it actually

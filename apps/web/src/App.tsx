@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickViewer } from './lib/viewer';
-import { useToast } from './lib/toast';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
@@ -30,7 +29,9 @@ import type { SlotBook } from './lib/handSlotBook.ts';
 import type { CardInteraction } from './motion/CardLayer.tsx';
 import type { PlacedCard } from './motion/zones.ts';
 import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
-import type { CardId, GameCard } from '@kinglier/engine/types';
+import type { CardId, GameCard, InstantType, PlotType, Role } from '@kinglier/engine/types';
+import { CARD_DESCRIPTIONS, isInstant, isPlot } from '@kinglier/engine/data/cardDescriptions';
+import type { CardMenuKind } from './lib/tableView.ts';
 import type { PendingTargetAction } from './components/targeting';
 import type { Account } from './auth/AuthClient';
 
@@ -118,16 +119,13 @@ export default function App({
   );
 
   const [normalActionsOpen, setNormalActionsOpen] = useState(false);
-  const [roleClaimOpen, setRoleClaimOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [codexOpen, setCodexOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
-  const [vaBanqueCombo, setVaBanqueCombo] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
-  const [stakedCardId, setStakedCardId] = useState<CardId | null>(null);
-  const [redirectCardId, setRedirectCardId] = useState<CardId | null>(null);
-  const showToast = useToast();
+  const [openMenuCardId, setOpenMenuCardId] = useState<CardId | null>(null);
+  const [bluffCardId, setBluffCardId] = useState<CardId | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   useEffect(() => {
@@ -149,7 +147,6 @@ export default function App({
   }, [mode]);
 
   const human = pickViewer(players, mode === 'online' ? viewerId : undefined);
-  const activePlayer = players.find(p => p.id === activePlayerId);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
 
   /* Which hand slot each held card owns. The engine keeps `hand` compact, so
@@ -312,30 +309,102 @@ export default function App({
     setPendingTarget(null);
   };
 
+  /* Клик по своей карте только раскрывает меню — играет уже пункт меню.
+     Повторный клик по той же карте закрывает: карта сама себе переключатель. */
   const handleCardClick = (cardId: CardId) => {
+    setOpenMenuCardId(current => (current === cardId ? null : cardId));
+  };
+
+  /** «Разыграть» — карта играется тем, что она есть, без заявки чужой роли. */
+  const playAtFaceValue = (cardId: CardId, card: GameCard) => {
+    if (!human) return;
+
+    if (view.phase === 'under-attack' && card === 'Перенаправление') {
+      setPendingTarget({
+        type: 'instant',
+        name: 'Перенаправление',
+        instantType: 'Перенаправление',
+        isInstantDirect: true,
+        stakedCardId: cardId,
+        cost: 0
+      });
+      return;
+    }
+    if (isPlot(card)) {
+      if (card === 'Досье') {
+        setPendingTarget({
+          type: 'plot',
+          name: 'Досье',
+          cost: 0,
+          isPlotDirect: true,
+          plotType: 'Досье',
+          stakedCardId: cardId
+        });
+      } else {
+        playPlotAction(card as PlotType, cardId);
+      }
+      return;
+    }
+    if (isInstant(card)) {
+      setPendingTarget({
+        type: 'instant',
+        name: card,
+        cost: 0,
+        isInstantDirect: true,
+        instantType: card as InstantType,
+        stakedCardId: cardId
+      });
+      return;
+    }
+
+    const info = CARD_DESCRIPTIONS[card];
+    if (info.targeted) {
+      setPendingTarget({
+        type: 'role',
+        name: card,
+        roleClaim: card as Role,
+        stakedCardId: cardId,
+        cost: info.cost
+      });
+      return;
+    }
+    performAction({
+      type: 'role',
+      name: card,
+      roleClaim: card as Role,
+      stakedCardId: cardId,
+      actorId: human.id,
+      withVaBanque: false,
+      costGold: info.cost,
+      costTokens: 1,
+      description: info.fullDescription
+    });
+  };
+
+  const pickCardAction = (cardId: CardId, kind: CardMenuKind) => {
     if (!human) return;
     const card = human.hand.find(held => held.id === cardId)?.card;
+    setOpenMenuCardId(null);
     if (!card) return;
 
-    if (turnPhase === 'VETO_WINDOW' && card === 'Право вето') {
-      playInstant(human.id, 'Право вето', cardId);
-      return;
+    switch (kind) {
+      case 'inspect':
+        setInspectedCard(card);
+        break;
+      case 'bluff':
+        setBluffCardId(cardId);
+        break;
+      case 'veto':
+        playInstant(human.id, 'Право вето', cardId);
+        break;
+      case 'duel-shield':
+      case 'duel-bluff':
+        targetDeclareDuel(human.id, cardId);
+        break;
+      case 'play':
+        playAtFaceValue(cardId, card);
+        break;
     }
-
-    if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === human.id) {
-      if (card === 'Перенаправление') setRedirectCardId(cardId);
-      else targetDeclareDuel(human.id, cardId);
-      return;
-    }
-
-    if (isMyTurn) {
-      setVaBanqueCombo(false);
-      setStakedCardId(cardId);
-      setRoleClaimOpen(true);
-      return;
-    }
-
-    showToast(`Сейчас распоряжается ${activePlayer?.name ?? 'другой придворный'}`);
   };
 
   /* Единственная клавиша, которую знает игра. Всё остальное делается мышью:
@@ -345,13 +414,13 @@ export default function App({
       if (e.key !== 'Escape') return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       setNormalActionsOpen(false);
-      setRoleClaimOpen(false);
+      setOpenMenuCardId(null);
+      setBluffCardId(null);
       setRulesOpen(false);
       setCodexOpen(false);
       setChronicleOpen(false);
       setInspectedCard(null);
       setPendingTarget(null);
-      setRedirectCardId(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -404,15 +473,9 @@ export default function App({
     onInspect: setInspectedCard,
     claimFor: claimedRoleFor,
     isOwnHand: isOwnHandCard,
-    isSelected: placed => roleClaimOpen && stakedCardId === placed.id,
+    isSelected: placed => openMenuCardId === placed.id,
     isPlayable: placed =>
       isOwnHandCard(placed) && (isMyTurn || isTargetReaction || vetoReady(placed.face.known)),
-    hintFor: placed => {
-      if (!isOwnHandCard(placed)) return undefined;
-      if (vetoReady(placed.face.known)) return 'вето';
-      if (isTargetReaction) return 'на дуэль';
-      return undefined;
-    }
   };
 
   return (
@@ -428,7 +491,7 @@ export default function App({
 
       <AnchorProvider>
         <CardInteractionProvider value={cardInteraction}>
-          <main className="app__stage">
+          <main className="app__stage" onPointerDown={() => setOpenMenuCardId(null)}>
             <div className="table">
               <div className="table__rim" />
               <SeatsRow
@@ -454,7 +517,13 @@ export default function App({
                 onInspectCard={setInspectedCard}
               />
 
-              <Hand player={human} />
+              <Hand
+                player={human}
+                slotBook={slotBook.current}
+                openCardId={openMenuCardId}
+                menus={view.menus}
+                onPick={pickCardAction}
+              />
 
               <div className="sidecol">
                 <ActionBar view={view} onAct={runBarAction} />
@@ -481,15 +550,8 @@ export default function App({
 
       <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
 
-      {roleClaimOpen && stakedCardId && (
-        <RoleClaimPopup
-          stakedCardId={stakedCardId}
-          initialWithVaBanque={vaBanqueCombo}
-          onClose={() => {
-            setRoleClaimOpen(false);
-            setVaBanqueCombo(false);
-          }}
-        />
+      {bluffCardId && (
+        <RoleClaimPopup stakedCardId={bluffCardId} onClose={() => setBluffCardId(null)} />
       )}
       {normalActionsOpen && (
         <NormalActionsPopup onClose={() => setNormalActionsOpen(false)} />
@@ -498,23 +560,6 @@ export default function App({
       <Modals
         showRules={rulesOpen}
         onCloseRules={() => setRulesOpen(false)}
-        redirectCardId={redirectCardId}
-        onCloseRedirect={() => setRedirectCardId(null)}
-        onRedirectAsInstant={cardId => {
-          setRedirectCardId(null);
-          setPendingTarget({
-            type: 'instant',
-            name: 'Перенаправление',
-            instantType: 'Перенаправление',
-            isInstantDirect: true,
-            stakedCardId: cardId,
-            cost: 0
-          });
-        }}
-        onRedirectAsDuelBluff={cardId => {
-          setRedirectCardId(null);
-          targetDeclareDuel(human.id, cardId);
-        }}
       />
 
       {mode === 'online' && connectionStatus !== 'connected' && (

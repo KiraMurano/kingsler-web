@@ -143,8 +143,6 @@ export interface CardInteraction {
   isOwnHand?: (placed: PlacedCard) => boolean;
   /** Is this card picked out right now, e.g. staked behind an open popup? */
   isSelected?: (placed: PlacedCard) => boolean;
-  /** Short label pinned to the card, e.g. «вето», «на дуэль». */
-  hintFor?: (placed: PlacedCard) => string | undefined;
 }
 
 const CardInteractionContext = createContext<CardInteraction>({});
@@ -622,7 +620,6 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const playable = !corner && (interaction.isPlayable?.(placed) ?? false);
   const own = !corner && (interaction.isOwnHand?.(placed) ?? false);
   const selected = !corner && (interaction.isSelected?.(placed) ?? false);
-  const hint = interaction.hintFor?.(placed);
 
   /**
    * What clicking this card opens.
@@ -763,7 +760,6 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
             </div>
           </motion.div>
         </div>
-        {hint && <span className="handcard__hint">{hint}</span>}
       </motion.div>
     </motion.div>
   );

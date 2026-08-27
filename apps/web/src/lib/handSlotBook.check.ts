@@ -10,7 +10,7 @@
  * Run: npx tsx apps/web/src/lib/handSlotBook.check.ts
  */
 import assert from 'node:assert/strict';
-import { reconcileSlots } from './handSlotBook.ts';
+import { cardInSlot, reconcileSlots } from './handSlotBook.ts';
 import type { SlotBook } from './handSlotBook.ts';
 
 /** A seat, as thin as `reconcileSlots` needs it. */
@@ -152,6 +152,20 @@ const EMPTY: SlotBook = {};
   const fixed = reconcileSlots(broken, [seat('p1', 'a', 'b')]);
   assert.equal(fixed.p1.a, 0, 'the first holder keeps the contested slot');
   assert.equal(fixed.p1.b, 1, 'the loser is re-seated as an arrival');
+}
+
+// Обратный поиск: рука спрашивает «кто в слоте», книга хранит «где карта».
+{
+  const book = reconcileSlots({}, [{ id: 'p1', hand: [{ id: 'a' }, { id: 'b' }] }]);
+  assert.equal(cardInSlot(book, 'p1', 0), 'a');
+  assert.equal(cardInSlot(book, 'p1', 1), 'b');
+
+  // Карта из слота 0 ушла — слот 1 не должен переехать, а слот 0 пустеет.
+  const после = reconcileSlots(book, [{ id: 'p1', hand: [{ id: 'b' }] }]);
+  assert.equal(cardInSlot(после, 'p1', 0), undefined, 'слот 0 опустел');
+  assert.equal(cardInSlot(после, 'p1', 1), 'b', 'соседка осталась на своём месте');
+
+  assert.equal(cardInSlot(book, 'нет-такого', 0), undefined);
 }
 
 console.log('handSlotBook.check: ok');

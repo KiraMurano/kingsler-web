@@ -88,6 +88,8 @@ export interface CardMenuOption {
   label: string;
   tone: Tone;
   disabled: boolean;
+  /** Что пункт сделает. Тултипом, как и у кнопок панели. */
+  hint: string;
   /** Стоит ли действие жетона ⚡ — см. `BarButton.spendsToken`. */
   spendsToken: boolean;
   /** Перечёркивать ли молнию — см. `BarButton.tokenBlocked`. */
@@ -153,6 +155,7 @@ export function shieldRoleFor(roleClaim: string | undefined): Role {
 function inspectOption(): CardMenuOption {
   return {
     kind: 'inspect',
+    hint: 'Открыть правило карты и её тактику',
     label: 'Подробнее',
     tone: 'calm',
     disabled: false,
@@ -184,6 +187,7 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
 
     options.push({
       kind: 'play',
+      hint: 'Сыграть карту тем, что она есть, — открыто и без блефа',
       label: 'Разыграть',
       tone: 'gold',
       disabled: !!reason,
@@ -200,6 +204,7 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
       : undefined;
   options.push({
     kind: 'bluff',
+    hint: 'Положить карту взакрытую и заявить любую роль двора',
     label: 'Блеф',
     tone: 'arcane',
     disabled: !!bluffReason,
@@ -222,6 +227,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
   if (card === 'Перенаправление') {
     options.push({
       kind: 'play',
+      hint: 'Перевести нападение на другого придворного. Защищаться будет он',
       label: 'Разыграть',
       tone: 'gold',
       disabled: false,
@@ -231,6 +237,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
     });
     options.push({
       kind: 'duel-bluff',
+      hint: 'Выставить карту как щит вслепую. Примут вызов — блеф раскроется',
       label: 'Дуэль: блеф',
       tone: 'danger',
       disabled: !hasTokens,
@@ -241,6 +248,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
   } else if (card === shield) {
     options.push({
       kind: 'duel-shield',
+      hint: 'Выставить настоящий щит: при вскрытии он остановит нападение',
       label: 'Дуэль: защита',
       tone: 'good',
       disabled: !hasTokens,
@@ -251,6 +259,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
   } else {
     options.push({
       kind: 'duel-bluff',
+      hint: 'Выставить карту как щит вслепую. Примут вызов — блеф раскроется',
       label: 'Дуэль: блеф',
       tone: 'danger',
       disabled: !hasTokens,
@@ -277,6 +286,7 @@ function menuFor(
     return [
       {
         kind: 'veto',
+        hint: 'Отменить готовящийся эффект. Карта уйдёт в сброс',
         label: 'Наложить вето',
         tone: 'danger',
         disabled: false,
