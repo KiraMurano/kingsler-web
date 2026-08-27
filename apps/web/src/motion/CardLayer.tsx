@@ -123,6 +123,15 @@ export interface CardInteraction {
   onActivate?: (cardId: CardId) => void;
   /** Open the card description modal. */
   onInspect?: (card: GameCard) => void;
+  /**
+   * What a card the viewer cannot read is *claiming* to be — the role a stake
+   * was played on, the claim each side of a duel is standing behind. It is the
+   * same word the claim badge under the card already prints, so it gives away
+   * nothing; it is what makes a face-down card on the table clickable at all,
+   * since there is no face to inspect. Returning the real face here would leak
+   * a bluff, which is the one thing this game cannot afford.
+   */
+  claimFor?: (placed: PlacedCard) => GameCard | undefined;
   /** May this card be acted on right now? Drives hover, press and cursor. */
   isPlayable?: (placed: PlacedCard) => boolean;
   /**
@@ -184,6 +193,32 @@ interface Plan {
 /** The two corners are anchors, not piles: a card at rest in one is not drawn. */
 function isCorner(kind: ZoneKind): boolean {
   return kind === 'deck' || kind === 'discard';
+}
+
+/**
+ * How high a scrutinised card rides. Above `ZONE_PRECEDENCE.overlay`, and by
+ * a margin, so nothing the catalog does with the `+ 1` transit bump can put an
+ * overlay back on top of a card the table is asking the court to read.
+ */
+const REVEALED_Z = ZONE_PRECEDENCE.overlay + 10;
+
+/**
+ * Where a card sits in the stack, at rest.
+ *
+ * Deliberately a *different* ordering from `ZONE_PRECEDENCE`, and the two must
+ * not be collapsed into one table. `ZONE_PRECEDENCE` answers «which rule owns
+ * this card» — it is what stops a staked card being drawn twice, and changing
+ * it would change which zone a card lands in. This answers «what does the
+ * player need to look at», which is a painting question with its own answer:
+ * an action played under Ва-банк keeps its instant in the `overlay` zone lying
+ * right across the stake, so when «не верю» turns the staked card over, the
+ * card being revealed is the one card on the table nobody can see. A card
+ * under scrutiny therefore rises above everything, its own overlay included,
+ * for as long as the table is showing it.
+ */
+function stackOrder(placed: PlacedCard): number {
+  if (placed.revealed && !isCorner(placed.zone.kind)) return REVEALED_Z;
+  return ZONE_PRECEDENCE[placed.zone.kind];
 }
 
 /** Where a card lies at rest, by what it is doing. */
@@ -349,6 +384,8 @@ interface Flight {
   /** Zone the current plan was made for, as a key and in full. */
   zone: string | null;
   zoneValue: Zone | null;
+  /** Kind of the zone this leg left, for the in-transit stacking bump. */
+  fromKind: ZoneKind;
   plan: Plan;
   /** Where the card waits out `plan.delayMs`. */
   parked: Vec | null;
@@ -381,7 +418,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const y = useMotionValue(0);
   const scale = useMotionValue(1);
   const opacity = useMotionValue(0);
-  const zIndex = useMotionValue(ZONE_PRECEDENCE[placed.zone.kind]);
+  const zIndex = useMotionValue(stackOrder(placed));
   const rotate = useMotionValue(restingRotation(placed.zone) ?? 0);
   const rotateY = useMotionValue(placed.face.known !== null ? 180 : 0);
 
@@ -400,6 +437,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
     target: null,
     zone: null,
     zoneValue: null,
+    fromKind: placed.zone.kind,
     plan: {
       move: spring.flight,
       moveX: spring.flight,
@@ -422,6 +460,12 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
     const base = getBase();
     const rect = rects.get(key);
 
+    /* Recomputed every frame rather than only on a zone change: a card can
+       rise in the stack without moving an inch — that is exactly what a reveal
+       under Ва-банк is — so the stacking order has to follow `revealed`, not
+       just `zone`. `drive` makes an unchanged value free. */
+    const resting = stackOrder(placed);
+
     /* 1. Where does this zone sit right now? A zone with no registered anchor
        leaves the last target standing; the card holds rather than teleports. */
     if (rect && base.width > 0) {
@@ -440,7 +484,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       drive(x, target.x);
       drive(y, target.y);
       drive(scale, target.scale);
-      drive(zIndex, ZONE_PRECEDENCE[placed.zone.kind]);
+      drive(zIndex, resting);
       animate(opacity, isCorner(placed.zone.kind) ? 0 : 1, {
         duration: reduce ? 0 : dur.fade
       });
@@ -480,12 +524,10 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       f.travel = Math.hypot(target.x - f.pos.x, target.y - f.pos.y);
       f.legAt = f.startAt;
       f.arrived = false;
-      /* Ride above both the zone left and the zone entered while in transit,
-         so a card crossing the table is never briefly behind one it passes. */
-      drive(
-        zIndex,
-        Math.max(ZONE_PRECEDENCE[previous.kind], ZONE_PRECEDENCE[placed.zone.kind]) + 1
-      );
+      /* Remembered so the card can ride above both the zone it left and the
+         zone it is entering for as long as it is in transit — a card crossing
+         the table is never briefly behind one it passes. Applied below. */
+      f.fromKind = previous.kind;
       if (plan.rotate !== null) {
         if (reduce) rotate.set(plan.rotate);
         else animate(rotate, plan.rotate, { ...spring.settle, delay: plan.delayMs / 1000 });
@@ -515,9 +557,9 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       f.pos = { ...target };
       f.vel.x.v = f.vel.y.v = f.vel.scale.v = 0;
       f.arrived = true;
-      drive(zIndex, ZONE_PRECEDENCE[placed.zone.kind]);
     }
 
+    drive(zIndex, f.arrived ? resting : Math.max(ZONE_PRECEDENCE[f.fromKind], resting) + 1);
     drive(x, f.pos.x);
     drive(y, f.pos.y);
     drive(scale, f.pos.scale);
@@ -581,7 +623,22 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const own = !corner && (interaction.isOwnHand?.(placed) ?? false);
   const selected = !corner && (interaction.isSelected?.(placed) ?? false);
   const hint = interaction.hintFor?.(placed);
-  const canInspect = !corner && !!interaction.onInspect && !!art;
+
+  /**
+   * What clicking this card opens.
+   *
+   * `placed.face.known`, deliberately, and never `art`: `art` falls back to
+   * the last face this node was *ever* allowed to show, which is right for
+   * painting the hidden side of a card mid-flip and catastrophically wrong
+   * here — a player staking their own card face-down would otherwise click it
+   * and be handed their own bluff's real identity, and a screen-share or a
+   * glance over a shoulder would give the table the same. When the face is
+   * hidden the card is inspected by what it *claims* to be instead.
+   */
+  const claimed = corner ? undefined : interaction.claimFor?.(placed);
+  const inspectable = placed.face.known ?? claimed;
+  const tip = inspectable ? CARD_INFO[inspectable] : undefined;
+  const canInspect = !corner && !!interaction.onInspect && !!inspectable;
   const interactive = own || canInspect;
   const lift = playable && !coarse && !reduce;
 
@@ -593,7 +650,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       interaction.onActivate(placed.id);
       return;
     }
-    if (art && interaction.onInspect) interaction.onInspect(art);
+    if (inspectable && interaction.onInspect) interaction.onInspect(inspectable);
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -661,7 +718,10 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
         onPointerLeave={releaseTilt}
         onPointerDown={releaseTilt}
         onClick={interactive ? onClick : undefined}
-        title={info ? `«${info.name}» — ${info.shortDescription}` : undefined}
+        /* The tooltip names whatever the click would open, for the same
+           reason: `info` is the art on the hidden side, `inspectable` is what
+           the viewer is entitled to read. */
+        title={tip ? `«${tip.name}» — ${tip.shortDescription}` : undefined}
       >
         {/* `.flip` is pure art treatment now — perspective, radius, border,
             shadow and `backface-visibility`. Size, entrance and the turn all

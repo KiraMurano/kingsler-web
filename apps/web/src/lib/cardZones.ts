@@ -2,11 +2,11 @@
  * Where every card is, derived from game state alone.
  *
  * `deriveCardZones` is the single source of truth for the card layer: given a
- * slice of the game state and the id of whoever is looking, it returns one
- * `PlacedCard` per card the table could need to draw, each in exactly one
- * zone. Nothing here touches React, the DOM or the store — the same state in
- * always yields the same placements out, which is what makes the motion layer
- * testable and interruptible.
+ * slice of the game state, the id of whoever is looking and the hand-slot book
+ * (see `handSlotBook.ts`), it returns one `PlacedCard` per card the table
+ * could need to draw, each in exactly one zone. Nothing here touches React,
+ * the DOM or the store — the same inputs always yield the same placements out,
+ * which is what makes the motion layer testable and interruptible.
  *
  * Two rules can want the same card at once: a role action stakes a card that
  * is still sitting in its owner's hand, and an instant is pushed into the
@@ -18,6 +18,7 @@ import type { GameCard, GameState } from '@kinglier/engine/types';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
 import { ZONE_PRECEDENCE } from '../motion/zones.ts';
 import type { Face, PlacedCard, Zone } from '../motion/zones.ts';
+import type { SlotBook } from './handSlotBook.ts';
 
 /** Exactly the part of the game state that placement depends on. */
 export type ZoneState = Pick<
@@ -67,7 +68,17 @@ function resolveOverlayCardId(
   return `overlay:${overlay.actorId}:${overlay.card}`;
 }
 
-export function deriveCardZones(state: ZoneState, viewerId: string): PlacedCard[] {
+/**
+ * @param slots Which visual slot each held card owns, from `reconcileSlots`.
+ *   Passing the book is what makes hand slots sticky; a seat the book does not
+ *   mention falls back to the array index, which is only ever right on the
+ *   very first render.
+ */
+export function deriveCardZones(
+  state: ZoneState,
+  viewerId: string,
+  slots: SlotBook = {}
+): PlacedCard[] {
   const {
     players,
     deck,
@@ -256,12 +267,15 @@ export function deriveCardZones(state: ZoneState, viewerId: string): PlacedCard[
     );
   }
 
-  /* 6. hand — array index is the slot. Identity is stable now, so no
-     name-matching reconciliation is needed; keeping a card in the slot it was
-     already drawn in is a layout concern for the anchor grid, not this. */
+  /* 6. hand — the slot comes from the book, never from the array index. The
+     engine keeps `hand` compact, so index 0 is simply "whichever card is left"
+     after a splice: reading the slot off it makes an untouched card slide
+     across when its neighbour is staked, and sends the end-of-turn refill to
+     the wrong side of the hand. `reconcileSlots` remembers instead. */
   for (const p of players) {
+    const book = slots[p.id];
     p.hand.forEach((held, index) => {
-      const slot: 0 | 1 = index === 0 ? 0 : 1;
+      const slot: 0 | 1 = book?.[held.id] ?? (index === 0 ? 0 : 1);
       claim(held.id, { kind: 'hand', playerId: p.id, slot }, faceFor(held.id, { ownerId: p.id }), p.id);
     });
   }

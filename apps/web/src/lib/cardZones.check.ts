@@ -12,6 +12,7 @@
 import assert from 'node:assert/strict';
 import { deriveCardZones } from './cardZones.ts';
 import type { ZoneState } from './cardZones.ts';
+import { reconcileSlots } from './handSlotBook.ts';
 import { zoneKey, ZONE_PRECEDENCE } from '../motion/zones.ts';
 import type { PlacedCard, Zone } from '../motion/zones.ts';
 import type { Action, GameCard, Player } from '@kinglier/engine/types';
@@ -213,10 +214,18 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     pendingAction: roleAction({ actorId: 'p1', stakedCardId: stakedId }),
     turnPhase: 'REVEAL_OUTCOME'
   });
-  const spliced = deriveCardZones(afterSplice, 'p1');
+  const splicedBook = reconcileSlots(
+    reconcileSlots({}, state.players),
+    afterSplice.players
+  );
+  const spliced = deriveCardZones(afterSplice, 'p1', splicedBook);
   assertUnique(spliced, 'stake/spliced');
   assert.equal(keyAt(spliced, stakedId, 'stake/spliced'), 'stake');
-  assert.equal(keyAt(spliced, survivorId, 'stake/spliced'), 'hand:p1:0', 'the survivor slides to slot 0');
+  assert.equal(
+    keyAt(spliced, survivorId, 'stake/spliced'),
+    'hand:p1:1',
+    'the survivor keeps slot 1 even though the engine has made it hand index 0'
+  );
   assert.equal(
     at(spliced, stakedId, 'stake/spliced').face.known,
     'Наследник',
@@ -227,6 +236,74 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     at(splicedAsP2, stakedId, 'stake/spliced/p2').face.known,
     'Наследник',
     'the graveyard is open, so this holds for every viewer'
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 2b. The user's scenario, end to end: play LEFT, then draw.          */
+/*                                                                     */
+/* «Если я разыгрываю левую карту из руки, то правая потом перемещается */
+/* на её место, такого быть не должно… вместо сыгранной из левого слота */
+/* карты должен быть добор в левую ячейку.»                            */
+/* ------------------------------------------------------------------ */
+{
+  const hand = pile(['Наследник', 'Шут']);
+  const drawn = pile(['Рыцарь']);
+  const [left, right] = hand;
+
+  /* Turn start: both cards in hand, left in slot 0, right in slot 1. */
+  const dealt = makeState({ players: [player({ id: 'p1', hand })] });
+  let book = reconcileSlots({}, dealt.players);
+  const atStart = deriveCardZones(dealt, 'p1', book);
+  assert.equal(keyAt(atStart, left.id, 'sticky/dealt'), 'hand:p1:0');
+  assert.equal(keyAt(atStart, right.id, 'sticky/dealt'), 'hand:p1:1');
+
+  /* The LEFT card is staked. The engine splices it out, so the right card
+     is now `hand[0]` — and must not budge. */
+  const staked = makeState({
+    players: [player({ id: 'p1', hand: [right] })],
+    discardPile: [left],
+    pendingAction: roleAction({ actorId: 'p1', stakedCardId: left.id }),
+    turnPhase: 'DOUBT_WINDOW'
+  });
+  book = reconcileSlots(book, staked.players);
+  const onTable = deriveCardZones(staked, 'p1', book);
+  assertUnique(onTable, 'sticky/staked');
+  assert.equal(keyAt(onTable, left.id, 'sticky/staked'), 'stake');
+  assert.equal(
+    keyAt(onTable, right.id, 'sticky/staked'),
+    'hand:p1:1',
+    'the untouched card stays on its own slot — it must not slide into the vacated one'
+  );
+
+  /* End of turn refills the hand. The engine appends the new card, so it is
+     `hand[1]` — but the hole is on the LEFT, and that is where it goes. */
+  const refilled = makeState({
+    players: [player({ id: 'p1', hand: [right, drawn[0]] })],
+    discardPile: [left]
+  });
+  book = reconcileSlots(book, refilled.players);
+  const afterDraw = deriveCardZones(refilled, 'p1', book);
+  assertUnique(afterDraw, 'sticky/refilled');
+  assert.equal(
+    keyAt(afterDraw, drawn[0].id, 'sticky/refilled'),
+    'hand:p1:0',
+    'the drawn card lands in the left slot, the one that was actually emptied'
+  );
+  assert.equal(
+    keyAt(afterDraw, right.id, 'sticky/refilled'),
+    'hand:p1:1',
+    'and the card that was never played has held slot 1 through the whole turn'
+  );
+  assert.equal(keyAt(afterDraw, left.id, 'sticky/refilled'), 'discard');
+
+  /* Without a book the old behaviour is still what you get — which is the
+     bug, and exactly why `App` must pass one. */
+  const unbooked = deriveCardZones(staked, 'p1');
+  assert.equal(
+    keyAt(unbooked, right.id, 'sticky/unbooked'),
+    'hand:p1:0',
+    'the array-index fallback is index-based, so a seat absent from the book still slides'
   );
 }
 
