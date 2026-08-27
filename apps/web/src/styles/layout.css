@@ -1185,16 +1185,8 @@
    ========================================================================== */
 /* Высота карты в руке названа один раз: её берут и слоты руки, и правая
    колонка, которая по ним выравнивается. */
-/* Тона названы один раз на всю геройскую строку: ими залиты и блок с рассказом,
-   и кнопки под ним, и меню над картой — расходиться им теперь нечем. */
 .hero {
   --hand-h: min(32vh, 258px);
-  --calm-top: rgba(20, 26, 38, 0.92);
-  --calm-bottom: rgba(10, 13, 20, 0.94);
-  --calm-line: var(--line-cold);
-  --alert-top: rgba(38, 16, 24, 0.86);
-  --alert-bottom: rgba(14, 8, 12, 0.9);
-  --alert-line: rgba(180, 64, 90, 0.5);
   position: absolute;
   left: 16px;
   right: 16px;
@@ -1534,33 +1526,26 @@
 
 /* --- Меню над картой --- */
 .cardmenu {
-  position: absolute;
-  /* Запас считает подъём выбранной карты (18px) и её увеличение на hover —
-     иначе карта наезжает на нижний край меню. */
-  bottom: calc(100% + 28px);
-  left: 50%;
-  translate: -50% 0;
-  z-index: calc(var(--z-tabled) + 20);
-  /* Слот руки — это `.cardanchor`, а у якорей `pointer-events: none`, чтобы они
-     не перехватывали карты. Меню обязано вернуть себе клики, иначе указатель
-     проходит сквозь него прямо в стол. */
+  /* `fixed`, а не `absolute`: меню вынесено порталом в `body`, и координаты ему
+     даёт реестр якорей — те же, по которым летают карты. */
+  position: fixed;
+  translate: -50% -100%;
+  z-index: var(--z-above-cards);
   pointer-events: auto;
   display: flex;
   flex-direction: row;
   align-items: stretch;
   gap: 6px;
-  padding: 7px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line-mid);
-  background: linear-gradient(180deg, rgba(24, 30, 44, 0.97) 0%, rgba(12, 16, 24, 0.98) 100%);
-  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.72);
 }
 
 .cardmenu .tt {
   display: flex;
 }
 
+/* Каждая кнопка держится собственной заливкой и тенью, а не общей подложкой:
+   подложка читалась как отдельная плашка поверх стола. */
 .cardmenu__item {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
   display: inline-flex;
   align-items: center;
   justify-content: center;

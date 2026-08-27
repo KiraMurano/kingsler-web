@@ -50,6 +50,7 @@ export const Hand: React.FC<HandProps> = ({
           {held && (
             <CardMenu
               open={openCardId === held}
+              zone={{ kind: 'hand', playerId: player.id, slot }}
               options={menus[held] ?? []}
               onPick={kind => onPick(held, kind)}
             />

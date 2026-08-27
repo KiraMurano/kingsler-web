@@ -1,36 +1,65 @@
 /**
- * Столбик кнопок над картой.
+ * Ряд кнопок над картой.
  *
- * Живёт внутри `.hand__slot`, а не в `CardLayer`: слой карт весь построен на
- * `scale` от базового размера, и меню внутри него масштабировалось бы вместе с
- * летящей картой. Слот стоит на месте всегда — меню тоже.
+ * Рисуется порталом в `document.body`, а не внутри слота руки, и вот почему.
+ * Геройская строка живёт на `z-index: 72`, а слой карт — на 75, поэтому всё,
+ * что лежит внутри строки, оказывается под картами: лежащая рядом карта
+ * наезжала на меню. Поднять саму строку нельзя — тогда карты в руке уйдут под
+ * рамку слота и под панель герба. Портал выносит меню из этой стопки целиком.
  *
- * Пункты приходят из `TableView` и потому всегда согласованы с тем, что пишет
- * правая колонка. Глухой пункт остаётся на месте и объясняет себя тултипом:
- * исчезнувший вариант неопытный игрок читает как поломку.
+ * Позиция берётся из реестра якорей: слот руки уже зарегистрирован там ради
+ * полётов карт, так что второго источника геометрии заводить не нужно. Пока
+ * меню открыто, карта лежит неподвижно, поэтому одного замера при открытии
+ * хватает — плюс пересчёт на изменение размера окна.
+ *
+ * Коробки у меню нет: кнопки стоят на сукне сами по себе, как и в правой
+ * колонке, и держатся не подложкой, а собственной заливкой.
  */
-import React from 'react';
+import React, { useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Search } from 'lucide-react';
 import { dur, spring } from '../motion/tokens.ts';
+import { useAnchorRects } from '../motion/AnchorRegistry.tsx';
+import { zoneKey } from '../motion/zones.ts';
+import type { Zone } from '../motion/zones.ts';
 import { Tooltip } from './ui/Tooltip';
 import { TokenCost } from './ui/TokenCost';
 import type { CardMenuKind, CardMenuOption } from '../lib/tableView.ts';
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 
+/** Просвет над картой. Считает подъём выбранной карты и её рост на наведении. */
+const CLEARANCE = 28;
+
 export const CardMenu: React.FC<{
   open: boolean;
+  zone: Zone;
   options: CardMenuOption[];
   onPick: (kind: CardMenuKind) => void;
-}> = ({ open, options, onPick }) => {
+}> = ({ open, zone, options, onPick }) => {
   const reduce = !!useReducedMotion();
+  const rects = useAnchorRects();
+  const key = zoneKey(zone);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
 
-  return (
+  useLayoutEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const r = rects.get(key);
+      if (r) setAt({ x: r.left + r.width / 2, y: r.top - CLEARANCE });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open, key, rects]);
+
+  return createPortal(
     <AnimatePresence>
-      {open && (
+      {open && at && (
         <motion.div
           className="cardmenu"
+          style={{ left: at.x, top: at.y }}
           initial={{ opacity: 0, y: reduce ? 0 : 10, scale: reduce ? 1 : 0.96 }}
           animate={{
             opacity: 1,
@@ -48,11 +77,7 @@ export const CardMenu: React.FC<{
           onPointerDown={e => e.stopPropagation()}
         >
           {options.map((o, i) => (
-            <Tooltip
-              key={o.kind}
-              text={o.disabled ? o.reason : o.hint}
-              tapToOpen={o.disabled}
-            >
+            <Tooltip key={o.kind} text={o.disabled ? o.reason : o.hint} tapToOpen={o.disabled}>
               <motion.button
                 type="button"
                 className={`cardmenu__item cardmenu__item--${o.tone}${
@@ -71,9 +96,9 @@ export const CardMenu: React.FC<{
                 }}
                 onClick={() => onPick(o.kind)}
               >
-                {/* «Подробнее» — единственный пункт, который ничего не меняет
-                    в партии, поэтому он сжат до лупы и не занимает места в ряду
-                    наравне с решениями. */}
+                {/* «Подробнее» — единственный пункт, который ничего не меняет в
+                    партии, поэтому он сжат до лупы и не делит ряд наравне с
+                    решениями. */}
                 {o.kind === 'inspect' ? (
                   <Search size={17} aria-label={o.label} />
                 ) : (
@@ -87,6 +112,7 @@ export const CardMenu: React.FC<{
           ))}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
