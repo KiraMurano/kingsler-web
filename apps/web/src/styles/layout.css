@@ -240,25 +240,46 @@
   --chip: 220px;
   --plot: 72px;
   position: absolute;
-  pointer-events: auto;
+  /* Коробка сиденья тянется во всю высоту стола (см. `.seat--left`), поэтому
+     кликабельны только её содержимые части, а не вся полоса вдоль края. */
+  pointer-events: none;
   display: flex;
   align-items: center;
   gap: 8px;
   transition: opacity var(--dur-fade) var(--ease-out);
 }
 
+/*
+ * Боковые сиденья центрируются раскладкой, а не `translateY(-50%)`.
+ *
+ * `-50%` берётся от собственной высоты, а высота чипа зависит от текста и
+ * равна 109.9765625px — то есть сдвиг выходил дробным (-54.9883px). Пока
+ * ничего не анимируется, браузер рисует текст прямо по дробной координате и
+ * это почти незаметно. Но всплывающая дельта и реплика анимируют `transform`,
+ * а `.delta` и `.bubble` лежат внутри чипа — их слой поднимает всю цепочку
+ * содержащих блоков, и ближайший трансформированный предок (само сиденье)
+ * растеризуется в текстуру, которую затем кладут с дробным смещением. Вся
+ * надпись и портрет пересемплируются — блок «мылится» ровно на время
+ * анимации и резчеет обратно после. Глаз читает это как дрожание на пиксель,
+ * хотя измерения показывают, что чип не сдвигается ни на сотую.
+ *
+ * `top: 0; bottom: 0` отдаёт центрирование флексу (`align-items: center`
+ * выше), а в `transform` остаётся только целочисленный сдвиг по X.
+ */
 .seat--left {
-  top: 50%;
+  top: 0;
+  bottom: 0;
   left: 0;
   flex-direction: row-reverse;
-  transform: translate(calc(-1 * var(--chip) - 8px), -50%);
+  transform: translateX(calc(-1 * var(--chip) - 8px));
 }
 
 .seat--right {
-  top: 50%;
+  top: 0;
+  bottom: 0;
   right: 0;
   flex-direction: row;
-  transform: translate(calc(var(--chip) + 8px), -50%);
+  transform: translateX(calc(var(--chip) + 8px));
 }
 
 .seat--top {
@@ -285,6 +306,7 @@
 
 .seat__chip {
   position: relative;
+  pointer-events: auto;
   width: var(--chip);
   flex: 0 0 auto;
   display: flex;
