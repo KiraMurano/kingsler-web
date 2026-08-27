@@ -39,11 +39,6 @@ export interface PlayerRef {
   avatar?: string;
 }
 
-export interface ClaimRef {
-  card: GameCard;
-  rule: string;
-}
-
 export type BarActionKind =
   | 'court-actions'
   | 'conspiracy'
@@ -61,7 +56,10 @@ export interface BarButton {
   label: string;
   tone: Tone;
   disabled: boolean;
-  /** Одно слово, печатается на глухой кнопке. Скрывать кнопку нельзя. */
+  /** Что кнопка сделает. Показывается тултипом, а не подписью под текстом:
+   *  подпись внутри кнопки меняла её высоту и ломала ряд. */
+  hint: string;
+  /** Почему нельзя. Заменяет `hint` в тултипе, когда кнопка глуха. */
   reason?: string;
 }
 
@@ -79,12 +77,16 @@ export interface TableView {
   id: string;
   phase: PhaseKind;
   title: string;
-  actor: PlayerRef | null;
-  claim: ClaimRef | null;
-  awaiting: PlayerRef[];
+  /**
+   * Что происходит и что от игрока требуется — одной фразой.
+   *
+   * Правая колонка не повторяет то, что и так нарисовано за столом: чьи это
+   * жетоны, какой у карты арт, кто уже ответил. Всё это видно на самом столе.
+   * Колонка отвечает на единственный вопрос, на который стол не отвечает:
+   * «что сейчас и что мне делать».
+   */
+  guidance: string;
   deadlineAt: number | null;
-  tokens: number;
-  spent: { court: boolean; plot: boolean; role: boolean };
   bar: BarButton[];
   /** Порядок слотов руки зрителя — тесты и `Hand` обходят её по нему. */
   viewerHandIds: CardId[];
@@ -114,14 +116,6 @@ const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avata
 /** Роль-щит против конкретного нападения. Против Вора — Казначей, иначе Рыцарь. */
 export function shieldRoleFor(roleClaim: string | undefined): Role {
   return roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
-}
-
-function claimOf(action: Action | null): ClaimRef | null {
-  const card = (action?.roleClaim ?? action?.plotType ?? action?.instantType) as
-    | GameCard
-    | undefined;
-  if (!card) return null;
-  return { card, rule: CARD_DESCRIPTIONS[card].shortDescription };
 }
 
 function inspectOption(): CardMenuOption {
@@ -233,7 +227,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
     case 'turn': {
       const courtReason =
         input.hasUsedNormalActionThisTurn || input.turnSubPhase !== 'NORMAL_ACTION_PHASE'
-          ? 'уже было'
+          ? 'действие двора уже было в этом ходу'
           : noTokens;
       const bar: BarButton[] = [
         {
@@ -241,6 +235,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
           label: 'Действия двора',
           tone: 'calm',
           disabled: !!courtReason,
+          hint: 'Содержание, пир, слух или обмен карт. Оспорить их нельзя',
           reason: courtReason
         }
       ];
@@ -252,26 +247,71 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
           label: `Свершить заговор · ${charges}/4`,
           tone: 'arcane',
           disabled: !hasTokens,
+          hint: 'Ударить по казне соперника, а с трёх зарядов — по короне',
           reason: noTokens
         });
       }
-      bar.push({ kind: 'end-turn', label: 'Завершить ход', tone: 'gold', disabled: false });
+      bar.push({
+        kind: 'end-turn',
+        label: 'Завершить ход',
+        tone: 'gold',
+        disabled: false,
+        hint: 'Добрать карты и передать ход. Неистраченные ⚡ останутся на защиту'
+      });
       return bar;
     }
     case 'doubt':
       return [
-        { kind: 'doubt', label: 'Не верю', tone: 'danger', disabled: !hasTokens, reason: noTokens },
-        { kind: 'believe', label: 'Верю', tone: 'good', disabled: false }
+        {
+          kind: 'doubt',
+          label: 'Не верю',
+          tone: 'danger',
+          disabled: !hasTokens,
+          hint: 'Проверить заявление. Карта вскроется — и кто-то из двоих потеряет её',
+          reason: noTokens
+        },
+        {
+          kind: 'believe',
+          label: 'Верю',
+          tone: 'good',
+          disabled: false,
+          hint: 'Пропустить проверку. Действие сработает как заявлено'
+        }
       ];
     case 'under-attack':
       return [
-        { kind: 'accept-attack', label: 'Принять', tone: 'calm', disabled: false },
-        { kind: 'doubt', label: 'Не верю', tone: 'danger', disabled: !hasTokens, reason: noTokens }
+        {
+          kind: 'accept-attack',
+          label: 'Принять',
+          tone: 'calm',
+          disabled: false,
+          hint: 'Позволить нападению сработать, ничего не тратя'
+        },
+        {
+          kind: 'doubt',
+          label: 'Не верю',
+          tone: 'danger',
+          disabled: !hasTokens,
+          hint: 'Проверить заявление нападающего. Его карта вскроется',
+          reason: noTokens
+        }
       ];
     case 'duel-answer':
       return [
-        { kind: 'duel-accept', label: 'Принять бой', tone: 'danger', disabled: false },
-        { kind: 'duel-retreat', label: 'Отступить', tone: 'calm', disabled: false }
+        {
+          kind: 'duel-accept',
+          label: 'Принять бой',
+          tone: 'danger',
+          disabled: false,
+          hint: 'Обе карты вскроются одновременно'
+        },
+        {
+          kind: 'duel-retreat',
+          label: 'Отступить',
+          tone: 'calm',
+          disabled: false,
+          hint: 'Отозвать нападение. Ваша карта уйдёт в сброс'
+        }
       ];
     default:
       return [];
@@ -315,19 +355,43 @@ function titleFor(phase: PhaseKind, actor: PlayerRef | null): string {
   }
 }
 
-/** Кого ещё ждут. Пусто там, где решение принимает один игрок. */
-function awaitingFor(phase: PhaseKind, input: TableViewInput): PlayerRef[] {
-  const { players, pendingAction, pendingDoubtPassedIds } = input;
-  if (phase === 'doubt' && pendingAction) {
-    return players
-      .filter(p => p.id !== pendingAction.actorId && !pendingDoubtPassedIds.includes(p.id))
-      .map(ref);
+/**
+ * Что происходит и что делать — одной фразой.
+ *
+ * Здесь нет ничего, что уже нарисовано за столом: ни жетонов, ни арта, ни
+ * списка ответивших. Только то, чего по столу не прочесть.
+ */
+function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): string {
+  const { players, pendingAction, activePlayerId } = input;
+  const имя = (id?: string) => players.find(p => p.id === id)?.name ?? 'придворный';
+  const заявка = pendingAction?.roleClaim ?? pendingAction?.plotType ?? pendingAction?.instantType;
+
+  switch (phase) {
+    case 'turn':
+      return 'Нажмите на карту, чтобы разыграть её или сблефовать. Или выберите действие двора.';
+    case 'doubt':
+      return `${имя(pendingAction?.actorId)} заявляет «${заявка}». Поверить или проверить?`;
+    case 'reveal':
+      return 'Карта вскрывается — сейчас станет видно, был ли это блеф.';
+    case 'under-attack':
+      return `${имя(pendingAction?.actorId)} нападает, заявляя «${заявка}». Примите, проверьте заявление или выставьте карту на дуэль.`;
+    case 'duel-answer':
+      return `${имя(pendingAction?.targetId)} принял вызов. Вскрывать карты или отступить?`;
+    case 'veto':
+      return holdsVeto(viewer)
+        ? `Готовится «${заявка}». Нажмите «Право вето», чтобы отменить.`
+        : `Готовится «${заявка}». Двор может вмешаться.`;
+    case 'coronation':
+      return 'Круг коронации: сбейте влияние претендента, пока круг не замкнулся.';
+    default:
+      return activePlayerId === viewer.id
+        ? 'Ход завершается.'
+        : `Ходит ${имя(activePlayerId)} — дождитесь своей очереди.`;
   }
-  if (phase === 'under-attack' && pendingAction?.targetId) {
-    const target = players.find(p => p.id === pendingAction.targetId);
-    return target ? [ref(target)] : [];
-  }
-  return [];
+}
+
+function holdsVeto(viewer: Player): boolean {
+  return viewer.hand.some(h => h.card === 'Право вето');
 }
 
 /** Что показывать, когда стола ещё нет: первый кадр партии, до раздачи. */
@@ -335,12 +399,8 @@ const EMPTY_VIEW: TableView = {
   id: 'empty',
   phase: 'waiting',
   title: 'Ожидание',
-  actor: null,
-  claim: null,
-  awaiting: [],
+  guidance: 'Двор собирается.',
   deadlineAt: null,
-  tokens: 0,
-  spent: { court: false, plot: false, role: false },
   bar: [],
   viewerHandIds: [],
   menus: {}
@@ -357,9 +417,8 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
   const actorPlayer = input.players.find(
     p => p.id === (input.pendingAction?.actorId ?? input.activePlayerId)
   );
-  const actor = actorPlayer ? ref(actorPlayer) : null;
-  const claim = claimOf(input.pendingAction);
-  const awaiting = awaitingFor(phase, input);
+  const title = titleFor(phase, actorPlayer ? ref(actorPlayer) : null);
+  const guidance = guidanceFor(phase, input, viewer);
   const bar = barFor(phase, viewer, input);
 
   const viewerHandIds = viewer.hand.map(h => h.id);
@@ -372,10 +431,9 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
      имеет права; всё, что здесь есть, обязано её менять. */
   const id = [
     phase,
-    actor?.id ?? '-',
-    claim?.card ?? '-',
-    awaiting.map(a => a.id).join(','),
-    bar.map(b => `${b.kind}${b.disabled ? '!' : ''}${b.reason ?? ''}`).join(','),
+    title,
+    guidance,
+    bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
     viewerHandIds
       .map(cid => menus[cid].map(o => `${o.kind}${o.disabled ? '!' : ''}`).join('.'))
       .join('|')
@@ -384,17 +442,9 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
   return {
     id,
     phase,
-    title: titleFor(phase, actor),
-    actor,
-    claim,
-    awaiting,
+    title,
+    guidance,
     deadlineAt: phase === 'veto' ? input.vetoDeadlineAt : null,
-    tokens: viewer.actionTokens,
-    spent: {
-      court: input.hasUsedNormalActionThisTurn,
-      plot: input.hasPlayedPlotThisTurn,
-      role: input.hasPlayedRoleThisTurn
-    },
     bar,
     viewerHandIds,
     menus

@@ -182,7 +182,8 @@ function action(over: Partial<Action> = {}): Action {
   assert.deepEqual(view.menus[jesterId].map(o => o.kind), ['inspect']);
 }
 
-// 7. Глухие кнопки остаются видимыми и объясняют себя одним словом.
+// 7. Глухая кнопка остаётся видимой и объясняет себя — но тултипом, а не
+//    подписью внутри себя: подпись меняла высоту кнопки и ломала ряд.
 {
   const view = deriveTableView(
     input({ players: [player('p1', { actionTokens: 0 }), player('p2'), player('p3')] }),
@@ -193,7 +194,49 @@ function action(over: Partial<Action> = {}): Action {
   assert.equal(court.reason, 'нет ⚡');
 
   const spent = deriveTableView(input({ hasUsedNormalActionThisTurn: true }), 'p1');
-  assert.equal(spent.bar.find(b => b.kind === 'court-actions')!.reason, 'уже было');
+  assert.match(
+    spent.bar.find(b => b.kind === 'court-actions')!.reason!,
+    /уже было/,
+    'причина объясняет себя фразой, а не обрубком'
+  );
+}
+
+// 7b. Подсказка есть у каждой кнопки в каждой фазе: тултип без текста —
+//     это кнопка, о которой игроку негде спросить.
+{
+  const фазы = [
+    input(),
+    input({ activePlayerId: 'p2', turnPhase: 'DOUBT_WINDOW', pendingAction: action() }),
+    input({
+      activePlayerId: 'p2',
+      turnPhase: 'TARGET_REACTION_WINDOW',
+      pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' })
+    }),
+    input({
+      activePlayerId: 'p1',
+      turnPhase: 'DUEL_ATTACKER_WINDOW',
+      pendingAction: action({ actorId: 'p1', targetId: 'p2' })
+    })
+  ];
+  for (const состояние of фазы) {
+    const view = deriveTableView(состояние, 'p1');
+    for (const b of view.bar) {
+      assert.ok(b.hint && b.hint.length > 10, `у кнопки «${b.label}» нет подсказки`);
+    }
+  }
+}
+
+// 7c. Подсказка фазы говорит, что делать, и не пуста ни в одной фазе.
+{
+  for (const состояние of [
+    input(),
+    input({ activePlayerId: 'p2' }),
+    input({ activePlayerId: 'p2', turnPhase: 'DOUBT_WINDOW', pendingAction: action() }),
+    input({ turnPhase: 'VETO_WINDOW', pendingAction: action(), vetoDeadlineAt: 1 })
+  ]) {
+    const view = deriveTableView(состояние, 'p1');
+    assert.ok(view.guidance.length > 10, `пустая подсказка в фазе ${view.phase}`);
+  }
 }
 
 // 8. Реактивные инстанты и Ва-банк в свой ход не «разыгрываются».
@@ -218,7 +261,7 @@ function action(over: Partial<Action> = {}): Action {
   assert.deepEqual(view.bar, []);
   assert.deepEqual(view.viewerHandIds, []);
   assert.deepEqual(view.menus, {});
-  assert.equal(view.actor, null);
+  assert.ok(view.guidance.length > 0, 'даже на пустом столе есть что сказать');
 }
 
 console.log('tableView.check: ok');

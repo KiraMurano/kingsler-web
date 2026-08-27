@@ -804,6 +804,48 @@
 /* ==========================================================================
    MOTION
    ========================================================================== */
+/* --- Подсказки --- */
+.tt {
+  position: relative;
+  display: inline-flex;
+}
+
+.tt__bubble {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  translate: -50% 0;
+  z-index: var(--z-float);
+  width: max-content;
+  max-width: 240px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line-mid);
+  background: rgba(12, 16, 24, 0.97);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text-soft);
+  pointer-events: none;
+  white-space: normal;
+}
+
+.tt__bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  translate: -50% -5px;
+  rotate: 45deg;
+  background: rgba(12, 16, 24, 0.97);
+  border-right: 1px solid var(--line-mid);
+  border-bottom: 1px solid var(--line-mid);
+}
+
 /* Наложение двух строк друг на друга: уходящая и приходящая занимают одну
    grid-область, поэтому смена текста не толкает соседей. */
 .xfade {

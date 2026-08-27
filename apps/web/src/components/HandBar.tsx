@@ -5,13 +5,15 @@
  * Набор кнопок берётся из `TableView`, поэтому он всегда согласован с тем, что
  * рассказывает правая колонка.
  *
- * Глухая кнопка остаётся на месте и называет причину одним словом. Прятать её
- * нельзя: исчезнувший вариант неопытный игрок читает как поломку.
+ * Глухая кнопка остаётся на месте, а причину рассказывает тултипом. Внутри
+ * кнопки подписи больше нет: она меняла её высоту, и ряд дёргался каждый раз,
+ * когда действие становилось недоступным.
  */
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { dur } from '../motion/tokens.ts';
 import { Button } from './ui/Button';
+import { Tooltip } from './ui/Tooltip';
 import { VetoTimerBar } from './VetoTimerBar';
 import type { BarActionKind, TableView } from '../lib/tableView.ts';
 
@@ -32,16 +34,16 @@ export const HandBar: React.FC<{
     ) : view.bar.length > 0 ? (
       <div className="handbar__row">
         {view.bar.map(b => (
-          <Button
-            key={b.kind}
-            tone={b.tone}
-            size="lg"
-            disabled={b.disabled}
-            sub={b.disabled ? b.reason : undefined}
-            onClick={() => onAct(b.kind)}
-          >
-            {b.label}
-          </Button>
+          <Tooltip key={b.kind} text={b.disabled ? b.reason : b.hint} tapToOpen={b.disabled}>
+            <Button
+              tone={b.tone}
+              size="lg"
+              disabled={b.disabled}
+              onClick={() => onAct(b.kind)}
+            >
+              {b.label}
+            </Button>
+          </Tooltip>
         ))}
       </div>
     ) : null;
