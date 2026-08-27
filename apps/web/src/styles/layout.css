@@ -813,9 +813,13 @@
 }
 
 /* An instant laid on top of the current action sits off to one side, so the
-   two cards read as two objects. The layer adds the tilt. */
+   two cards read as two objects. The layer adds the tilt.
+
+   The offset is what keeps the card underneath reachable: a face-down stake
+   under a Ва-банк has to stay clickable so its claimed role can be inspected,
+   and at a smaller offset the overlay swallowed all but a ~20px strip of it. */
 .staked__pile .cardanchor--overlay {
-  transform: translate(16%, -6%);
+  transform: translate(42%, -13%);
 }
 
 .duel__side .cardanchor {
