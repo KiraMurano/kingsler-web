@@ -1013,11 +1013,13 @@
   color: #fff;
 }
 
+/* Над картой, а не под ней: снизу подпись перекрывалась рядом кнопок,
+   который теперь стоит прямо над рукой. */
 .claimbadge {
   position: absolute;
   left: 50%;
-  top: 100%;
-  translate: -50% 8px;
+  bottom: 100%;
+  translate: -50% -8px;
   z-index: 6;
   width: max-content;
   max-width: min(220px, 60vw);
@@ -1039,7 +1041,7 @@
 .claimbadge--solo {
   position: relative;
   left: auto;
-  top: auto;
+  bottom: auto;
   transform: none;
   translate: none;
   font-size: 0.82rem;
@@ -1375,11 +1377,9 @@
   width: 100%;
 }
 
-/*
- * Ряд кнопок над рукой — без подложки. Стекло вместо панели: у самих кнопок
- * фона нет, но есть `backdrop-filter`, поэтому сукно под ними размывается и
- * они перестают быть прозрачными, не превращаясь при этом в тяжёлую плашку.
- */
+/* Ряд кнопок над рукой. Кнопки непрозрачные: на сукне полупрозрачная
+   тонировка растворялась, а блюр делал их стеклянными и мягкими там, где
+   нужна плотная физическая кнопка. */
 .handbar__row {
   display: flex;
   gap: 8px;
@@ -1388,15 +1388,20 @@
 
 .handbar__row .btn {
   min-width: 156px;
-  background-color: transparent;
-  backdrop-filter: blur(12px) saturate(0.75) brightness(0.55);
-  -webkit-backdrop-filter: blur(12px) saturate(0.75) brightness(0.55);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  background-color: var(--ink-900, #0a0d14);
+  background-image: linear-gradient(180deg, rgba(28, 35, 50, 0.9) 0%, rgba(12, 16, 24, 0.95) 100%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 
 .handbar__row .btn:hover:not(:disabled) {
-  backdrop-filter: blur(12px) saturate(0.9) brightness(0.72);
-  -webkit-backdrop-filter: blur(12px) saturate(0.9) brightness(0.72);
+  background-image: linear-gradient(180deg, rgba(38, 47, 66, 0.95) 0%, rgba(18, 24, 34, 0.97) 100%);
+}
+
+/* Название и значок стоимости стоят в одну строку — высота кнопки постоянна. */
+.handbar__row .btn__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 /* --- Полоска окна вето --- */

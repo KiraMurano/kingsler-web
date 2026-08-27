@@ -59,6 +59,9 @@ export interface BarButton {
   /** Что кнопка сделает. Показывается тултипом, а не подписью под текстом:
    *  подпись внутри кнопки меняла её высоту и ломала ряд. */
   hint: string;
+  /** Стоит ли действие жетона ⚡. Рисуется значком на самой кнопке, а когда
+   *  жетона нет — значком под красным запретом. */
+  spendsToken: boolean;
   /** Почему нельзя. Заменяет `hint` в тултипе, когда кнопка глуха. */
   reason?: string;
 }
@@ -70,6 +73,8 @@ export interface CardMenuOption {
   label: string;
   tone: Tone;
   disabled: boolean;
+  /** Стоит ли действие жетона ⚡ — см. `BarButton.spendsToken`. */
+  spendsToken: boolean;
   reason?: string;
 }
 
@@ -119,7 +124,7 @@ export function shieldRoleFor(roleClaim: string | undefined): Role {
 }
 
 function inspectOption(): CardMenuOption {
-  return { kind: 'inspect', label: 'Подробнее', tone: 'calm', disabled: false };
+  return { kind: 'inspect', label: 'Подробнее', tone: 'calm', disabled: false, spendsToken: false };
 }
 
 /** Меню карты в свой ход. */
@@ -143,7 +148,14 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
     else if (role && input.hasPlayedRoleThisTurn) reason = 'роль уже была';
     else if (role && viewer.gold < info.cost) reason = 'дорого';
 
-    options.push({ kind: 'play', label: 'Разыграть', tone: 'gold', disabled: !!reason, reason });
+    options.push({
+      kind: 'play',
+      label: 'Разыграть',
+      tone: 'gold',
+      disabled: !!reason,
+      spendsToken: true,
+      reason
+    });
   }
 
   const bluffReason = !hasTokens
@@ -156,6 +168,7 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
     label: 'Блеф',
     tone: 'arcane',
     disabled: !!bluffReason,
+    spendsToken: true,
     reason: bluffReason
   });
 
@@ -171,12 +184,20 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
   const shield = shieldRoleFor(input.pendingAction?.roleClaim);
 
   if (card === 'Перенаправление') {
-    options.push({ kind: 'play', label: 'Разыграть', tone: 'gold', disabled: false });
+    options.push({
+      kind: 'play',
+      label: 'Разыграть',
+      tone: 'gold',
+      disabled: false,
+      /* Перенаправление — защитный реактивный инстант: 0 ⚡. */
+      spendsToken: false
+    });
     options.push({
       kind: 'duel-bluff',
       label: 'Дуэль: блеф',
       tone: 'danger',
       disabled: !hasTokens,
+      spendsToken: true,
       reason: noTokens
     });
   } else if (card === shield) {
@@ -185,6 +206,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       label: 'Дуэль: защита',
       tone: 'good',
       disabled: !hasTokens,
+      spendsToken: true,
       reason: noTokens
     });
   } else {
@@ -193,6 +215,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       label: 'Дуэль: блеф',
       tone: 'danger',
       disabled: !hasTokens,
+      spendsToken: true,
       reason: noTokens
     });
   }
@@ -212,7 +235,7 @@ function menuFor(
   if (phase === 'under-attack') return underAttackMenu(card, viewer, input);
   if (phase === 'veto' && card === 'Право вето' && !input.isVetoed) {
     return [
-      { kind: 'veto', label: 'Наложить вето', tone: 'danger', disabled: false },
+      { kind: 'veto', label: 'Наложить вето', tone: 'danger', disabled: false, spendsToken: false },
       inspectOption()
     ];
   }
@@ -232,6 +255,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       const bar: BarButton[] = [
         {
           kind: 'court-actions',
+          spendsToken: true,
           label: 'Действия двора',
           tone: 'calm',
           disabled: !!courtReason,
@@ -244,6 +268,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       if (charges >= 1) {
         bar.push({
           kind: 'conspiracy',
+          spendsToken: true,
           label: `Свершить заговор · ${charges}/4`,
           tone: 'arcane',
           disabled: !hasTokens,
@@ -253,6 +278,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       }
       bar.push({
         kind: 'end-turn',
+        spendsToken: false,
         label: 'Завершить ход',
         tone: 'gold',
         disabled: false,
@@ -264,6 +290,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       return [
         {
           kind: 'doubt',
+          spendsToken: true,
           label: 'Не верю',
           tone: 'danger',
           disabled: !hasTokens,
@@ -272,6 +299,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         },
         {
           kind: 'believe',
+          spendsToken: false,
           label: 'Верю',
           tone: 'good',
           disabled: false,
@@ -282,6 +310,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       return [
         {
           kind: 'accept-attack',
+          spendsToken: false,
           label: 'Принять',
           tone: 'calm',
           disabled: false,
@@ -289,6 +318,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         },
         {
           kind: 'doubt',
+          spendsToken: true,
           label: 'Не верю',
           tone: 'danger',
           disabled: !hasTokens,
@@ -300,6 +330,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       return [
         {
           kind: 'duel-accept',
+          spendsToken: false,
           label: 'Принять бой',
           tone: 'danger',
           disabled: false,
@@ -307,6 +338,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         },
         {
           kind: 'duel-retreat',
+          spendsToken: false,
           label: 'Отступить',
           tone: 'calm',
           disabled: false,

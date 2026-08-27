@@ -14,6 +14,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { dur } from '../motion/tokens.ts';
 import { Button } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
+import { TokenCost } from './ui/TokenCost';
 import { VetoTimerBar } from './VetoTimerBar';
 import type { BarActionKind, TableView } from '../lib/tableView.ts';
 
@@ -42,6 +43,7 @@ export const HandBar: React.FC<{
               onClick={() => onAct(b.kind)}
             >
               {b.label}
+              {b.spendsToken && <TokenCost blocked={b.disabled} />}
             </Button>
           </Tooltip>
         ))}

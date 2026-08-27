@@ -804,6 +804,31 @@
 /* ==========================================================================
    MOTION
    ========================================================================== */
+/* --- Стоимость действия --- */
+.tokencost {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* Запрещённое действие: молния притухает, но остаётся узнаваемой — знак
+   должен говорить, что именно нельзя, а не просто «нельзя». */
+.tokencost--blocked .ui-icon {
+  opacity: 0.62;
+}
+
+.tokencost__ban {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  color: var(--crimson);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.95));
+  pointer-events: none;
+}
+
 /* --- Подсказки --- */
 .tt {
   position: relative;
