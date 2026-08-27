@@ -121,12 +121,6 @@ export function attackerAcceptDuel(
     ? pluck(defender.hand, defenderStaked.id)
     : { rest: [...defender.hand] };
 
-  const newPlayers = players.map(p => {
-    if (p.id === actor.id) return { ...p, hand: actorHand };
-    if (p.id === defender.id) return { ...p, hand: defenderHand };
-    return p;
-  });
-
   // RULES.md §6, правило 2: любая карта, вскрытая на столе (при проверке или
   // дуэли), уходит в сброс. Both stakes leave their hands right here, so the
   // very same instances have to land in the discard — otherwise the cards are
@@ -146,24 +140,32 @@ export function attackerAcceptDuel(
   let bothLostCoin = false;
   let message = '';
 
+  // Печати НЕ начисляются здесь: `addSealsToPlayer` читает `get().players` и
+  // пишет обратно весь массив игроков (плюс конвертирует 2 ⚜️ в 1 👑 и может
+  // начать круг коронации). Если выдать награду до `set` ниже, этот `set`
+  // затрёт её своим снимком, а если выдать по устаревшему снимку — потеряются
+  // изменения рук. Поэтому исходы дуэли только КОПЯТ награды, а начисляются
+  // они после того, как состояние уже знает об ушедших в сброс картах.
+  const sealAwards: { playerId: string; count: number }[] = [];
+
   if (actorWasTruth && defenderWasTruth) {
     resultType = 'clash_blocked';
-    get().addSealsToPlayer(actor.id, 1);
-    get().addSealsToPlayer(defender.id, 1);
+    sealAwards.push({ playerId: actor.id, count: 1 });
+    sealAwards.push({ playerId: defender.id, count: 1 });
     message = `🛡️ ЧЕСТНАЯ ДУЭЛЬ! Оба игрока сказали правду (${actor.name}: «${actorRevealedRole}», ${defender.name}: «${defenderRevealedRole}»). Атака заблокирована, КАЖДЫЙ получает по +1 ⚜️!${isVaBanqueActive ? ' (Ва-банк нейтрализован щитом)' : ''}`;
   } else if (actorWasTruth && !defenderWasTruth) {
     resultType = 'attacker_breakthrough';
     if (!isVaBanqueActive) {
       sealsWinnerId = actor.id;
-      get().addSealsToPlayer(actor.id, 1);
+      sealAwards.push({ playerId: actor.id, count: 1 });
     }
     message = `💥 ПРОБИТИЕ ЗАЩИТЫ${isVaBanqueActive ? ' ПОД ВА-БАНКОМ' : ''}! ${actor.name} сказал правду («${actorRevealedRole}»), а ${defender.name} блефовал(а) («${defenderRevealedRole}»). ${isVaBanqueActive ? 'Защитник проиграл дуэль: атака проходит с удвоением (4 🪙 / 2 👑, печати отменены)!' : `${actor.name} получает +1 ⚜️, атака проходит!`}`;
   } else if (!actorWasTruth && defenderWasTruth) {
     resultType = 'defender_counter';
     sealsWinnerId = defender.id;
     const defSeals = isVaBanqueActive ? 2 : 1;
-    get().addSealsToPlayer(defender.id, defSeals);
-    message = `🛡️ КОНТРАТАКА ЩИТОМ${isVaBanqueActive ? ' ПОД ВА-БАНКОМ' : ''}! ${defender.name} подтвердил(а) защиту («${defenderRevealedRole}»), а ${actor.name} блефовал(а) («${actorRevealedRole}»). Атакующий проиграл дуэль под Ва-банком: ${defender.name} получает +${defSeals} ⚜️, атака отбита!`;
+    sealAwards.push({ playerId: defender.id, count: defSeals });
+    message = `🛡️ КОНТРАТАКА ЩИТОМ${isVaBanqueActive ? ' ПОД ВА-БАНКОМ' : ''}! ${defender.name} подтвердил(а) защиту («${defenderRevealedRole}»), а ${actor.name} блефовал(а) («${actorRevealedRole}»). Атакующий проиграл дуэль${isVaBanqueActive ? ' под Ва-банком' : ''}: ${defender.name} получает +${defSeals} ⚜️, атака отбита!`;
   } else {
     resultType = 'mutual_bluff';
     bothLostCoin = false;
@@ -186,7 +188,11 @@ export function attackerAcceptDuel(
   };
 
   set(state => ({
-    players: newPlayers,
+    players: state.players.map(p => {
+      if (p.id === actor.id) return { ...p, hand: actorHand };
+      if (p.id === defender.id) return { ...p, hand: defenderHand };
+      return p;
+    }),
     discardPile: [...state.discardPile, ...revealedInstances],
     duelOutcome: outcome,
     turnPhase: 'DUEL_OUTCOME',
@@ -197,6 +203,13 @@ export function attackerAcceptDuel(
     },
     history: [message, ...state.history].slice(0, 50)
   }));
+
+  // Только теперь, поверх уже применённого состояния (карты ушли из рук в
+  // сброс), выдаём печати: `addSealsToPlayer` сам сконвертирует 2 ⚜️ в 1 👑 и
+  // при необходимости откроет круг коронации.
+  for (const award of sealAwards) {
+    get().addSealsToPlayer(award.playerId, award.count);
+  }
 
   timerManager.scheduleDelay(() => {
     get().closeDuelOutcome();
