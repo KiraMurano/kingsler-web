@@ -44,7 +44,7 @@ export const ActionBar: React.FC<{
               onClick={() => onAct(b.kind)}
             >
               {b.label}
-              {b.spendsToken && <TokenCost blocked={b.disabled} />}
+              {b.spendsToken && <TokenCost blocked={b.tokenBlocked} />}
             </Button>
           </Tooltip>
         ))}

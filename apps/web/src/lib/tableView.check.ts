@@ -193,14 +193,16 @@ function action(over: Partial<Action> = {}): Action {
   );
   const court = view.bar.find(b => b.kind === 'court-actions')!;
   assert.equal(court.disabled, true);
-  assert.equal(court.reason, 'нет ⚡');
+  assert.match(court.reason!, /^Нет жетонов/, 'причина — фраза с большой буквы');
+  assert.equal(court.tokenBlocked, true, 'жетонов нет — молнию перечёркиваем');
 
+  // А вот когда жетоны есть, но действие уже было, перечёркивать молнию нельзя:
+  // она бы врала, будто дело в жетонах.
   const spent = deriveTableView(input({ hasUsedNormalActionThisTurn: true }), 'p1');
-  assert.match(
-    spent.bar.find(b => b.kind === 'court-actions')!.reason!,
-    /уже было/,
-    'причина объясняет себя фразой, а не обрубком'
-  );
+  const spentCourt = spent.bar.find(b => b.kind === 'court-actions')!;
+  assert.equal(spentCourt.disabled, true);
+  assert.match(spentCourt.reason!, /^Действие двора уже было/);
+  assert.equal(spentCourt.tokenBlocked, false, 'жетоны на месте — запрет не рисуем');
 }
 
 // 7b. Подсказка есть у каждой кнопки в каждой фазе: тултип без текста —
@@ -334,6 +336,22 @@ function action(over: Partial<Action> = {}): Action {
 
   // Спокойный стол — рассказывать нечего.
   assert.equal(deriveTableView(input(), 'p1').event, '');
+}
+
+// 11. Подсказка не повторяет событие: вместе они читаются как одна фраза,
+//     а не как одно и то же сообщение дважды подряд.
+{
+  const view = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      turnPhase: 'DOUBT_WINDOW',
+      pendingAction: action({ roleClaim: 'Наследник' })
+    }),
+    'p1'
+  );
+  assert.match(view.event, /заявляет «Наследник»/);
+  assert.doesNotMatch(view.guidance, /заявляет/, 'подсказка не пересказывает событие');
+  assert.equal(view.guidance, 'Поверить или проверить?');
 }
 
 console.log('tableView.check: ok');

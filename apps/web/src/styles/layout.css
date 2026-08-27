@@ -1388,68 +1388,59 @@
   display: flex;
 }
 
-/*
- * Кнопки непрозрачные, но тонировку не теряют.
- *
- * Сплошная заливка через `background-image` затирала цвет тона, и «Завершить
- * ход» переставала быть красной. Плотность даёт непрозрачный слой под кнопкой
- * — `::before`, — а собственный фон тона остаётся сверху.
- */
+/* Кнопки в колонке залиты цветом целиком, а не обведены им: тонкая рамка на
+   тёмном фоне читалась как «выключено». Заливки ниже непрозрачны, поэтому
+   никакой подложки под ними не нужно. */
 .actionbar__col .btn {
-  isolation: isolate;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 
 /*
- * В колонке тона звучат в полный голос. Общие `.btn--*` держат заливку на
- * 16–24% альфы — этого хватает на светлой панели диалога, но поверх тёмной
- * подложки кнопка выходит почти чёрной, и «Завершить ход» переставала читаться
- * как красная. Здесь у каждого тона своя плотная заливка.
+ * Тона в колонке звучат в полный голос: кнопка залита цветом целиком, а не
+ * обведена им. Общие `.btn--*` держат заливку на 16–24% альфы — этого хватает
+ * на светлой панели диалога, но поверх тёмной колонки остаётся почти чёрный
+ * прямоугольник с цветной рамкой, который читается как «выключено».
  */
 .actionbar__col .btn--danger {
-  background: linear-gradient(180deg, rgba(150, 44, 68, 0.95) 0%, rgba(104, 28, 46, 0.97) 100%);
-  border-color: var(--crimson);
+  background: linear-gradient(180deg, #9a2c45 0%, #6c1c2e 100%);
+  border-color: #c4405e;
   color: #ffe6ec;
 }
 
 .actionbar__col .btn--danger:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(178, 56, 84, 0.97) 0%, rgba(126, 34, 56, 0.98) 100%);
+  background: linear-gradient(180deg, #b53a56 0%, #83243a 100%);
 }
 
 .actionbar__col .btn--good {
-  background: linear-gradient(180deg, rgba(58, 112, 94, 0.95) 0%, rgba(34, 74, 62, 0.97) 100%);
-  border-color: var(--sage-soft);
+  background: linear-gradient(180deg, #3a705e 0%, #234a3e 100%);
+  border-color: #5b9a86;
   color: #e2f5ee;
 }
 
 .actionbar__col .btn--good:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(72, 136, 114, 0.97) 0%, rgba(44, 92, 78, 0.98) 100%);
+  background: linear-gradient(180deg, #488872 0%, #2c5c4e 100%);
 }
 
 .actionbar__col .btn--calm {
-  background: linear-gradient(180deg, rgba(46, 66, 94, 0.95) 0%, rgba(26, 38, 56, 0.97) 100%);
-  border-color: rgba(95, 131, 174, 0.75);
+  background: linear-gradient(180deg, #35506f 0%, #1f2f45 100%);
+  border-color: #5f83ae;
   color: #dbe7f7;
 }
 
 .actionbar__col .btn--calm:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(60, 86, 122, 0.97) 0%, rgba(34, 50, 72, 0.98) 100%);
+  background: linear-gradient(180deg, #42628a 0%, #283c58 100%);
 }
 
 .actionbar__col .btn--arcane,
 .actionbar__col .btn--gold {
-  background: linear-gradient(180deg, rgba(122, 92, 18, 0.9) 0%, rgba(74, 55, 10, 0.95) 100%);
+  background: linear-gradient(180deg, #8a6714 0%, #55400c 100%);
   border-color: var(--gold);
   color: var(--gold-pale);
 }
 
-.actionbar__col .btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(18, 23, 34, 0.97) 0%, rgba(10, 13, 20, 0.98) 100%);
+.actionbar__col .btn--arcane:hover:not(:disabled),
+.actionbar__col .btn--gold:hover:not(:disabled) {
+  background: linear-gradient(180deg, #a67c19 0%, #6b5010 100%);
 }
 
 /* Название и значок стоимости стоят в одну строку — высота кнопки постоянна. */

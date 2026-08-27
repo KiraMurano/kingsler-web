@@ -68,9 +68,15 @@ export interface BarButton {
   /** Что кнопка сделает. Показывается тултипом, а не подписью под текстом:
    *  подпись внутри кнопки меняла её высоту и ломала ряд. */
   hint: string;
-  /** Стоит ли действие жетона ⚡. Рисуется значком на самой кнопке, а когда
-   *  жетона нет — значком под красным запретом. */
+  /** Стоит ли действие жетона ⚡. Рисуется значком на самой кнопке. */
   spendsToken: boolean;
+  /**
+   * Перечёркивать ли молнию красным запретом.
+   *
+   * Только когда причина именно в жетонах. «Действие двора уже было» — не про
+   * жетоны: они на месте, и перечёркнутая молния в этом случае врёт.
+   */
+  tokenBlocked: boolean;
   /** Почему нельзя. Заменяет `hint` в тултипе, когда кнопка глуха. */
   reason?: string;
 }
@@ -84,6 +90,8 @@ export interface CardMenuOption {
   disabled: boolean;
   /** Стоит ли действие жетона ⚡ — см. `BarButton.spendsToken`. */
   spendsToken: boolean;
+  /** Перечёркивать ли молнию — см. `BarButton.tokenBlocked`. */
+  tokenBlocked: boolean;
   reason?: string;
 }
 
@@ -143,7 +151,14 @@ export function shieldRoleFor(roleClaim: string | undefined): Role {
 }
 
 function inspectOption(): CardMenuOption {
-  return { kind: 'inspect', label: 'Подробнее', tone: 'calm', disabled: false, spendsToken: false };
+  return {
+    kind: 'inspect',
+    label: 'Подробнее',
+    tone: 'calm',
+    disabled: false,
+    spendsToken: false,
+    tokenBlocked: false
+  };
 }
 
 /** Меню карты в свой ход. */
@@ -162,10 +177,10 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
   if (playable) {
     const info = CARD_DESCRIPTIONS[card];
     let reason: string | undefined;
-    if (!hasTokens) reason = 'нет ⚡';
-    else if (plot && input.hasPlayedPlotThisTurn) reason = 'интрига уже была';
-    else if (role && input.hasPlayedRoleThisTurn) reason = 'роль уже была';
-    else if (role && viewer.gold < info.cost) reason = 'дорого';
+    if (!hasTokens) reason = 'Нет жетонов действия.';
+    else if (plot && input.hasPlayedPlotThisTurn) reason = 'Интрига уже была в этом ходу.';
+    else if (role && input.hasPlayedRoleThisTurn) reason = 'Роль уже была в этом ходу.';
+    else if (role && viewer.gold < info.cost) reason = 'Не хватает золота.';
 
     options.push({
       kind: 'play',
@@ -173,14 +188,15 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
       tone: 'gold',
       disabled: !!reason,
       spendsToken: true,
+      tokenBlocked: reason === 'Нет жетонов действия.',
       reason
     });
   }
 
   const bluffReason = !hasTokens
-    ? 'нет ⚡'
+    ? 'Нет жетонов действия.'
     : input.hasPlayedRoleThisTurn
-      ? 'роль уже была'
+      ? 'Роль уже была в этом ходу.'
       : undefined;
   options.push({
     kind: 'bluff',
@@ -188,6 +204,7 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
     tone: 'arcane',
     disabled: !!bluffReason,
     spendsToken: true,
+    tokenBlocked: bluffReason === 'Нет жетонов действия.',
     reason: bluffReason
   });
 
@@ -199,7 +216,7 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
 function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput): CardMenuOption[] {
   const options: CardMenuOption[] = [];
   const hasTokens = viewer.actionTokens >= 1;
-  const noTokens = hasTokens ? undefined : 'нет ⚡';
+  const noTokens = hasTokens ? undefined : 'Нет жетонов действия.';
   const shield = shieldRoleFor(input.pendingAction?.roleClaim);
 
   if (card === 'Перенаправление') {
@@ -209,7 +226,8 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       tone: 'gold',
       disabled: false,
       /* Перенаправление — защитный реактивный инстант: 0 ⚡. */
-      spendsToken: false
+      spendsToken: false,
+      tokenBlocked: false
     });
     options.push({
       kind: 'duel-bluff',
@@ -217,6 +235,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       tone: 'danger',
       disabled: !hasTokens,
       spendsToken: true,
+      tokenBlocked: !hasTokens,
       reason: noTokens
     });
   } else if (card === shield) {
@@ -226,6 +245,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       tone: 'good',
       disabled: !hasTokens,
       spendsToken: true,
+      tokenBlocked: !hasTokens,
       reason: noTokens
     });
   } else {
@@ -235,6 +255,7 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       tone: 'danger',
       disabled: !hasTokens,
       spendsToken: true,
+      tokenBlocked: !hasTokens,
       reason: noTokens
     });
   }
@@ -254,7 +275,14 @@ function menuFor(
   if (phase === 'under-attack') return underAttackMenu(card, viewer, input);
   if (phase === 'veto' && card === 'Право вето' && !input.isVetoed) {
     return [
-      { kind: 'veto', label: 'Наложить вето', tone: 'danger', disabled: false, spendsToken: false },
+      {
+        kind: 'veto',
+        label: 'Наложить вето',
+        tone: 'danger',
+        disabled: false,
+        spendsToken: false,
+        tokenBlocked: false
+      },
       inspectOption()
     ];
   }
@@ -263,18 +291,19 @@ function menuFor(
 
 function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarButton[] {
   const hasTokens = viewer.actionTokens >= 1;
-  const noTokens = hasTokens ? undefined : 'нет ⚡';
+  const noTokens = hasTokens ? undefined : 'Нет жетонов действия.';
 
   switch (phase) {
     case 'turn': {
       const courtReason =
         input.hasUsedNormalActionThisTurn || input.turnSubPhase !== 'NORMAL_ACTION_PHASE'
-          ? 'действие двора уже было в этом ходу'
+          ? 'Действие двора уже было в этом ходу.'
           : noTokens;
       const bar: BarButton[] = [
         {
           kind: 'court-actions',
           spendsToken: true,
+          tokenBlocked: !hasTokens,
           label: 'Действия двора',
           tone: 'calm',
           disabled: !!courtReason,
@@ -288,6 +317,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         bar.push({
           kind: 'conspiracy',
           spendsToken: true,
+          tokenBlocked: !hasTokens,
           label: `Свершить заговор · ${charges}/4`,
           tone: 'arcane',
           disabled: !hasTokens,
@@ -298,6 +328,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       bar.push({
         kind: 'end-turn',
         spendsToken: false,
+        tokenBlocked: false,
         label: 'Завершить ход',
         /* Красная: это единственная кнопка своего хода, которая необратимо
            отдаёт ход дальше. */
@@ -312,6 +343,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         {
           kind: 'doubt',
           spendsToken: true,
+          tokenBlocked: !hasTokens,
           label: 'Не верю',
           tone: 'danger',
           disabled: !hasTokens,
@@ -321,6 +353,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         {
           kind: 'believe',
           spendsToken: false,
+          tokenBlocked: false,
           label: 'Верю',
           tone: 'good',
           disabled: false,
@@ -332,6 +365,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         {
           kind: 'accept-attack',
           spendsToken: false,
+          tokenBlocked: false,
           label: 'Принять',
           tone: 'calm',
           disabled: false,
@@ -340,6 +374,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         {
           kind: 'doubt',
           spendsToken: true,
+          tokenBlocked: !hasTokens,
           label: 'Не верю',
           tone: 'danger',
           disabled: !hasTokens,
@@ -352,6 +387,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         {
           kind: 'duel-accept',
           spendsToken: false,
+          tokenBlocked: false,
           label: 'Принять бой',
           tone: 'danger',
           disabled: false,
@@ -360,6 +396,7 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         {
           kind: 'duel-retreat',
           spendsToken: false,
+          tokenBlocked: false,
           label: 'Отступить',
           tone: 'calm',
           disabled: false,
@@ -417,29 +454,30 @@ function titleFor(phase: PhaseKind, actor: PlayerRef | null): string {
 function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): string {
   const { players, pendingAction, activePlayerId } = input;
   const имя = (id?: string) => players.find(p => p.id === id)?.name ?? 'придворный';
-  const заявка = pendingAction?.roleClaim ?? pendingAction?.plotType ?? pendingAction?.instantType;
 
+  /*
+   * Только указание к действию — кто что сделал, уже сказано в `event`, и
+   * повторять это здесь значит печатать одну фразу дважды подряд.
+   */
   switch (phase) {
     case 'turn':
       return 'Выберите действие двора или нажмите на карту, чтобы сыграть её.';
     case 'doubt':
-      return `${имя(pendingAction?.actorId)} заявляет «${заявка}». Поверить или проверить?`;
+      return 'Поверить или проверить?';
     case 'reveal':
       return 'Карта вскрывается.';
     case 'under-attack':
-      return `${имя(pendingAction?.actorId)} нападает, заявляя «${заявка}». Примите, проверьте или выставьте карту на дуэль.`;
+      return 'Примите, проверьте заявление или выставьте карту на дуэль.';
     case 'duel-answer':
-      return `${имя(pendingAction?.targetId)} принял вызов. Вскрывать карты или отступить?`;
+      return 'Вскрывать карты или отступить?';
     case 'veto':
-      return holdsVeto(viewer)
-        ? `Готовится «${заявка}». Можно наложить вето.`
-        : `Готовится «${заявка}».`;
+      return holdsVeto(viewer) ? 'Можно наложить вето.' : 'Двор может вмешаться.';
     case 'coronation':
-      return 'Круг коронации: сбейте влияние претендента.';
+      return 'Сбейте влияние претендента, пока круг не замкнулся.';
     default:
-      return activePlayerId === viewer.id
-        ? 'Ход завершается.'
-        : `Ходит ${имя(activePlayerId)}.`;
+      /* В чужой ход `event` уже рассказывает, что происходит; добавлять к нему
+         «Ходит N» незачем. Фраза нужна только когда за столом тихо. */
+      return pendingAction ? '' : `Ходит ${имя(activePlayerId)}.`;
   }
 }
 
