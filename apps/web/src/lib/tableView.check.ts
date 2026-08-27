@@ -354,4 +354,31 @@ function action(over: Partial<Action> = {}): Action {
   assert.equal(view.guidance, 'Поверить или проверить?');
 }
 
+// 12. Склоняем ботов, но не ники живых игроков.
+{
+  const бот = (id: string, name: string) => player(id, { name, isBot: true });
+  const живой = (id: string, name: string) => player(id, { name, isBot: false });
+
+  const поБоту = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      players: [живой('p1', 'Мурена'), бот('p2', 'Княгиня Анна'), бот('p3', 'Барон Дима')],
+      pendingAction: action({ roleClaim: 'Вор', targetId: 'p3' })
+    }),
+    'p1'
+  );
+  assert.match(поБоту.event, /на Барона Диму/, 'титул бота склоняется вместе с именем');
+
+  const поЖивому = deriveTableView(
+    input({
+      activePlayerId: 'p2',
+      players: [живой('p1', 'Мурена'), бот('p2', 'Княгиня Анна'), бот('p3', 'Барон Дима')],
+      pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' })
+    }),
+    'p1'
+  );
+  assert.match(поЖивому.event, /на Мурена/, 'ник живого игрока не склоняется');
+  assert.doesNotMatch(поЖивому.event, /Мурену/);
+}
+
 console.log('tableView.check: ok');

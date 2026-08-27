@@ -2,7 +2,7 @@ import type { Action, GameState, InstantType, CardId } from '../types';
 import { CARD_INFO, drawCardsFromDeck } from '../cards';
 import { pluck } from '../cardInstance';
 import { botMemory } from '../Bot';
-import { declineGen } from '../utils/russianText';
+import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
@@ -140,7 +140,7 @@ export function playInstant(
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `⚡ ${actor.name} разыгрывает инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (потрачен 1 ⚡)! Двор может наложить Вето до смены руки ${declineGen(players.find(p => p.id === targetPlayerId)?.name ?? 'цели')}.`,
+        `⚡ ${actor.name} разыгрывает инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (потрачен 1 ⚡)! Двор может наложить Вето до смены руки ${(() => { const t = players.find(p => p.id === targetPlayerId); return t ? genOf(t) : 'цели'; })()}.`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -238,7 +238,7 @@ export function resolveInstantEffect(
         players: newPlayers,
         discardPile: [...state.discardPile, searched],
         history: [
-          `🔍 «Обыск покоев»: интрига ${declineGen(victim.name)} («${plotType}») сброшена!`,
+          `🔍 «Обыск покоев»: интрига ${genOf(victim)} («${plotType}») сброшена!`,
           ...state.history
         ].slice(0, 50)
       }));

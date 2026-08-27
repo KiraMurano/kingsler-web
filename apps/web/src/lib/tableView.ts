@@ -23,7 +23,7 @@ import type {
   RevealOutcome,
   Role
 } from '@kinglier/engine/types';
-import { declineAcc } from '@kinglier/engine/utils/russianText';
+import { accOf, genOf } from '@kinglier/engine/utils/russianText';
 
 /** Инстанты, которые владелец может выложить открыто в свой ход. */
 const OPENLY_PLAYABLE_INSTANTS: GameCard[] = [
@@ -487,23 +487,28 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
  */
 function eventFor(input: TableViewInput): string {
   const { players, revealOutcome, duelOutcome, pendingAction } = input;
-  const имя = (id?: string) => players.find(p => p.id === id)?.name ?? 'придворный';
+  const кто = (id?: string) => players.find(p => p.id === id);
+  const имя = (id?: string) => кто(id)?.name ?? 'придворный';
+  /* Склоняем по игроку, а не по строке: имена ботов придуманы нами и склоняются,
+     ники живых игроков — нет. */
+  const вин = (id?: string) => { const p = кто(id); return p ? accOf(p) : 'придворного'; };
+  const род = (id?: string) => { const p = кто(id); return p ? genOf(p) : 'придворного'; };
   const печать = (id?: string) => (id ? ` ${имя(id)} получает +1 ⚜️.` : '');
 
   if (revealOutcome) {
     const r = revealOutcome;
     return r.wasTruth
       ? `${имя(r.accusedId)} говорил правду: «${r.revealedRole}».${печать(r.sealsWinnerId)}`
-      : `${имя(r.accuserId)} разоблачил ${declineAcc(имя(r.accusedId))}: блеф.${печать(r.sealsWinnerId)}`;
+      : `${имя(r.accuserId)} разоблачил ${вин(r.accusedId)}: блеф.${печать(r.sealsWinnerId)}`;
   }
 
   if (duelOutcome) {
     const d = duelOutcome;
     if (d.attackerWasTruth && !d.defenderWasTruth) {
-      return `Дуэль: щит ${declineGenSafe(имя(d.defenderId))} оказался блефом.${печать(d.sealsWinnerId)}`;
+      return `Дуэль: щит ${род(d.defenderId)} оказался блефом.${печать(d.sealsWinnerId)}`;
     }
     if (!d.attackerWasTruth && d.defenderWasTruth) {
-      return `Дуэль: нападение ${declineGenSafe(имя(d.attackerId))} оказалось блефом.${печать(d.sealsWinnerId)}`;
+      return `Дуэль: нападение ${род(d.attackerId)} оказалось блефом.${печать(d.sealsWinnerId)}`;
     }
     return `Дуэль ${имя(d.attackerId)} и ${имя(d.defenderId)} разрешилась.${печать(d.sealsWinnerId)}`;
   }
@@ -511,7 +516,7 @@ function eventFor(input: TableViewInput): string {
   if (pendingAction) {
     const a = pendingAction;
     const кто = имя(a.actorId);
-    const цель = a.targetId ? ` на ${declineAcc(имя(a.targetId))}` : '';
+    const цель = a.targetId ? ` на ${вин(a.targetId)}` : '';
     if (a.type === 'normal') return `${кто}: ${a.name.toLowerCase()}.`;
     if (a.type === 'plot') return `${кто} выкладывает интригу «${a.plotType}».`;
     if (a.type === 'instant') return `${кто} играет «${a.instantType}».`;
@@ -519,11 +524,6 @@ function eventFor(input: TableViewInput): string {
   }
 
   return '';
-}
-
-/** Родительный падеж имени; отдельной функцией, чтобы не тащить лишний импорт. */
-function declineGenSafe(name: string): string {
-  return name.endsWith('а') ? `${name.slice(0, -1)}ы` : name;
 }
 
 function holdsVeto(viewer: Player): boolean {

@@ -1,7 +1,7 @@
 import type { Action, CardId, GameState, PlotType, Player, CardInstance } from '../types';
 import { pluck } from '../cardInstance';
 import { CARD_INFO } from '../cards';
-import { declineGen } from '../utils/russianText';
+import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
@@ -30,7 +30,7 @@ export function disruptPlayerPlotsOnLoss(
     set(state => ({
       players: newPlayers,
       discardPile: [...state.discardPile, burned],
-      history: [`💥 «Королевский приём» ${declineGen(victim.name)} сорван из-за ${reason}! Интрига сгорела.`, ...state.history].slice(0, 50)
+      history: [`💥 «Королевский приём» ${genOf(victim)} сорван из-за ${reason}! Интрига сгорела.`, ...state.history].slice(0, 50)
     }));
     triggerResourceFloat(set, victim.id, '💥 Интрига сорвана', false);
   }
@@ -378,7 +378,7 @@ export function discardMorningPlot(get: StateGetter, set: StateSetter, actorId: 
     pendingAction: null,
     turnPhase: 'IDLE',
     turnSubPhase: 'NORMAL_ACTION_PHASE',
-    history: [`🛡️ Утренний эффект «${plotType}» ${declineGen(player.name)} отменён Вето.`, ...state.history].slice(0, 50)
+    history: [`🛡️ Утренний эффект «${plotType}» ${genOf(player)} отменён Вето.`, ...state.history].slice(0, 50)
   }));
 }
 
@@ -411,7 +411,7 @@ export function resolveMorningPlots(
 
     newDiscard = [...newDiscard, spentPlot];
     set(state => ({
-      history: [`👑 Королевский приём ${declineGen(nextPlayerUpdated.name)} успешно состоялся! Получено +1 👑!`, ...state.history].slice(0, 50)
+      history: [`👑 Королевский приём ${genOf(nextPlayerUpdated)} успешно состоялся! Получено +1 👑!`, ...state.history].slice(0, 50)
     }));
 
     if (newFavor >= 6 && !coronationCandidateId) {
@@ -441,7 +441,7 @@ export function resolveMorningPlots(
     newDiscard = [...newDiscard, spentPlot];
     const convNotice = gainedCrowns > 0 ? ` (2 печати дали +${gainedCrowns} 👑)` : '';
     set(state => ({
-      history: [`📜 «Золотая булла» ${declineGen(nextPlayerUpdated.name)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
+      history: [`📜 «Золотая булла» ${genOf(nextPlayerUpdated)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
     }));
 
     if (newFavor >= 6 && !coronationCandidateId) {
@@ -456,7 +456,7 @@ export function resolveMorningPlots(
     updatedPlayers[nextIndex] = nextPlayerUpdated;
     newDiscard = [...newDiscard, spentPlot];
     set(state => ({
-      history: [`👁️ Действие «Сети информаторов» ${declineGen(nextPlayerUpdated.name)} завершилось после полного круга.`, ...state.history].slice(0, 50)
+      history: [`👁️ Действие «Сети информаторов» ${genOf(nextPlayerUpdated)} завершилось после полного круга.`, ...state.history].slice(0, 50)
     }));
   }
 

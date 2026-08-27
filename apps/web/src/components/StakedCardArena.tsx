@@ -9,8 +9,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { GameCard } from '@kinglier/engine/data/cardDescriptions';
+import type { Player } from '@kinglier/engine/types';
 import { courtly } from '../lib/text';
-import { declineGen } from '@kinglier/engine/utils/russianText';
+import { genOf } from '@kinglier/engine/utils/russianText';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import { dur } from '../motion/tokens.ts';
 
@@ -20,8 +21,15 @@ function givenName(name: string): string {
   return parts[parts.length - 1] || name;
 }
 
-function claimBadge(claim: string, targetName?: string | null): string {
-  return targetName ? `${claim} против ${declineGen(givenName(targetName))}` : claim;
+/**
+ * Бейдж короткий, поэтому титул отбрасывается: «Вор против Елены», а не
+ * «Вор против Графини Елены». Склоняется только имя бота — ник живого игрока
+ * остаётся как есть.
+ */
+function claimBadge(claim: string, target?: Player | null): string {
+  if (!target) return claim;
+  const кого = genOf({ name: givenName(target.name), isBot: target.isBot });
+  return `${claim} против ${кого}`;
 }
 
 /**
@@ -103,7 +111,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
       : courtly(pendingAction.name);
     return (
       <div className="staked">
-        <ClaimBadge solo text={claimBadge(label, target?.name)} />
+        <ClaimBadge solo text={claimBadge(label, target)} />
       </div>
     );
   }
@@ -116,7 +124,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
         <div className="staked__pile">
           <CardAnchor zone={{ kind: 'table' }} />
           {overlayAnchor}
-          <ClaimBadge text={claimBadge(laid, target?.name)} />
+          <ClaimBadge text={claimBadge(laid, target)} />
         </div>
       </div>
     );
@@ -132,7 +140,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
       <div className="staked">
         <div className="staked__pile">
           {overlayAnchor}
-          <ClaimBadge text={claimBadge(plot, target?.name)} />
+          <ClaimBadge text={claimBadge(plot, target)} />
         </div>
       </div>
     );
@@ -152,7 +160,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
         <div className="duel">
           <div className="duel__side">
             <CardAnchor zone={{ kind: 'duel', side: 'attacker' }}>
-              <ClaimBadge text={claimBadge(attackerClaim, target?.name)} />
+              <ClaimBadge text={claimBadge(attackerClaim, target)} />
             </CardAnchor>
           </div>
 
@@ -172,9 +180,9 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
   const claimed = String(pendingAction?.roleClaim || pendingAction?.name || '');
   const badge = overlayInstant
     ? overlayInstant.card === 'Перенаправление'
-      ? claimBadge(overlayInstant.card, target?.name)
+      ? claimBadge(overlayInstant.card, target)
       : overlayInstant.card
-    : claimBadge(claimed, target?.name);
+    : claimBadge(claimed, target);
 
   return (
     <div className="staked">

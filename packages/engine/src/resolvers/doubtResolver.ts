@@ -1,7 +1,7 @@
 import type { Action, GameState, RevealOutcome } from '../types';
 import { isRole } from '../cards';
 import { byId, holds, pluck } from '../cardInstance';
-import { declineAcc, verbDoubted, verbCaught } from '../utils/russianText';
+import { accOf, verbCaught, verbDoubted } from '../utils/russianText';
 import { botMemory, evaluateBotDoubt } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
@@ -248,7 +248,7 @@ export function executeRevealOutcome(
   const blackBookNotice = (doubterPlot?.type === 'Чёрная книга' && !wasTruth) ? ' 📕 (Сработала Чёрная книга!)' : '';
   const dossierNotice = dossierBonusPlayerId ? ` 📜 (Досье принесло +1 👑 для ${players.find(p => p.id === dossierBonusPlayerId)?.name}!)` : '';
 
-  const actorAcc = declineAcc(actor.name);
+  const actorAcc = accOf(actor);
   const doubterDoubted = verbDoubted(doubter.name);
   const doubterCaught = verbCaught(doubter.name);
 

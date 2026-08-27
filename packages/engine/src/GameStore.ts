@@ -13,7 +13,7 @@ import {
 } from './cards';
 import { botMemory, clearBotTimer } from './Bot';
 import { ALL_BOT_CANDIDATES, BOT_ARCHETYPES, getBotArchetype, type BotCandidate } from './botsConfig';
-import { declineAcc, shuffleArray } from './utils/russianText';
+import { accOf, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
 import { ACTION_HOLD_MS } from './timing';
 import { triggerResourceFloat } from './utils/visualEffects';
@@ -331,7 +331,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const roleName = action.roleClaim ? `«${action.roleClaim}»` : action.name;
     const target = action.targetId ? players.find(p => p.id === action.targetId) : null;
-    const targetInfo = target ? ` на ${declineAcc(target.name)}` : '';
+    const targetInfo = target ? ` на ${accOf(target)}` : '';
     const stakeNotice = action.roleClaim ? ' (карта на кону)' : '';
     const vbNotice = withVaBanque ? ' 🎲 [ВА-БАНК x2 при проверке!]' : '';
 
