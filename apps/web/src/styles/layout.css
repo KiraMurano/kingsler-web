@@ -1363,7 +1363,15 @@
  * ними то короче, то длиннее — а рука должна находить кнопку там же, где
  * нашла её в прошлый раз. Ширина колонки постоянна по той же причине.
  */
+/* Тревожный красный задан один раз: им залит и блок «что происходит», и
+   кнопка. Пока значение одно, они не разъедутся. */
 .sidecol {
+  --calm-top: rgba(20, 26, 38, 0.92);
+  --calm-bottom: rgba(10, 13, 20, 0.94);
+  --calm-line: var(--line-cold);
+  --alert-top: rgba(38, 16, 24, 0.86);
+  --alert-bottom: rgba(14, 8, 12, 0.9);
+  --alert-line: rgba(180, 64, 90, 0.5);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -1402,33 +1410,37 @@
  * прямоугольник с цветной рамкой, который читается как «выключено».
  */
 .actionbar__col .btn--danger {
-  background: linear-gradient(180deg, #9a2c45 0%, #6c1c2e 100%);
-  border-color: #c4405e;
-  color: #ffe6ec;
+  background: linear-gradient(180deg, var(--alert-top) 0%, var(--alert-bottom) 100%);
+  border-color: var(--alert-line);
+  color: #f0c2cd;
 }
 
 .actionbar__col .btn--danger:hover:not(:disabled) {
-  background: linear-gradient(180deg, #b53a56 0%, #83243a 100%);
+  background: linear-gradient(180deg, rgba(58, 24, 36, 0.92) 0%, rgba(26, 14, 20, 0.94) 100%);
+  border-color: var(--crimson);
+  color: #ffe6ec;
 }
 
 .actionbar__col .btn--good {
-  background: linear-gradient(180deg, #3a705e 0%, #234a3e 100%);
-  border-color: #5b9a86;
-  color: #e2f5ee;
+  background: linear-gradient(180deg, #2f5fb0 0%, #1d3c73 100%);
+  border-color: #4a80d8;
+  color: #dfe9fb;
 }
 
 .actionbar__col .btn--good:hover:not(:disabled) {
-  background: linear-gradient(180deg, #488872 0%, #2c5c4e 100%);
+  background: linear-gradient(180deg, #3b71c9 0%, #254a8b 100%);
 }
 
 .actionbar__col .btn--calm {
-  background: linear-gradient(180deg, #35506f 0%, #1f2f45 100%);
-  border-color: #5f83ae;
-  color: #dbe7f7;
+  background: linear-gradient(180deg, var(--calm-top) 0%, var(--calm-bottom) 100%);
+  border-color: var(--calm-line);
+  color: var(--steel-soft);
 }
 
 .actionbar__col .btn--calm:hover:not(:disabled) {
-  background: linear-gradient(180deg, #42628a 0%, #283c58 100%);
+  background: linear-gradient(180deg, rgba(32, 42, 60, 0.95) 0%, rgba(18, 24, 34, 0.96) 100%);
+  border-color: rgba(95, 131, 174, 0.7);
+  color: #dbe7f7;
 }
 
 .actionbar__col .btn--arcane,
@@ -1576,16 +1588,16 @@
   flex-direction: column;
   padding: 12px 14px;
   border-radius: var(--radius);
-  border: 1px solid var(--line-cold);
-  background: linear-gradient(180deg, rgba(20, 26, 38, 0.92) 0%, rgba(10, 13, 20, 0.94) 100%);
+  border: 1px solid var(--calm-line);
+  background: linear-gradient(180deg, var(--calm-top) 0%, var(--calm-bottom) 100%);
   box-shadow: var(--shadow-sm);
   transition: border-color var(--dur-panel) var(--ease-out),
     background var(--dur-panel) var(--ease-out);
 }
 
 .phase--alert {
-  border-color: rgba(180, 64, 90, 0.5);
-  background: linear-gradient(180deg, rgba(38, 16, 24, 0.86) 0%, rgba(14, 8, 12, 0.9) 100%);
+  border-color: var(--alert-line);
+  background: linear-gradient(180deg, var(--alert-top) 0%, var(--alert-bottom) 100%);
 }
 
 .phase__view {
