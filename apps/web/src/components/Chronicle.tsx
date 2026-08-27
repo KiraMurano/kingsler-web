@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { courtly } from '../lib/text';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';
@@ -46,7 +47,17 @@ interface ChronicleProps {
 }
 
 export const Chronicle: React.FC<ChronicleProps> = ({ open, onClose, onOpenRules }) => {
-  const { history, coronationCandidateId, players } = useGameStore();
+  const {
+    history,
+    coronationCandidateId,
+    players
+  } = useGameStore(
+    useShallow(s => ({
+      history: s.history,
+      coronationCandidateId: s.coronationCandidateId,
+      players: s.players
+    }))
+  );
   const [filter, setFilter] = useState<ChronicleFilter>('all');
 
   const candidate = coronationCandidateId

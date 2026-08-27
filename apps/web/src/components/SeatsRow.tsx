@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { OpponentSeat } from './OpponentSeat';
 import { seatOpponents } from '../lib/seats';
 import { pickViewer } from '../lib/viewer';
@@ -17,7 +18,19 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
   onSelectTarget,
   onInspectCard
 }) => {
-  const { players, activePlayerId, pendingAction, viewerId } = useGameStore();
+  const {
+    players,
+    activePlayerId,
+    pendingAction,
+    viewerId
+  } = useGameStore(
+    useShallow(s => ({
+      players: s.players,
+      activePlayerId: s.activePlayerId,
+      pendingAction: s.pendingAction,
+      viewerId: s.viewerId
+    }))
+  );
   const human = pickViewer(players, viewerId);
   const opponents = seatOpponents(players, human);
 

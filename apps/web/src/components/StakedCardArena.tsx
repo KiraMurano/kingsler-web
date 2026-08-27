@@ -7,6 +7,7 @@
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { GameCard } from '@kinglier/engine/data/cardDescriptions';
 import { courtly } from '../lib/text';
 import { declineGen } from '@kinglier/engine/utils/russianText';
@@ -71,7 +72,16 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
     duelOutcome,
     pendingDuelDefenderRoleClaim,
     overlayInstant
-  } = useGameStore();
+  } = useGameStore(
+    useShallow(s => ({
+      players: s.players,
+      pendingAction: s.pendingAction,
+      turnPhase: s.turnPhase,
+      duelOutcome: s.duelOutcome,
+      pendingDuelDefenderRoleClaim: s.pendingDuelDefenderRoleClaim,
+      overlayInstant: s.overlayInstant
+    }))
+  );
 
   const target = pendingAction?.targetId
     ? players.find(p => p.id === pendingAction.targetId)

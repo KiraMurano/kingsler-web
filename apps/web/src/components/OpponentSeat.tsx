@@ -2,6 +2,7 @@ import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { GameCard, Player } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { courtly } from '../lib/text';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import { dur } from '../motion/tokens.ts';
@@ -36,8 +37,21 @@ interface OpponentSeatProps {
 }
 
 function useSeatSpeech(player: Player): string | null {
-  const { pendingAction, turnPhase, duelOutcome, revealOutcome, activeSpeechReactions } =
-    useGameStore();
+  const {
+    pendingAction,
+    turnPhase,
+    duelOutcome,
+    revealOutcome,
+    activeSpeechReactions
+  } = useGameStore(
+    useShallow(s => ({
+        pendingAction: s.pendingAction,
+        turnPhase: s.turnPhase,
+        duelOutcome: s.duelOutcome,
+        revealOutcome: s.revealOutcome,
+        activeSpeechReactions: s.activeSpeechReactions
+    }))
+  );
 
   const scripted = activeSpeechReactions[player.id];
   if (scripted) return courtly(scripted);
@@ -76,7 +90,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   isDimmed,
   onTarget
 }) => {
-  const { floatingResourceEvents } = useGameStore();
+  const floatingResourceEvents = useGameStore(s => s.floatingResourceEvents);
 
   const speech = useSeatSpeech(player);
   const reduce = !!useReducedMotion();

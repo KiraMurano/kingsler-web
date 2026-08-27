@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
 import { Dialog } from './ui/Overlay';
@@ -11,7 +12,17 @@ import { pickViewer } from '../lib/viewer';
 const FEAST_CROWN_CAP = 5;
 
 export const NormalActionsPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { players, viewerId, performAction } = useGameStore();
+  const {
+    players,
+    viewerId,
+    performAction
+  } = useGameStore(
+    useShallow(s => ({
+      players: s.players,
+      viewerId: s.viewerId,
+      performAction: s.performAction
+    }))
+  );
   const human = pickViewer(players, viewerId);
   if (!human) return null;
 

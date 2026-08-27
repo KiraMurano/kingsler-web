@@ -3,6 +3,7 @@ import { pickViewer } from './lib/viewer';
 import { idOf } from '@kinglier/engine/cardInstance';
 import { useToast } from './lib/toast';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
 import { timerManager } from '@kinglier/engine/utils/timerManager';
 import { TopBar } from './components/TopBar';
@@ -73,7 +74,36 @@ export default function App({
     attackerRetreatDuel,
     attackerAcceptDuel,
     endTurn
-  } = useGameStore();
+  } = useGameStore(
+    useShallow(s => ({
+      players: s.players,
+      deck: s.deck,
+      discardPile: s.discardPile,
+      activePlayerId: s.activePlayerId,
+      turnPhase: s.turnPhase,
+      pendingAction: s.pendingAction,
+      pendingDuelDefenderCardId: s.pendingDuelDefenderCardId,
+      pendingDuelDefenderRoleClaim: s.pendingDuelDefenderRoleClaim,
+      overlayInstant: s.overlayInstant,
+      revealOutcome: s.revealOutcome,
+      duelOutcome: s.duelOutcome,
+      coronationCandidateId: s.coronationCandidateId,
+      coronationOriginId: s.coronationOriginId,
+      viewerId: s.viewerId,
+      startGame: s.startGame,
+      performAction: s.performAction,
+      playPlotAction: s.playPlotAction,
+      playInstant: s.playInstant,
+      doubtAction: s.doubtAction,
+      passDoubt: s.passDoubt,
+      targetAcceptAttack: s.targetAcceptAttack,
+      targetDoubtAttack: s.targetDoubtAttack,
+      targetDeclareDuel: s.targetDeclareDuel,
+      attackerRetreatDuel: s.attackerRetreatDuel,
+      attackerAcceptDuel: s.attackerAcceptDuel,
+      endTurn: s.endTurn
+    }))
+  );
 
   const [normalActionsOpen, setNormalActionsOpen] = useState(false);
   const [roleClaimOpen, setRoleClaimOpen] = useState(false);

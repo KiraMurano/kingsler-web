@@ -24,6 +24,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { Role } from '@kinglier/engine/types';
 import { pickViewer } from '../lib/viewer';
 import { idOf } from '@kinglier/engine/cardInstance';
@@ -79,7 +80,30 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     passVetoWindow,
     openConspiracyDialog,
     endTurnManually
-  } = useGameStore();
+  } = useGameStore(
+    useShallow(s => ({
+        players: s.players,
+        activePlayerId: s.activePlayerId,
+        turnPhase: s.turnPhase,
+        turnSubPhase: s.turnSubPhase,
+        hasUsedNormalActionThisTurn: s.hasUsedNormalActionThisTurn,
+        isVetoed: s.isVetoed,
+        pendingAction: s.pendingAction,
+        pendingDoubtDoubterId: s.pendingDoubtDoubterId,
+        viewerId: s.viewerId,
+        doubtAction: s.doubtAction,
+        passDoubt: s.passDoubt,
+        targetAcceptAttack: s.targetAcceptAttack,
+        targetDoubtAttack: s.targetDoubtAttack,
+        targetDeclareDuel: s.targetDeclareDuel,
+        attackerRetreatDuel: s.attackerRetreatDuel,
+        attackerAcceptDuel: s.attackerAcceptDuel,
+        playInstant: s.playInstant,
+        passVetoWindow: s.passVetoWindow,
+        openConspiracyDialog: s.openConspiracyDialog,
+        endTurnManually: s.endTurnManually
+    }))
+  );
 
   const [duelPicker, setDuelPicker] = useState(false);
   const [redirectPicker, setRedirectPicker] = useState(false);
@@ -442,7 +466,11 @@ export const ActionControls: React.FC<ActionControlsProps> = ({ onOpenNormalActi
     };
   }
 
-  const panelKey = `${windowKey}|${view.variant}`;
+  /* Ключ — только то, что нарисовано. `windowKey` содержит `pendingAction.id`
+     и меняется на каждое действие любого игрока, включая ходы ботов, которые
+     не меняют в панели ни строчки: панель пересоздавалась впустую. Сбросом
+     `busy` `windowKey` по-прежнему занимается — см. эффект выше. */
+  const panelKey = view.variant;
   const fade = reduce ? REDUCED_FADE : dur.panel;
   const travel = reduce ? 0 : SLIDE;
 

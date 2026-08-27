@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { holds } from '@kinglier/engine/cardInstance';
 import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { getCardMaxCopies, TOTAL_DECK_SIZE } from '@kinglier/engine/cards';
@@ -21,7 +22,19 @@ interface CodexProps {
 const ALL_CARDS: GameCard[] = [...ALL_ROLES, ...ALL_PLOTS, ...ALL_INSTANTS];
 
 export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => {
-  const { deck, discardPile, players, viewerId } = useGameStore();
+  const {
+    deck,
+    discardPile,
+    players,
+    viewerId
+  } = useGameStore(
+    useShallow(s => ({
+      deck: s.deck,
+      discardPile: s.discardPile,
+      players: s.players,
+      viewerId: s.viewerId
+    }))
+  );
   const [tab, setTab] = useState<CodexTab>('all');
   const [query, setQuery] = useState('');
 

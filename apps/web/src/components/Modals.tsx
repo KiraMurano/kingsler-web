@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import {
   TOTAL_ROLES_COUNT,
@@ -249,7 +250,21 @@ export const Modals: React.FC<ModalsProps> = ({
     turnPhase,
     winnerId,
     restartGame
-  } = useGameStore();
+  } = useGameStore(
+    useShallow(s => ({
+      players: s.players,
+      viewerId: s.viewerId,
+      pendingAction: s.pendingAction,
+      informantPeekData: s.informantPeekData,
+      conspiracyPrompt: s.conspiracyPrompt,
+      closeInformantPeek: s.closeInformantPeek,
+      closeConspiracyDialog: s.closeConspiracyDialog,
+      activateConspiracy: s.activateConspiracy,
+      turnPhase: s.turnPhase,
+      winnerId: s.winnerId,
+      restartGame: s.restartGame
+    }))
+  );
 
   const human = pickViewer(players, viewerId);
   if (!human) return null;

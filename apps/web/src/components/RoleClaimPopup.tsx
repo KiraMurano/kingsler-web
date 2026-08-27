@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ALL_ROLES, CARD_DESCRIPTIONS, isPlot, isInstant } from '@kinglier/engine/data/cardDescriptions';
 import type { CardId, PlotType, InstantType } from '@kinglier/engine/types';
 import { Button } from './ui/Button';
@@ -53,7 +54,17 @@ export const RoleClaimPopup: React.FC<RoleClaimPopupProps> = ({
     playInstant,
     hasPlayedPlotThisTurn,
     hasPlayedRoleThisTurn
-  } = useGameStore();
+  } = useGameStore(
+    useShallow(s => ({
+      players: s.players,
+      viewerId: s.viewerId,
+      performAction: s.performAction,
+      playPlotAction: s.playPlotAction,
+      playInstant: s.playInstant,
+      hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
+      hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn
+    }))
+  );
   const human = pickViewer(players, viewerId);
 
   const hasVaBanque = !!human && holds(human.hand, 'Ва-банк');
