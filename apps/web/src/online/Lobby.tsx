@@ -4,9 +4,12 @@ import { Check, Copy, Crown, LogIn, CirclePlus, ArrowLeft, LogOut } from 'lucide
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
 import { onlineClient, type LobbyMessage } from './OnlineGameClient';
+import { RulesEditor } from '../rules/RulesEditor';
+import { DEFAULT_RULES, rulesProblems, type GameRules } from '@kinglier/engine/rules';
 import { ROOM_CODE_LENGTH, sanitizeRoomCode } from './roomCode';
 import { useToast } from '../lib/toast';
 import '../styles/screen.css';
+import '../styles/rules.css';
 
 interface LobbyProps {
   onGameStarted: () => void;
@@ -158,6 +161,9 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
   }
 
   const isHost = room.sessionId === lobby.hostSessionId;
+  /* Комната могла быть создана прошлой версией клиента — тогда правил в
+     снапшоте нет, и падать из-за этого лобби не должно. */
+  const rules: GameRules = lobby.rules ?? DEFAULT_RULES;
   const hostPlayerId = lobby.seats[0]?.playerId;
   const emptySeatCount = Math.max(0, MAX_SEATS - lobby.seats.length);
 
@@ -213,8 +219,22 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
             ))}
           </ul>
 
+          {/* Правила видит весь стол, а правит только хост: играть по ним всем,
+              и узнавать о них в первом же ходу — плохая шутка. */}
+          <RulesEditor
+            rules={rules}
+            readOnly={!isHost}
+            onChange={next => onlineClient.sendRules(next)}
+          />
+
           {isHost ? (
-            <Button tone="gold" size="lg" block onClick={() => onlineClient.startGame()}>
+            <Button
+              tone="gold"
+              size="lg"
+              block
+              disabled={rulesProblems(rules).length > 0}
+              onClick={() => onlineClient.startGame()}
+            >
               Начать игру
             </Button>
           ) : (

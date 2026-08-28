@@ -2,6 +2,7 @@ import { Worker } from 'node:worker_threads';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
+import type { GameRules } from '@kinglier/engine/rules';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,8 +38,8 @@ export class GameWorkerClient {
     return () => this.stateListeners.delete(listener);
   }
 
-  startGame(seats: SeatInput[]): void {
-    this.worker.postMessage({ type: 'startGame', seats });
+  startGame(seats: SeatInput[], rules?: GameRules): void {
+    this.worker.postMessage({ type: 'startGame', seats, rules });
   }
 
   call(method: string, args: unknown[]): void {

@@ -45,11 +45,14 @@ type State = {
     isBot: boolean;
     avatar: string;
     title?: string;
+    actionTokens: number;
   }[];
   activePlayerId: string;
+  rules: { crownsToWin: number; actionTokens: number };
 };
 type Lobby = {
   seats: { playerId: string; nickname: string; avatar: string; title: string }[];
+  rules: { crownsToWin: number; actionTokens: number; feastCost: number };
 };
 let hostState: State | null = null;
 let guestState: State | null = null;
@@ -64,6 +67,29 @@ assert.ok(lastLobby, 'host must receive a lobby update after the guest joins');
 assert.equal((lastLobby as Lobby).seats[0].avatar, '/avatars/yulia.webp');
 assert.equal((lastLobby as Lobby).seats[0].title, 'Оппортунист');
 
+// --- Правила партии: их задаёт хост, сервер их нормализует и рассылает ---
+assert.equal((lastLobby as Lobby).rules.crownsToWin, 5, 'в снапшоте лежат дефолтные правила');
+
+let guestLobby: unknown = null;
+guest.onMessage('lobby', data => { guestLobby = data; });
+
+// Мусор от хоста нормализуется, а не принимается как есть.
+host.send('rules', { crownsToWin: 99, feastCost: 6, deck: 'вся колода' });
+await new Promise(resolve => setTimeout(resolve, 200));
+assert.equal((lastLobby as Lobby).rules.crownsToWin, 10, 'выход за диапазон зажат сервером');
+assert.equal((lastLobby as Lobby).rules.feastCost, 6, 'валидное значение принято');
+assert.ok(guestLobby, 'правила разосланы всему столу, а не только хосту');
+assert.equal((guestLobby as Lobby).rules.crownsToWin, 10, 'гость видит те же правила');
+
+// Не-хост правила не меняет.
+guest.send('rules', { crownsToWin: 1 });
+await new Promise(resolve => setTimeout(resolve, 200));
+assert.equal((lastLobby as Lobby).rules.crownsToWin, 10, 'правила от не-хоста отброшены');
+
+// Дальше партия должна начаться на выполнимых правилах.
+host.send('rules', { crownsToWin: 3, actionTokens: 4 });
+await new Promise(resolve => setTimeout(resolve, 200));
+
 host.send('start');
 await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -71,6 +97,15 @@ assert.ok(hostState, 'host must receive a state message once the game starts');
 assert.ok(guestState, 'guest must receive a state message once the game starts');
 assert.equal(hostState!.players.length, 4);
 assert.equal(hostState!.players.filter(p => !p.isBot).length, 2, 'exactly the 2 joined humans, rest are bots');
+
+// Правила хоста доехали до партии и до клиентов — отдельного канала для них нет.
+assert.equal(hostState!.rules.crownsToWin, 3, 'партия идёт по правилам, выставленным в лобби');
+assert.equal(hostState!.rules.actionTokens, 4);
+assert.equal(guestState!.rules.crownsToWin, 3, 'гость получил те же правила в состоянии');
+assert.ok(
+  hostState!.players.every(p => p.actionTokens === 4),
+  'жетоны розданы по правилам партии, а не по дефолту'
+);
 
 // Место в лобби (`seats[0]`) — это очередь входа, а рассадка за столом
 // перемешана: игрок ищется по id, а не по индексу.

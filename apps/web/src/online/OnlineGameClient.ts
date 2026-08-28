@@ -2,6 +2,7 @@ import type { Room } from '@colyseus/sdk';
 import { colyseusClient } from '../auth/AuthClient';
 import { bindOnlineStore } from './bindOnlineStore';
 import { sanitizeRoomCode } from './roomCode';
+import type { GameRules } from '@kinglier/engine/rules';
 
 export interface LobbySeat {
   playerId: string;
@@ -15,6 +16,8 @@ export interface LobbyMessage {
   seats: LobbySeat[];
   hostSessionId: string | null;
   phase: 'WAITING' | 'PLAYING' | 'GAME_OVER';
+  /** Правила партии, уже нормализованные сервером. */
+  rules: GameRules;
 }
 
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'lost';
@@ -89,6 +92,11 @@ export class OnlineGameClient {
     this.room = await colyseusClient.joinById(sanitizeRoomCode(roomId));
     this.watch(this.room);
     return this.room;
+  }
+
+  /** Хост меняет правила партии; сервер их нормализует и разошлёт всем. */
+  sendRules(rules: GameRules): void {
+    this.room?.send('rules', rules);
   }
 
   startGame(): void {

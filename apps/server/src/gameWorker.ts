@@ -2,6 +2,7 @@ import { parentPort } from 'node:worker_threads';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { startBotEngine } from '@kinglier/engine/Bot';
 import { toGameStateData } from '@kinglier/engine/net/gameStateData';
+import { normalizeRules } from '@kinglier/engine/rules';
 
 if (!parentPort) {
   throw new Error('gameWorker.ts must only be run as a worker_threads Worker');
@@ -24,6 +25,7 @@ const ALLOWED_METHODS = new Set([
 interface WorkerMessage {
   type: 'startGame' | 'call' | 'setBotSeat';
   seats?: { id: string; name: string; avatar?: string; title?: string }[];
+  rules?: unknown;
   method?: string;
   args?: unknown[];
   playerId?: string;
@@ -38,7 +40,7 @@ startBotEngine();
 port.on('message', (msg: WorkerMessage) => {
   switch (msg.type) {
     case 'startGame':
-      useGameStore.getState().startGame(msg.seats);
+      useGameStore.getState().startGame(msg.seats, normalizeRules(msg.rules));
       break;
     case 'call': {
       if (!msg.method || !ALLOWED_METHODS.has(msg.method)) return;

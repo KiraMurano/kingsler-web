@@ -6,6 +6,8 @@ import { redactStateForPlayer } from '@kinglier/engine/net/redaction';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
 import { findUserById } from './db.ts';
 import { setActiveSeat, clearActiveSeat } from './activeSeats.ts';
+import { DEFAULT_RULES, normalizeRules } from '@kinglier/engine/rules';
+import type { GameRules } from '@kinglier/engine/rules';
 
 const ACTIVE_PLAYER_ONLY_ACTIONS = new Set([
   'performAction', 'skipNormalActionPhase', 'endTurnManually',
@@ -71,6 +73,8 @@ interface LobbyMessage {
   }[];
   hostSessionId: string | null;
   phase: Phase;
+  /** Правила партии, выставленные хостом. Видны всем — играть по ним всем. */
+  rules: GameRules;
 }
 
 export class KinglierRoom extends Room {
@@ -78,6 +82,7 @@ export class KinglierRoom extends Room {
 
   private seats: Seat[] = [];
   private hostSessionId: string | null = null;
+  private rules: GameRules = DEFAULT_RULES;
   private phase: Phase = 'WAITING';
   protected worker: GameWorkerClient | null = null;
   protected latestState: GameStateData | null = null;
@@ -93,7 +98,8 @@ export class KinglierRoom extends Room {
     // join handshake completes, so it explicitly asks for a fresh snapshot
     // instead of relying on the broadcast sent below (which only reaches
     // clients that were already in the room).
-    lobby: (client: Client) => client.send('lobby', this.lobbySnapshot())
+    lobby: (client: Client) => client.send('lobby', this.lobbySnapshot()),
+    rules: (client: Client, payload: unknown) => this.handleRules(client, payload)
   };
 
   async onAuth(_client: Client, _options: unknown, context: AuthContext): Promise<AuthPayload> {
@@ -221,8 +227,23 @@ export class KinglierRoom extends Room {
         connected: seat.connected
       })),
       hostSessionId: this.hostSessionId,
-      phase: this.phase
+      phase: this.phase,
+      rules: this.rules
     };
+  }
+
+  /**
+   * Правила меняет только хост и только до старта.
+   *
+   * Нормализация здесь не дублирует клиентскую, а заменяет её: клиент шлёт что
+   * угодно, и единственное место, где это становится валидными правилами, —
+   * сервер. Клиентская проверка нужна лишь для того, чтобы объяснить игроку,
+   * что не так, до нажатия «Начать».
+   */
+  protected handleRules(client: Client, payload: unknown): void {
+    if (this.phase !== 'WAITING' || client.sessionId !== this.hostSessionId) return;
+    this.rules = normalizeRules(payload);
+    this.broadcastLobby();
   }
 
   protected broadcastLobby(): void {
@@ -251,7 +272,7 @@ export class KinglierRoom extends Room {
       avatar: seat.avatar,
       title: seat.title
     }));
-    this.worker.startGame(seatInputs);
+    this.worker.startGame(seatInputs, this.rules);
     this.broadcastLobby();
   }
 
