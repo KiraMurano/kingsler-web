@@ -24,6 +24,7 @@
 import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
+import { usePileArrivals } from '../motion/pileTally.ts';
 import type { Zone } from '../motion/zones.ts';
 
 const CARD_BACK = '/assets/cards/back-dual-face.webp';
@@ -55,7 +56,11 @@ const Pile: React.FC<{
  */
 export const CardPiles: React.FC = () => {
   const deckCount = useGameStore(s => s.deck.length);
-  const discardCount = useGameStore(s => s.discardPile.length);
+  /* Движок кладёт карту в сброс в тот же миг, когда решает её судьбу, а лететь
+     ей ещё почти секунду. Считаем доехавшее: подпись не должна обгонять
+     картинку — см. `pileTally`. */
+  const discardInFlight = usePileArrivals('discard');
+  const discardCount = Math.max(0, useGameStore(s => s.discardPile.length) - discardInFlight);
 
   return (
     <div className="piles">

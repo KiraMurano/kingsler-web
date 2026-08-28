@@ -59,6 +59,7 @@ import type { CardId } from '@kinglier/engine/cardInstance';
 import type { GameCard } from '@kinglier/engine/types';
 import { CARD_INFO } from '@kinglier/engine/cards';
 import { useAnchorRects } from './AnchorRegistry.tsx';
+import { markFlyingToPile, markLandedAtPile, type PileKind } from './pileTally.ts';
 import { dur, spring, tilt } from './tokens.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
 import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
@@ -214,6 +215,11 @@ const REVEALED_Z = ZONE_PRECEDENCE.overlay + 10;
  * under scrutiny therefore rises above everything, its own overlay included,
  * for as long as the table is showing it.
  */
+/** Угол со счётчиком — или ничего, если зона не угол. */
+function pileOf(kind: Zone['kind']): PileKind | null {
+  return kind === 'deck' || kind === 'discard' ? kind : null;
+}
+
 function stackOrder(placed: PlacedCard): number {
   if (placed.revealed && !isCorner(placed.zone.kind)) return REVEALED_Z;
   return ZONE_PRECEDENCE[placed.zone.kind];
@@ -429,6 +435,18 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
 
   const flipped = placed.face.known !== null;
 
+  /* Карта может исчезнуть со стола прямо в полёте — при перетасовке сброса в
+     колоду. Отметку о её перелёте надо снять, иначе счётчик под стопкой
+     недосчитается её навсегда. */
+  const cardId = placed.id;
+  useEffect(
+    () => () => {
+      markLandedAtPile('deck', cardId);
+      markLandedAtPile('discard', cardId);
+    },
+    [cardId]
+  );
+
   const flight = useRef<Flight>({
     pos: null,
     vel: { x: { v: 0 }, y: { v: 0 }, scale: { v: 0 } },
@@ -522,6 +540,12 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       f.travel = Math.hypot(target.x - f.pos.x, target.y - f.pos.y);
       f.legAt = f.startAt;
       f.arrived = false;
+      /* Подпись под стопкой ждёт саму карту: пока она в пути, счётчик её не
+         считает. Уход в другую зону снимает отметку так же, как приземление. */
+      const wasPile = pileOf(previous.kind);
+      if (wasPile) markLandedAtPile(wasPile, placed.id);
+      const toPile = pileOf(placed.zone.kind);
+      if (toPile) markFlyingToPile(toPile, placed.id);
       /* Remembered so the card can ride above both the zone it left and the
          zone it is entering for as long as it is in transit — a card crossing
          the table is never briefly behind one it passes. Applied below. */
@@ -555,6 +579,8 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       f.pos = { ...target };
       f.vel.x.v = f.vel.y.v = f.vel.scale.v = 0;
       f.arrived = true;
+      const pile = pileOf(placed.zone.kind);
+      if (pile) markLandedAtPile(pile, placed.id);
     }
 
     drive(zIndex, f.arrived ? resting : Math.max(ZONE_PRECEDENCE[f.fromKind], resting) + 1);
