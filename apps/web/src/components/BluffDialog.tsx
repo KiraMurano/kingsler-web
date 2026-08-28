@@ -58,7 +58,6 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
   if (!staked) return null;
 
   const card = staked.card;
-  const stakedSlot = human.hand.findIndex(h => h.id === staked.id);
   const hasTokens = human.actionTokens >= 1;
 
   const claimRole = (role: Role) => {
@@ -95,11 +94,6 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
       width={640}
       className={withVaBanque ? 'dialog__panel--vabanque' : undefined}
       title={withVaBanque ? 'Розыгрыш под Ва-банком' : 'Розыгрыш или блеф'}
-      description={
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          Карта {stakedSlot + 1}: <Tag tone="gold">{card}</Tag>
-        </span>
-      }
     >
       {hasVaBanque && !hasPlayedRoleThisTurn && (
         <div className="optlist">
@@ -125,26 +119,13 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
         </div>
       )}
 
-      <div
-        className="overlay__desc"
-        style={{
-          margin: '4px 0 10px',
-          color: hasPlayedRoleThisTurn ? 'var(--crimson-soft)' : undefined
-        }}
-      >
-        {hasPlayedRoleThisTurn ? (
-          'За ход можно разыграть только одну роль.'
-        ) : withVaBanque ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            Выберите заявляемую роль · 1 <UiIcon kind="move" size="xs" />
-          </span>
-        ) : (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            Положите карту взакрытую и заявите любую роль двора · 1{' '}
-            <UiIcon kind="move" size="xs" />
-          </span>
-        )}
-      </div>
+      {/* Что делает эта модалка, видно из плиток. Строка остаётся только там,
+          где сетка глухая: иначе шесть погасших ролей ничего не объясняют. */}
+      {hasPlayedRoleThisTurn && (
+        <div className="overlay__desc" style={{ margin: '4px 0 10px', color: 'var(--crimson-soft)' }}>
+          За ход можно разыграть только одну роль.
+        </div>
+      )}
 
       <div className="tilegrid">
         {ALL_ROLES.map(role => {
@@ -157,8 +138,8 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
               art={info.artImage}
               name={role}
               tone={withVaBanque ? 'arcane' : 'gold'}
-              badge={<Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'правда' : 'блеф'}</Tag>}
-              meta={info.cost > 0 ? <>{info.cost} <UiIcon kind="coin" size="xs" /></> : 'бесплатно'}
+              badge={<Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'Правда' : 'Блеф'}</Tag>}
+              meta={info.cost > 0 ? <>{info.cost} <UiIcon kind="coin" size="xs" /></> : undefined}
               desc={renderWithIcons(withVaBanque ? VA_BANQUE_EFFECT[role] : info.shortDescription)}
               disabled={!affordable}
               onClick={() => claimRole(role)}
