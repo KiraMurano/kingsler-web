@@ -26,11 +26,12 @@ export function beginCoronationIfNeeded(
   const origin = originId ?? state.activePlayerId;
   const candidate = state.players.find(p => p.id === candidateId);
   const originPlayer = state.players.find(p => p.id === origin);
+  const crownsToWin = state.rules.crownsToWin;
   set(s => ({
     coronationCandidateId: candidateId,
     coronationOriginId: origin,
     history: [
-      `👑 КРУГ КОРОНАЦИИ! ${candidate?.name ?? 'Фаворит'} набрал 6 👑. Круг начался на ходе ${originPlayer?.name ?? 'текущего игрока'} и завершится в начале его следующего хода.`,
+      `👑 КРУГ КОРОНАЦИИ! ${candidate?.name ?? 'Фаворит'} набрал ${crownsToWin} 👑. Круг начался на ходе ${originPlayer?.name ?? 'текущего игрока'} и завершится в начале его следующего хода.`,
       ...s.history
     ].slice(0, 50)
   }));
@@ -39,9 +40,10 @@ export function beginCoronationIfNeeded(
 export function fallenCoronationPatch(
   candidateId: string | null,
   fallenId: string,
-  newFavor: number
+  newFavor: number,
+  crownsToWin: number
 ): typeof NO_CORONATION | Record<string, never> {
-  if (candidateId === fallenId && newFavor < 6) return NO_CORONATION;
+  if (candidateId === fallenId && newFavor < crownsToWin) return NO_CORONATION;
   return {};
 }
 
@@ -49,12 +51,13 @@ export function resolveCoronationAtTurnStart(
   nextPlayerId: string,
   players: Player[],
   candidateId: string | null,
-  originId: string | null
+  originId: string | null,
+  crownsToWin: number
 ): CoronationTurnVerdict {
   if (!originId || !candidateId) return { kind: 'continue' };
   if (nextPlayerId !== originId) return { kind: 'continue' };
   const candidate = players.find(p => p.id === candidateId);
-  if (candidate && candidate.favor >= 6) {
+  if (candidate && candidate.favor >= crownsToWin) {
     return {
       kind: 'win',
       winnerId: candidate.id,

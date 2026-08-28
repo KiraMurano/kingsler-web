@@ -41,7 +41,7 @@ export function loseCrowns(
   reason: string,
   floatLabel?: string
 ): CrownLossResult {
-  const { players } = get();
+  const { players, rules } = get();
   const idx = players.findIndex(p => p.id === victimId);
   if (idx === -1) return { kind: 'no_crowns' };
   const victim = players[idx];
@@ -66,10 +66,10 @@ export function loseCrowns(
 
   set(state => ({
     players: newPlayers,
-    ...fallenCoronationPatch(state.coronationCandidateId, victimId, newFavor),
+    ...fallenCoronationPatch(state.coronationCandidateId, victimId, newFavor, rules.crownsToWin),
     history: [
-      ...(state.coronationCandidateId === victimId && newFavor < 6
-        ? [`⚖️ Коронация ${victim.name} сорвана: ${reason}. Влияние упало ниже 6 👑!`]
+      ...(state.coronationCandidateId === victimId && newFavor < rules.crownsToWin
+        ? [`⚖️ Коронация ${victim.name} сорвана: ${reason}. Влияние упало ниже ${rules.crownsToWin} 👑!`]
         : []),
       ...state.history
     ].slice(0, 50)

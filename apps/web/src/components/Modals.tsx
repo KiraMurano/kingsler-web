@@ -2,12 +2,6 @@ import React, { useState } from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
-import {
-  TOTAL_ROLES_COUNT,
-  TOTAL_PLOTS_COUNT,
-  TOTAL_INSTANTS_COUNT,
-  TOTAL_DECK_SIZE
-} from '@kinglier/engine/cards';
 import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
 import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '@kinglier/engine/resolvers/plotResolver';
 import { courtly } from '../lib/text';
@@ -181,7 +175,8 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
     activateConspiracy,
     turnPhase,
     winnerId,
-    restartGame
+    restartGame,
+    rules
   } = useGameStore(
     useShallow(s => ({
       players: s.players,
@@ -193,11 +188,21 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
       activateConspiracy: s.activateConspiracy,
       turnPhase: s.turnPhase,
       winnerId: s.winnerId,
-      restartGame: s.restartGame
+      restartGame: s.restartGame,
+      rules: s.rules
     }))
   );
 
   const human = pickViewer(players, viewerId);
+  /* Состав колоды берётся из правил партии, а не из констант: с Фазы 2 его
+     задаёт хост, и справочник обязан показывать ту колоду, которой играют. */
+  const crownsToWin = rules.crownsToWin;
+  const countOf = (cards: readonly GameCard[]) =>
+    cards.reduce((sum, card) => sum + (rules.deck[card] ?? 0), 0);
+  const rolesCount = countOf(ALL_ROLES);
+  const plotsCount = countOf(ALL_PLOTS);
+  const instantsCount = countOf(ALL_INSTANTS);
+  const deckSize = rolesCount + plotsCount + instantsCount;
   if (!human) return null;
 
   // conspiracyPrompt isn't redacted per-viewer (unlike informantPeekData) — it's
@@ -296,7 +301,7 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
         title="Свод законов двора"
         description={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            Единая колода из {TOTAL_DECK_SIZE} карт · цель — удержать 6{' '}
+            Единая колода из {deckSize} карт · цель — удержать {crownsToWin}{' '}
             <UiIcon kind="crown" size="xs" /> полный круг
           </span>
         }
@@ -304,7 +309,7 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
         <div className="rules">
           <div>
             <h4>Колода и победа</h4>
-            {TOTAL_ROLES_COUNT} карт ролей, {TOTAL_PLOTS_COUNT} интриг и {TOTAL_INSTANTS_COUNT}{' '}
+            {rolesCount} карт ролей, {plotsCount} интриг и {instantsCount}{' '}
             инстантов. Побеждает тот, кто первым удержит 6 <UiIcon kind="crown" size="xs" /> целый
             круг. За выигранные споры начисляются печати: 2 <UiIcon kind="bulla" size="xs" />{' '}
             обращаются в 1 <UiIcon kind="crown" size="xs" />.

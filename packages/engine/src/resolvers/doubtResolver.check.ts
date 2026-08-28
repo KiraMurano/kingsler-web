@@ -11,6 +11,7 @@ import { useGameStore } from '../GameStore.ts';
 import { executeRevealOutcome } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 function human(id: string, hand: GameCard[]): Player {
   return {
@@ -261,6 +262,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     activePlayerId: 'p1',
     turnPhase: 'DOUBT_WINDOW' as GameState['turnPhase'],
     turnSubPhase: 'CARD_PLAY_PHASE' as GameState['turnSubPhase'],
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     pendingAction: null as Action | null,

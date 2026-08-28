@@ -14,6 +14,7 @@ import {
   disruptPlayerPlotsOnLoss
 } from './plotResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
   return {
@@ -40,6 +41,7 @@ function plotter(charges: number): Player {
 
 function makeHarness(players: Player[]) {
   const api = {
+    rules: DEFAULT_RULES,
     players,
     discardPile: [] as CardInstance[],
     activePlayerId: players[0].id,

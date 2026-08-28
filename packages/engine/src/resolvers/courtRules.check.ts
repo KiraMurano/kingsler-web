@@ -14,6 +14,7 @@ import {
   resolvePendingActionEffect
 } from './doubtResolver.ts';
 import { faces, idOf, mintDeck } from '../cardInstance.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
   (globalThis as { window: typeof globalThis }).window = globalThis;
@@ -55,6 +56,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     timerSeconds: 0,
     timerMaxSeconds: 0,
     isTimerPaused: false,
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     pendingAction: null as Action | null,

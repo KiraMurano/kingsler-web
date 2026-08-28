@@ -24,6 +24,7 @@ import {
 import { timerManager } from '../utils/timerManager.ts';
 import { VETO_WINDOW_MS } from '../timing.ts';
 import { assertCardCensus } from './cardCensus.check.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
   (globalThis as { window: typeof globalThis }).window = globalThis;
@@ -62,6 +63,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     timerSeconds: 0,
     timerMaxSeconds: 0,
     isTimerPaused: false,
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     pendingAction: null as Action | null,

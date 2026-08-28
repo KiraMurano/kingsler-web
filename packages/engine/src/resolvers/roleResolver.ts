@@ -21,10 +21,11 @@ export function resolveRoleActionEffect(
   let actor = newPlayers[actorIdx];
   const role = action.roleClaim;
   const isVB = isAfterTruthChallenge && get().isVaBanqueActive;
+  const crownsToWin = get().rules.crownsToWin;
 
   if (role === 'Наследник') {
     const crowns = isVB ? 2 : 1;
-    const targetFavor = Math.min(6, actor.favor + crowns);
+    const targetFavor = Math.min(crownsToWin, actor.favor + crowns);
     const actualGained = targetFavor - actor.favor;
     actor = { ...actor, favor: targetFavor };
     newPlayers[actorIdx] = actor;
@@ -87,7 +88,7 @@ export function resolveRoleActionEffect(
     if (stolen > 0) {
       const idx = newPlayers.findIndex(p => p.id === action.actorId);
       const thief = newPlayers[idx];
-      const nextFavor = Math.min(6, thief.favor + stolen);
+      const nextFavor = Math.min(crownsToWin, thief.favor + stolen);
       const actualGained = nextFavor - thief.favor;
       newPlayers[idx] = { ...thief, favor: nextFavor };
       set({ players: newPlayers });

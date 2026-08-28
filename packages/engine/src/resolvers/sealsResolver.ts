@@ -14,12 +14,13 @@ export function addSealsToPlayer(
   count: number
 ): void {
   if (count <= 0) return;
-  const { players } = get();
+  const { players, rules } = get();
+  const crownsToWin = rules.crownsToWin;
   const pIdx = players.findIndex(p => p.id === playerId);
   if (pIdx === -1) return;
 
   const player = players[pIdx];
-  if (player.favor >= 6) return;
+  if (player.favor >= crownsToWin) return;
 
   /* Цена «Охранной грамоты»: пока она лежит, печати держателю не идут.
      Именно не идут, а не копятся — иначе защита была бы бесплатной, а после
@@ -37,7 +38,7 @@ export function addSealsToPlayer(
   const totalSeals = player.seals + count;
   const gainedCrowns = Math.floor(totalSeals / 2);
   const newFavor = player.favor + gainedCrowns;
-  const remainderSeals = newFavor >= 6 ? 0 : (totalSeals % 2);
+  const remainderSeals = newFavor >= crownsToWin ? 0 : (totalSeals % 2);
 
   // Royal Bulla trigger: +1 🪙 from treasury when gaining seals!
   const hasRoyalCharter = player.activePlot?.type === 'Золотая булла';
@@ -47,7 +48,7 @@ export function addSealsToPlayer(
     ...player,
     gold: player.gold + charterBonusGold,
     seals: remainderSeals,
-    favor: Math.min(6, newFavor)
+    favor: Math.min(crownsToWin, newFavor)
   };
 
   const newPlayers = [...players];
@@ -75,7 +76,7 @@ export function addSealsToPlayer(
     history: [`⚜️ ${player.name} получает +${count} ⚜️ Королевскую печать.${charterNotice}${conversionNotice}`, ...state.history].slice(0, 50)
   }));
 
-  if (updatedPlayer.favor >= 6) {
+  if (updatedPlayer.favor >= crownsToWin) {
     beginCoronationIfNeeded(get, set, updatedPlayer.id);
   }
 }

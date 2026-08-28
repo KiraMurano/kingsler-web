@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import type { GameState, Player } from '../types.ts';
 import { beginCoronationIfNeeded, resolveCoronationAtTurnStart } from './coronation.ts';
 import { mintDeck } from '../cardInstance.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -33,6 +34,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     timerSeconds: 0,
     timerMaxSeconds: 0,
     isTimerPaused: false,
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     pendingAction: null,
@@ -66,19 +68,24 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   return { get, set, api };
 }
 
+/* Порог победы теперь задаётся правилами партии, поэтому тесты считают его от
+   `WIN`, а не от прежней зашитой шестёрки. */
+const WIN = DEFAULT_RULES.crownsToWin;
+
 const table = [
-  player({ id: 'p1', name: 'Анна', favor: 6 }),
+  player({ id: 'p1', name: 'Анна', favor: WIN }),
   player({ id: 'p2', name: 'Борис', isBot: true }),
   player({ id: 'p3', name: 'Вера', isBot: true }),
   player({ id: 'p4', name: 'Глеб', isBot: true })
 ];
 
-function verdictAt(nextId: string, favor = 6) {
+function verdictAt(nextId: string, favor = WIN) {
   return resolveCoronationAtTurnStart(
     nextId,
     table.map(p => p.id === 'p1' ? { ...p, favor } : p),
     'p1',
-    'p2'
+    'p2',
+    WIN
   );
 }
 
@@ -103,10 +110,10 @@ const win = verdictAt('p2');
 assert.equal(win.kind, 'win');
 if (win.kind === 'win') assert.equal(win.winnerId, 'p1');
 
-assert.equal(verdictAt('p2', 5).kind, 'abort');
+assert.equal(verdictAt('p2', WIN - 1).kind, 'abort', 'ниже порога — срыв');
 
 {
-  const ownTurn = resolveCoronationAtTurnStart(table[0].id, table, 'p1', 'p1');
+  const ownTurn = resolveCoronationAtTurnStart(table[0].id, table, 'p1', 'p1', WIN);
   assert.equal(ownTurn.kind, 'win');
 }
 

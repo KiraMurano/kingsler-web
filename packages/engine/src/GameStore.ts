@@ -146,7 +146,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         gold: 2,
         favor: 0,
         seals: 0,
-        actionTokens: 2,
+        actionTokens: rules.actionTokens,
         hand: [deck.pop()!, deck.pop()!],
         activePlot: null
       })),
@@ -159,7 +159,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         gold: 2,
         favor: 0,
         seals: 0,
-        actionTokens: 2,
+        actionTokens: rules.actionTokens,
         hand: [deck.pop()!, deck.pop()!],
         activePlot: null
       }))

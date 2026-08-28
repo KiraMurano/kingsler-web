@@ -364,7 +364,8 @@ export function applyMorningPlotReward(get: StateGetter, set: StateSetter, actio
     idx,
     discardPile,
     coronationCandidateId,
-    set
+    set,
+    get().rules.crownsToWin
   );
   set({
     players: result.updatedPlayers,
@@ -402,7 +403,8 @@ export function resolveMorningPlots(
   nextIndex: number,
   curDiscard: CardInstance[],
   coronationCandidateId: string | null,
-  set: StateSetter
+  set: StateSetter,
+  crownsToWin: number
 ): {
   updatedPlayers: Player[];
   curDiscard: CardInstance[];
@@ -415,7 +417,7 @@ export function resolveMorningPlots(
 
   if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Королевский приём') {
     const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Королевский приём' };
-    const newFavor = Math.min(6, nextPlayerUpdated.favor + 1);
+    const newFavor = Math.min(crownsToWin, nextPlayerUpdated.favor + 1);
     nextPlayerUpdated = {
       ...nextPlayerUpdated,
       favor: newFavor,
@@ -429,15 +431,15 @@ export function resolveMorningPlots(
       history: [`👑 Королевский приём ${genOf(nextPlayerUpdated)} успешно состоялся! Получено +1 👑!`, ...state.history].slice(0, 50)
     }));
 
-    if (newFavor >= 6 && !coronationCandidateId) {
+    if (newFavor >= crownsToWin && !coronationCandidateId) {
       coronationTriggeredByReception = true;
     }
   } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Золотая булла') {
     const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Золотая булла' };
     const totalSeals = nextPlayerUpdated.seals + 1;
     const gainedCrowns = Math.floor(totalSeals / 2);
-    const newFavor = Math.min(6, nextPlayerUpdated.favor + gainedCrowns);
-    const remainderSeals = newFavor >= 6 ? 0 : (totalSeals % 2);
+    const newFavor = Math.min(crownsToWin, nextPlayerUpdated.favor + gainedCrowns);
+    const remainderSeals = newFavor >= crownsToWin ? 0 : (totalSeals % 2);
 
     nextPlayerUpdated = {
       ...nextPlayerUpdated,
@@ -459,7 +461,7 @@ export function resolveMorningPlots(
       history: [`📜 «Золотая булла» ${genOf(nextPlayerUpdated)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
     }));
 
-    if (newFavor >= 6 && !coronationCandidateId) {
+    if (newFavor >= crownsToWin && !coronationCandidateId) {
       coronationTriggeredByReception = true;
     }
   } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Сеть информаторов') {

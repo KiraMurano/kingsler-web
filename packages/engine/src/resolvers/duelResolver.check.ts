@@ -25,6 +25,7 @@ import { addSealsToPlayer } from './sealsResolver.ts';
 import { botMemory } from '../bot/botMemory.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { assertCardCensus, locateCards } from './cardCensus.check.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 /** Like `mintDeck`, but ids stay unique across hands — two seats holding
  *  `c0` would make the whole-state card census meaningless. */
@@ -62,6 +63,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     isVetoed: false,
     isPendingActionAfterTruthChallenge: false,
     overlayInstant: null,
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     activeSpeechReactions: {} as Record<string, string>,

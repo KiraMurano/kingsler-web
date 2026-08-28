@@ -168,6 +168,7 @@ export function executeRevealOutcome(
   let sealsCount = 0;
   let dossierBonusPlayerId: string | undefined = undefined;
   const doubterPlot = doubter.activePlot;
+  const crownsToWin = get().rules.crownsToWin;
 
   if (wasTruth) {
     // Failed check: Black Book is discarded without reward
@@ -177,15 +178,15 @@ export function executeRevealOutcome(
     }
 
     if (claimedRole === 'Шут') {
-      if (actor.favor < 6) {
-        const nextFavor = Math.min(6, actor.favor + 1);
+      if (actor.favor < crownsToWin) {
+        const nextFavor = Math.min(crownsToWin, actor.favor + 1);
         const gained = nextFavor - actor.favor;
         newPlayers[actorIdx] = { ...actor, favor: nextFavor };
         jesterBonus = true;
         triggerResourceFloat(set, actor.id, `+${gained} 👑`, true);
       }
 
-      if (newPlayers[actorIdx].favor >= 6) {
+      if (newPlayers[actorIdx].favor >= crownsToWin) {
         beginCoronationIfNeeded(get, set, actor.id);
       }
     } else {
@@ -200,8 +201,8 @@ export function executeRevealOutcome(
     // Check Black Book (Чёрная книга) for doubter: grants +1 👑 directly, NO seals!
     if (doubterPlot && doubterPlot.type === 'Чёрная книга') {
       blackBookApplied = true;
-      if (doubter.favor < 6) {
-        const nextFavor = Math.min(6, doubter.favor + 1);
+      if (doubter.favor < crownsToWin) {
+        const nextFavor = Math.min(crownsToWin, doubter.favor + 1);
         const gained = nextFavor - doubter.favor;
         newPlayers[doubterIdx] = {
           ...newPlayers[doubterIdx],
@@ -217,7 +218,7 @@ export function executeRevealOutcome(
       }
       set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
 
-      if (newPlayers[doubterIdx].favor >= 6) {
+      if (newPlayers[doubterIdx].favor >= crownsToWin) {
         beginCoronationIfNeeded(get, set, doubter.id);
       }
     } else {
@@ -232,7 +233,7 @@ export function executeRevealOutcome(
       const dossierCardId = dossierOwner.activePlot!.cardId;
       dossierBonusPlayerId = dossierOwner.id;
       const dIdx = newPlayers.findIndex(p => p.id === dossierOwner.id);
-      const dNextFavor = Math.min(6, dossierOwner.favor + 1);
+      const dNextFavor = Math.min(crownsToWin, dossierOwner.favor + 1);
       const dGained = dNextFavor - dossierOwner.favor;
       newPlayers[dIdx] = {
         ...newPlayers[dIdx],
@@ -242,7 +243,7 @@ export function executeRevealOutcome(
       triggerResourceFloat(set, dossierOwner.id, `+${dGained} 👑 Досье!`, true);
       set(state => ({ discardPile: [...state.discardPile, { id: dossierCardId, card: 'Досье' as const }] }));
 
-      if (newPlayers[dIdx].favor >= 6) {
+      if (newPlayers[dIdx].favor >= crownsToWin) {
         beginCoronationIfNeeded(get, set, dossierOwner.id);
       }
     }

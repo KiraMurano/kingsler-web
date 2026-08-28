@@ -21,12 +21,13 @@ function applyCoronationTurnStart(
   players: Player[],
   extra: Partial<GameState>
 ): boolean {
-  const { coronationCandidateId, coronationOriginId } = get();
+  const { coronationCandidateId, coronationOriginId, rules } = get();
   const verdict = resolveCoronationAtTurnStart(
     nextPlayerId,
     players,
     coronationCandidateId,
-    coronationOriginId
+    coronationOriginId,
+    rules.crownsToWin
   );
   switch (verdict.kind) {
     case 'win':
@@ -60,7 +61,7 @@ export function checkEndgameAndAdvanceTurn(
   const actor = players.find(p => p.id === activePlayerId);
 
   if (!coronationCandidateId) {
-    const favorite = players.find(p => p.favor >= 6);
+    const favorite = players.find(p => p.favor >= get().rules.crownsToWin);
     if (favorite) beginCoronationIfNeeded(get, set, favorite.id);
   }
 
@@ -106,10 +107,10 @@ export function endTurn(
   const nextIndex = (currentIndex + 1) % refilledPlayers.length;
   const nextPlayer = refilledPlayers[nextIndex];
 
-  // 2. Refill nextPlayer action tokens to 2 at turn start
+  // 2. Восполнение жетонов в начале хода — до значения из правил партии.
   const updatedPlayers = refilledPlayers.map(p => {
     if (p.id === nextPlayer.id) {
-      return { ...p, actionTokens: 2 };
+      return { ...p, actionTokens: get().rules.actionTokens };
     }
     return p;
   });
@@ -177,7 +178,14 @@ export function endTurn(
     curDiscard: morningDiscard,
     coronationTriggeredByReception,
     nextPlayerUpdated
-  } = resolveMorningPlots(updatedPlayers, nextIndex, curDiscard, get().coronationCandidateId, set);
+  } = resolveMorningPlots(
+    updatedPlayers,
+    nextIndex,
+    curDiscard,
+    get().coronationCandidateId,
+    set,
+    get().rules.crownsToWin
+  );
 
   set({
     players: morningPlayers,

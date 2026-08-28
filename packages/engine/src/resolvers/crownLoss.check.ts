@@ -7,6 +7,10 @@ import assert from 'node:assert/strict';
 import type { CardInstance, GameState, Player } from '../types.ts';
 import { burnCharter, discardProtectiveIntrigueOnBluff, loseCrowns } from './crownLoss.ts';
 import { disruptPlayerPlotsOnLoss } from './plotResolver.ts';
+import { DEFAULT_RULES } from '../rules.ts';
+
+/** Порог победы задаётся правилами — тесты считают от него, а не от числа. */
+const WIN = DEFAULT_RULES.crownsToWin;
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
   return {
@@ -28,6 +32,7 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   const api = {
     players,
     discardPile: [] as CardInstance[],
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
@@ -76,7 +81,7 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
 // --- 4. Потеря срывает круг коронации ---
 {
   const { api, get, set } = makeHarness(
-    [player({ id: 'p1', favor: 6 })],
+    [player({ id: 'p1', favor: WIN })],
     { coronationCandidateId: 'p1', coronationOriginId: 'p2' }
   );
   loseCrowns(get, set, 'p1', 1, 'обвинения в измене');
@@ -148,14 +153,14 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   const { api, get, set } = makeHarness(
     [player({
       id: 'p1',
-      favor: 6,
+      favor: WIN,
       activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
     })],
     { coronationCandidateId: 'p1', coronationOriginId: 'p2' }
   );
   loseCrowns(get, set, 'p1', 1, 'обвинения в измене');
   assert.equal(api.coronationCandidateId, 'p1', 'круг коронации не сорван');
-  assert.equal(api.players[0].favor, 6);
+  assert.equal(api.players[0].favor, WIN);
 }
 
 // --- 9б. Грамота держит и удар «Тайного заговора» ---

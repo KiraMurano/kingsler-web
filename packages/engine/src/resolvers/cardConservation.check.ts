@@ -14,6 +14,7 @@ import { resolveRoleActionEffect } from './roleResolver.ts';
 import { checkEndgameAndAdvanceTurn } from './turnResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { allCardIds, assertCardCensus, type CardCensusState } from './cardCensus.check.ts';
+import { DEFAULT_RULES } from '../rules.ts';
 
 /** Like `mintDeck`, but ids stay unique across hands — two seats both holding
  *  `c0` would make the whole-state card census meaningless. */
@@ -45,6 +46,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     activePlayerId: 'p1',
     turnPhase: 'IDLE' as GameState['turnPhase'],
     turnSubPhase: 'CARD_PLAY_PHASE' as GameState['turnSubPhase'],
+    rules: DEFAULT_RULES,
     coronationCandidateId: null as string | null,
     coronationOriginId: null as string | null,
     pendingAction: null as Action | null,
