@@ -1,4 +1,4 @@
-import type { Action, GameState, RevealOutcome } from '../types';
+import type { Action, GameRules, GameState, Player, RevealOutcome } from '../types';
 import { isRole } from '../cards';
 import { byId, pluck } from '../cardInstance';
 import { accOf, verbCaught, verbDoubted } from '../utils/russianText';
@@ -15,6 +15,37 @@ type StateGetter = () => GameState;
 type StateSetter = (
   partial: Partial<GameState> | ((state: GameState) => Partial<GameState>)
 ) => void;
+
+/**
+ * Чем игрок может оплатить проверку «НЕ ВЕРЮ!» — и может ли вообще.
+ *
+ * Жетон приоритетнее золота: он восполняется в начале хода, золото — нет.
+ * Золотая оплата открывается двумя правилами. «Платная проверка» разрешает её
+ * любому; «Срыв масок» — только жертве текущей атаки Вора или Шантажиста, то
+ * есть ровно тому, кого бьют и кому нечем ответить. Правила
+ * взаимоисключающие, это гарантирует `normalizeRules`.
+ */
+export function doubtPayment(
+  rules: GameRules,
+  doubter: Player,
+  pendingAction: Action
+): { tokens: number; gold: number } | null {
+  if (doubter.actionTokens >= 1) return { tokens: 1, gold: 0 };
+
+  if (rules.paidDoubtEnabled) {
+    return doubter.gold >= rules.paidDoubtCost ? { tokens: 0, gold: rules.paidDoubtCost } : null;
+  }
+
+  if (rules.unmaskEnabled) {
+    const isAttackVictim =
+      pendingAction.targetId === doubter.id &&
+      (pendingAction.roleClaim === 'Вор' || pendingAction.roleClaim === 'Шантажист');
+    if (!isAttackVictim) return null;
+    return doubter.gold >= rules.unmaskCost ? { tokens: 0, gold: rules.unmaskCost } : null;
+  }
+
+  return null;
+}
 
 export function doubtAction(
   get: StateGetter,
@@ -34,14 +65,30 @@ export function doubtAction(
   const doubter = players.find(p => p.id === doubterId);
   if (!actor || !doubter) return;
 
-  // Doubter must spend 1 Action Token!
-  if (doubter.actionTokens < 1) {
-    return;
-  }
+  /* Чем платят за проверку.
+   *
+   * Жетон — всегда первый выбор: он восполнится в начале хода, а золото нет.
+   * Золото включается только когда жетона нет и правила это разрешают. Выбор
+   * не предлагается игроку: диалог «чем платите?» — это лишний клик в каждом
+   * споре и лишняя ветка в ботах, а выигрыша в решениях он не даёт. */
+  const payment = doubtPayment(get().rules, doubter, pendingAction);
+  if (!payment) return;
 
-  // Deduct 1 Action Token from doubter immediately
-  let newPlayers = players.map(p => p.id === doubter.id ? { ...p, actionTokens: p.actionTokens - 1 } : p);
-  triggerResourceFloat(set, doubter.id, '-1 ⚡', false);
+  let newPlayers = players.map(p =>
+    p.id === doubter.id
+      ? {
+          ...p,
+          actionTokens: p.actionTokens - payment.tokens,
+          gold: p.gold - payment.gold
+        }
+      : p
+  );
+  triggerResourceFloat(
+    set,
+    doubter.id,
+    payment.tokens > 0 ? '-1 ⚡' : `-${payment.gold} 🪙 проверка`,
+    false
+  );
 
   // Informant Network trigger: all OTHER holders (not the doubter) receive +1 🪙 for checks by other players!
   const informantHolders = newPlayers.filter(p => p.activePlot?.type === 'Сеть информаторов' && p.id !== doubter.id);

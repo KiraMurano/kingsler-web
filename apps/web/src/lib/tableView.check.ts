@@ -13,6 +13,7 @@ import { deriveTableView } from './tableView.ts';
 import type { TableViewInput } from './tableView.ts';
 import type { Action, GameCard, Player } from '@kinglier/engine/types';
 import type { CardInstance } from '@kinglier/engine/cardInstance';
+import { DEFAULT_RULES } from '@kinglier/engine/rules';
 
 let seq = 0;
 function hand(...cards: GameCard[]): CardInstance[] {
@@ -49,6 +50,8 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
     isVetoed: false,
+  vetoOnVeto: false,
+  rules: DEFAULT_RULES,
     vetoDeadlineAt: null,
     coronationCandidateId: null,
     revealOutcome: null,

@@ -24,6 +24,8 @@ import type {
   Role
 } from '@kinglier/engine/types';
 import { accOf, genOf } from '@kinglier/engine/utils/russianText';
+import type { GameRules } from '@kinglier/engine/rules';
+import { doubtPayment } from '@kinglier/engine/resolvers/doubtResolver';
 
 /** Инстанты, которые владелец может выложить открыто в свой ход. */
 const OPENLY_PLAYABLE_INSTANTS: GameCard[] = [
@@ -150,6 +152,8 @@ export interface TableViewInput {
   isVetoed: boolean;
   /** Разрешено ли правилами партии класть вето поверх вето. */
   vetoOnVeto: boolean;
+  /** Правила партии целиком — из них берётся цена платной проверки. */
+  rules: GameRules;
   vetoDeadlineAt: number | null;
   coronationCandidateId: string | null;
   revealOutcome: RevealOutcome | null;
@@ -330,6 +334,23 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
   const hasTokens = viewer.actionTokens >= 1;
   const noTokens = hasTokens ? undefined : 'Нет жетонов действия.';
 
+  /* Проверку можно оплатить золотом, если правила это разрешают, а жетона нет.
+     Кнопка обязана показывать, чем именно платит игрок: цена в 🪙 — это уже не
+     «бесплатная реакция за жетон», и путать одно с другим нельзя. */
+  const payment = input.pendingAction
+    ? doubtPayment(input.rules, viewer, input.pendingAction)
+    : null;
+  const paysGold = !!payment && payment.gold > 0;
+  const canDoubt = !!payment;
+  const doubtLabel = paysGold ? `Не верю · ${payment.gold} 🪙` : 'Не верю';
+  const doubtReason = canDoubt
+    ? undefined
+    : hasTokens
+      ? undefined
+      : input.rules.paidDoubtEnabled || input.rules.unmaskEnabled
+        ? 'Нет жетонов, а золота не хватает на платную проверку.'
+        : noTokens;
+
   switch (phase) {
     case 'turn': {
       /* Пока выбирают карты к обмену, колонка показывает только этот выбор.
@@ -398,13 +419,15 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
       return [
         {
           kind: 'doubt',
-          spendsToken: true,
-          tokenBlocked: !hasTokens,
-          label: 'Не верю',
+          spendsToken: !paysGold,
+          tokenBlocked: !canDoubt,
+          label: doubtLabel,
           tone: 'danger',
-          disabled: !hasTokens,
-          hint: 'Проверить заявление. Карта вскроется — и кто-то из двоих потеряет её',
-          reason: noTokens
+          disabled: !canDoubt,
+          hint: paysGold
+            ? 'Купить проверку за золото. Карта вскроется — и кто-то из двоих потеряет её'
+            : 'Проверить заявление. Карта вскроется — и кто-то из двоих потеряет её',
+          reason: doubtReason
         },
         {
           kind: 'believe',
@@ -429,13 +452,15 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         },
         {
           kind: 'doubt',
-          spendsToken: true,
-          tokenBlocked: !hasTokens,
-          label: 'Не верю',
+          spendsToken: !paysGold,
+          tokenBlocked: !canDoubt,
+          label: doubtLabel,
           tone: 'danger',
-          disabled: !hasTokens,
-          hint: 'Проверить заявление нападающего. Его карта вскроется',
-          reason: noTokens
+          disabled: !canDoubt,
+          hint: paysGold
+            ? 'Сорвать маску за золото. Карта нападающего вскроется'
+            : 'Проверить заявление нападающего. Его карта вскроется',
+          reason: doubtReason
         }
       ];
     case 'duel-answer':
