@@ -28,7 +28,7 @@ export function executeNormalAction(
     newPlayers[actorIdx] = actor;
     triggerResourceFloat(set, actor.id, '+1 🪙', true);
   } else if (action.name.includes('Пир') || action.name.includes('пир')) {
-    if (actor.favor < 5) {
+    if (actor.favor < get().rules.crownsToWin - 1) {
       actor = { ...actor, favor: actor.favor + 1 };
       newPlayers[actorIdx] = actor;
       triggerResourceFloat(set, actor.id, '+1 👑', true);

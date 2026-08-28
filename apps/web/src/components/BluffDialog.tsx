@@ -38,12 +38,13 @@ interface BluffDialogProps {
 }
 
 export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose }) => {
-  const { players, viewerId, performAction, hasPlayedRoleThisTurn } = useGameStore(
+  const { players, viewerId, performAction, hasPlayedRoleThisTurn, rules } = useGameStore(
     useShallow(s => ({
       players: s.players,
       viewerId: s.viewerId,
       performAction: s.performAction,
-      hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn
+      hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn,
+      rules: s.rules
     }))
   );
   const human = pickViewer(players, viewerId);
@@ -130,7 +131,12 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
       <div className="tilegrid">
         {ALL_ROLES.map(role => {
           const info = CARD_DESCRIPTIONS[role];
-          const affordable = human.gold >= info.cost && hasTokens && !hasPlayedRoleThisTurn;
+          /* «Шантажист» может стоить золота по правилам партии — и платит его
+             заявитель, а не только тот, кому поверили. Плитка обязана
+             показывать эту цену и гаснуть, когда денег нет: иначе клик уйдёт
+             в движок и молча отклонится. */
+          const cost = info.cost + (role === 'Шантажист' ? rules.blackmailCost : 0);
+          const affordable = human.gold >= cost && hasTokens && !hasPlayedRoleThisTurn;
           const truthful = role === card;
           return (
             <Tile
@@ -139,7 +145,7 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
               name={role}
               tone={withVaBanque ? 'arcane' : 'gold'}
               badge={<Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'Правда' : 'Блеф'}</Tag>}
-              meta={info.cost > 0 ? <>{info.cost} <UiIcon kind="coin" size="xs" /></> : undefined}
+              meta={cost > 0 ? <>{cost} <UiIcon kind="coin" size="xs" /></> : undefined}
               desc={renderWithIcons(withVaBanque ? VA_BANQUE_EFFECT[role] : info.shortDescription)}
               disabled={!affordable}
               onClick={() => claimRole(role)}

@@ -121,4 +121,116 @@ for (const actionTokens of [1, 2, 5]) {
   timerManager.clearAll();
 }
 
+// ==========================================================================
+// Экономика: пир, слух, шантаж
+// ==========================================================================
+
+/** Заявляет действие от лица `meId` и говорит, приняли ли его. */
+function acted(meId: string, action: Parameters<ReturnType<typeof useGameStore.getState>['performAction']>[0]): boolean {
+  const before = useGameStore.getState().players.find(p => p.id === meId)!;
+  useGameStore.getState().performAction(action);
+  const after = useGameStore.getState().players.find(p => p.id === meId)!;
+  timerManager.clearAll();
+  return after.actionTokens < before.actionTokens;
+}
+
+// --- Пир стоит feastCost и заперт на crownsToWin - 1 ---
+{
+  const meId = table({ feastCost: 7, crownsToWin: 6 });
+  patch(meId, { gold: 10, favor: 0 });
+  assert.equal(acted(meId, { type: 'normal', name: 'Устроить пир', actorId: meId, costGold: 7, costTokens: 1, description: '' }), true);
+  assert.equal(useGameStore.getState().players.find(p => p.id === meId)!.gold, 3, 'списано 7 🪙');
+}
+{
+  const meId = table({ feastCost: 2, crownsToWin: 6 });
+  patch(meId, { gold: 10, favor: 5 });
+  assert.equal(
+    acted(meId, { type: 'normal', name: 'Устроить пир', actorId: meId, costGold: 2, costTokens: 1, description: '' }),
+    false,
+    'на crownsToWin - 1 короне пир заперт'
+  );
+}
+{
+  const meId = table({ feastCost: 2, crownsToWin: 6 });
+  patch(meId, { gold: 1, favor: 0 });
+  assert.equal(
+    acted(meId, { type: 'normal', name: 'Устроить пир', actorId: meId, costGold: 2, costTokens: 1, description: '' }),
+    false,
+    'без золота пир недоступен'
+  );
+}
+
+// --- Слух стоит rumorCost ---
+{
+  const meId = table({ rumorCost: 8 });
+  const victim = useGameStore.getState().players[1].id;
+  patch(meId, { gold: 9 });
+  patch(victim, { favor: 2 });
+  assert.equal(
+    acted(meId, { type: 'normal', name: 'Распустить слух', actorId: meId, targetId: victim, costGold: 8, costTokens: 1, description: '' }),
+    true
+  );
+  assert.equal(useGameStore.getState().players.find(p => p.id === meId)!.gold, 1, 'списано 8 🪙');
+}
+
+// --- Шантаж: цена списывается при заявлении ---
+{
+  const meId = table({ blackmailCost: 4 });
+  const victim = useGameStore.getState().players[1].id;
+  patch(meId, { gold: 6, hand: hand(['Шантажист', 'Шут']) });
+  patch(victim, { favor: 3, gold: 3, activePlot: null });
+
+  const staked = useGameStore.getState().players.find(p => p.id === meId)!.hand[0].id;
+  assert.equal(
+    acted(meId, {
+      type: 'role', name: 'Шантажист', actorId: meId, targetId: victim,
+      roleClaim: 'Шантажист', stakedCardId: staked, costGold: 0, costTokens: 1, description: ''
+    }),
+    true,
+    'заявка принята'
+  );
+  assert.equal(
+    useGameStore.getState().players.find(p => p.id === meId)!.gold,
+    2,
+    'цена шантажа списана при заявлении, ещё до всякой проверки'
+  );
+}
+
+// --- Шантаж: не хватает золота — заявка отклоняется даже блефом ---
+{
+  const meId = table({ blackmailCost: 5 });
+  const victim = useGameStore.getState().players[1].id;
+  patch(meId, { gold: 4, hand: hand(['Шут', 'Наследник']) });
+  patch(victim, { favor: 3, activePlot: null });
+
+  const staked = useGameStore.getState().players.find(p => p.id === meId)!.hand[0].id;
+  assert.equal(
+    acted(meId, {
+      type: 'role', name: 'Шантажист', actorId: meId, targetId: victim,
+      roleClaim: 'Шантажист', stakedCardId: staked, costGold: 0, costTokens: 1, description: ''
+    }),
+    false,
+    'блефовать Шантажистом без денег тоже нельзя'
+  );
+  assert.equal(useGameStore.getState().players.find(p => p.id === meId)!.gold, 4, 'ничего не списано');
+}
+
+// --- При нулевой цене шантаж бесплатен, как раньше ---
+{
+  const meId = table({ blackmailCost: 0 });
+  const victim = useGameStore.getState().players[1].id;
+  patch(meId, { gold: 0, hand: hand(['Шантажист', 'Шут']) });
+  patch(victim, { favor: 3, activePlot: null });
+
+  const staked = useGameStore.getState().players.find(p => p.id === meId)!.hand[0].id;
+  assert.equal(
+    acted(meId, {
+      type: 'role', name: 'Шантажист', actorId: meId, targetId: victim,
+      roleClaim: 'Шантажист', stakedCardId: staked, costGold: 0, costTokens: 1, description: ''
+    }),
+    true,
+    'дефолтная нулевая цена ничего не меняет'
+  );
+}
+
 console.log('rules.engine.check: ok');

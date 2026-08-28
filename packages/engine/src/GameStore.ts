@@ -345,6 +345,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const actor = players.find(p => p.id === activePlayerId);
     if (!actor) return;
 
+    const rules = get().rules;
     const withVaBanque = !!actionData.withVaBanque;
     const tokensRequired = 1;
 
@@ -367,8 +368,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
-    if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= 5) {
-      return; // Feast victory crown limit (cannot buy the 6th winning crown)
+    /* Пиром нельзя купить победную корону: кап на единицу ниже порога. */
+    if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= rules.crownsToWin - 1) {
+      return;
+    }
+
+    /* Заявление «Шантажиста» стоит золота, если правила так велят. Плата
+       берётся здесь, при заявлении, — значит она уходит и при блефе, и при
+       вето, и при отступлении с дуэли. Это и есть смысл настройки: заявка
+       Шантажиста должна стоить денег сама по себе, а не только успешная. */
+    if (actionData.roleClaim === 'Шантажист' && actor.gold < rules.blackmailCost) {
+      return;
     }
 
     let actorHand = [...actor.hand];
@@ -394,6 +404,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...actionData,
       id: Math.random().toString(36).substring(7),
       costTokens: tokensRequired,
+      costGold: actionData.costGold + (actionData.roleClaim === 'Шантажист' ? rules.blackmailCost : 0),
       stakedCardId,
       withVaBanque
     };

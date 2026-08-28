@@ -20,8 +20,6 @@ import { UiIcon } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
 
-const FEAST_CROWN_CAP = 5;
-
 /**
  * Недоступная строка не получает `disabled`, а гаснет классом.
  *
@@ -39,19 +37,23 @@ export const CourtActionsDialog: React.FC<{
   /** Открыть выбор карт к обмену прямо за столом. */
   onStartExchange: () => void;
 }> = ({ onClose, onInspectCard, onStartExchange }) => {
-  const { players, viewerId, performAction } = useGameStore(
+  const { players, viewerId, performAction, rules } = useGameStore(
     useShallow(s => ({
       players: s.players,
       viewerId: s.viewerId,
-      performAction: s.performAction
+      performAction: s.performAction,
+      rules: s.rules
     }))
   );
   const human = pickViewer(players, viewerId);
   if (!human) return null;
 
+  /* Цены и кап пира берутся из правил партии: их задаёт хост, и диалог обязан
+     показывать те числа, по которым реально играют. */
+  const feastCap = rules.crownsToWin - 1;
   const hasTokens = human.actionTokens >= 1;
-  const feastOff = !hasTokens || human.gold < 3 || human.favor >= FEAST_CROWN_CAP;
-  const rumourOff = !hasTokens || human.gold < 5;
+  const feastOff = !hasTokens || human.gold < rules.feastCost || human.favor >= feastCap;
+  const rumourOff = !hasTokens || human.gold < rules.rumorCost;
 
   return (
     <Dialog
@@ -105,15 +107,15 @@ export const CourtActionsDialog: React.FC<{
               type: 'normal',
               name: 'Устроить пир',
               actorId: human.id,
-              costGold: 3,
+              costGold: rules.feastCost,
               costTokens: 1,
-              description: 'Платит 3 🪙 и получает +1 👑.'
+              description: `Платит ${rules.feastCost} 🪙 и получает +1 👑.`
             });
           }}
         >
           <div className="opt__name">Устроить пир</div>
           <div className="opt__desc">
-            Потратьте 3 <UiIcon kind="coin" size="xs" />, чтобы купить 1{' '}
+            Потратьте {rules.feastCost} <UiIcon kind="coin" size="xs" />, чтобы купить 1{' '}
             <UiIcon kind="crown" size="xs" />. Победную корону таким образом получить нельзя.
           </div>
         </button>
@@ -128,14 +130,14 @@ export const CourtActionsDialog: React.FC<{
             startTargeting({
               type: 'normal',
               name: 'Распустить слух',
-              cost: 5,
-              description: 'Заплатил 5 🪙: выбранный игрок теряет -1 👑.'
+              cost: rules.rumorCost,
+              description: `Заплатил ${rules.rumorCost} 🪙: выбранный игрок теряет -1 👑.`
             });
           }}
         >
           <div className="opt__name">Распустить слух</div>
           <div className="opt__desc">
-            Потратьте 5 <UiIcon kind="coin" size="xs" />, чтобы немедленно сбросить 1{' '}
+            Потратьте {rules.rumorCost} <UiIcon kind="coin" size="xs" />, чтобы немедленно сбросить 1{' '}
             <UiIcon kind="crown" size="xs" /> у соперника. Срывает{' '}
             {/* Название карты — не текст, а ссылка на неё: игрок читает про
                 «Королевский приём» ровно там, где впервые о нём услышал.
