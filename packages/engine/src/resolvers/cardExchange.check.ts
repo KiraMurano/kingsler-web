@@ -9,13 +9,16 @@
  * Перепись карт обязана сходиться в каждой из точек: между тактами карты
  * лежат в сбросе, а рука короче — но ни одна карта не исчезла и не удвоилась.
  *
+ * И начинается всё это в тот же миг, что и нажатие: общей паузы перед
+ * действием у обмена нет, читать в ней нечего.
+ *
  * Run: npx tsx packages/engine/src/resolvers/cardExchange.check.ts
  */
 import assert from 'node:assert/strict';
 import type { GameCard, Player } from '../types.ts';
 import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
-import { ACTION_HOLD_MS, EXCHANGE_DRAW_MS } from '../timing.ts';
+import { EXCHANGE_DRAW_MS } from '../timing.ts';
 import { assertCardCensus } from './cardCensus.check.ts';
 
 function seat(id: string, hand: GameCard[], isBot = false): Player {
@@ -61,11 +64,7 @@ useGameStore.getState().performAction({
   description: 'Сбросил обе карты и взял две новые.'
 });
 
-/* Обычное действие само по себе выдерживает `ACTION_HOLD_MS` перед тем, как
-   сработать, — обмен начинается только после этого. */
-await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS + 200));
-
-// --- Такт 1: карты уже в сбросе, рука ещё пуста. ---
+// --- Такт 1: карты уже в сбросе, рука ещё пуста. Сразу, без паузы. ---
 {
   const s = useGameStore.getState();
   const hand = s.players.find(p => p.id === 'p1')!.hand;

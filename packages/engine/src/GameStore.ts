@@ -349,6 +349,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 1. Normal actions execute after 1.5s
     if (action.type === 'normal') {
       set({ pendingAction: action, turnPhase: 'IDLE' });
+
+      /*
+       * Обмен карт начинается сразу, без общей паузы.
+       *
+       * Пауза перед действием нужна, чтобы двор успел прочесть заявку: «пир»,
+       * «слух» — это строка, и без задержки её эффект случился бы раньше, чем
+       * её заметили. Обмену читать нечего: его заявка — это и есть карты,
+       * которые сейчас полетят. Пауза перед ними выглядела поломкой — карты
+       * опускались обратно в руку, жетон списывался, и только через две
+       * секунды что-то происходило.
+       */
+      if (isCardExchange) {
+        get()._executeNormalAction(action);
+        return;
+      }
+
       timerManager.scheduleDelay(() => {
         get()._executeNormalAction(action);
       }, ACTION_HOLD_MS);
