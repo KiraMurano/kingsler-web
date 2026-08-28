@@ -6,6 +6,7 @@ import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { chargeActiveConspiracies } from './plotResolver';
+import { discardProtectiveIntrigueOnBluff } from './crownLoss';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -207,6 +208,13 @@ export function attackerAcceptDuel(
   // Только теперь, поверх уже применённого состояния (карты ушли из рук в
   // сброс), выдаём печати: `addSealsToPlayer` сам сконвертирует 2 ⚜️ в 1 👑 и
   // при необходимости откроет круг коронации.
+  /* На дуэли вскрываются обе карты — значит уличёнными могут оказаться оба.
+     Порядок с печатями важен: интриги сжигаются до наград, иначе
+     `addSealsToPlayer` прочитает уже сгоревшую «Охранную грамоту» как живую
+     и не начислит печать тому, кто её только что потерял. */
+  if (!actorWasTruth) discardProtectiveIntrigueOnBluff(get, set, actor.id);
+  if (!defenderWasTruth) discardProtectiveIntrigueOnBluff(get, set, defender.id);
+
   for (const award of sealAwards) {
     get().addSealsToPlayer(award.playerId, award.count);
   }

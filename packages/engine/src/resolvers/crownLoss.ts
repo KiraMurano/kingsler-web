@@ -120,3 +120,45 @@ export function burnCharterOnRumor(
 
   return true;
 }
+
+/** Интриги, которые перестают работать, как только держателя поймали на лжи. */
+const PROTECTIVE_PLOTS = ['Стража покоев', 'Охранная грамота'] as const;
+
+/**
+ * Держателя защитной интриги уличили в блефе — интрига сгорает.
+ *
+ * Это то, что не даёт защите быть бесплатной: держать «Стражу» или «Грамоту»
+ * и при этом блефовать ролями одновременно нельзя.
+ *
+ * @returns была ли интрига сожжена.
+ */
+export function discardProtectiveIntrigueOnBluff(
+  get: StateGetter,
+  set: StateSetter,
+  playerId: string
+): boolean {
+  const { players } = get();
+  const idx = players.findIndex(p => p.id === playerId);
+  if (idx === -1) return false;
+
+  const victim = players[idx];
+  const plot = victim.activePlot;
+  if (!plot) return false;
+  if (!PROTECTIVE_PLOTS.some(type => type === plot.type)) return false;
+
+  const burned: CardInstance = { id: plot.cardId, card: plot.type };
+  const newPlayers = [...players];
+  newPlayers[idx] = { ...victim, activePlot: null };
+
+  set(state => ({
+    players: newPlayers,
+    discardPile: [...state.discardPile, burned],
+    history: [
+      `💥 «${plot.type}» ${genOf(victim)} сгорает: ${victim.name} уличён(а) в блефе.`,
+      ...state.history
+    ].slice(0, 50)
+  }));
+  triggerResourceFloat(set, playerId, `💥 ${plot.type} сорвана`, false);
+
+  return true;
+}

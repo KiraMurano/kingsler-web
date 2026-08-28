@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import type { CardInstance, GameState, Player } from '../types.ts';
-import { burnCharterOnRumor, loseCrowns } from './crownLoss.ts';
+import { burnCharterOnRumor, discardProtectiveIntrigueOnBluff, loseCrowns } from './crownLoss.ts';
 import { disruptPlayerPlotsOnLoss } from './plotResolver.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
@@ -244,6 +244,58 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   const burned = burnCharterOnRumor(get, set, 'p1');
   assert.equal(burned, false, 'слух жжёт только грамоту');
   assert.ok(api.players[0].activePlot, 'Стража осталась на месте');
+}
+
+// --- 14. Уличённый в блефе теряет Стражу покоев ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      activePlot: { id: 'x', cardId: 'c1', type: 'Стража покоев' }
+    })
+  ]);
+  const burned = discardProtectiveIntrigueOnBluff(get, set, 'p1');
+  assert.equal(burned, true);
+  assert.equal(api.players[0].activePlot, null, 'Стража сгорела');
+  assert.equal(api.discardPile[0].card, 'Стража покоев');
+  assert.equal(api.discardPile[0].id, 'c1', 'в сброс ушёл тот же экземпляр');
+}
+
+// --- 15. Уличённый в блефе теряет Охранную грамоту ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 5,
+      activePlot: { id: 'x', cardId: 'c2', type: 'Охранная грамота' }
+    })
+  ]);
+  const burned = discardProtectiveIntrigueOnBluff(get, set, 'p1');
+  assert.equal(burned, true);
+  assert.equal(api.players[0].activePlot, null, 'грамота сгорела');
+  assert.equal(api.players[0].favor, 5, 'сама по себе потеря карты корон не отнимает');
+  assert.equal(api.discardPile[0].card, 'Охранная грамота');
+}
+
+// --- 16. Прочие интриги блефом не сжигаются ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      activePlot: { id: 'x', cardId: 'c3', type: 'Королевский приём' }
+    })
+  ]);
+  const burned = discardProtectiveIntrigueOnBluff(get, set, 'p1');
+  assert.equal(burned, false, 'горят только защитные интриги');
+  assert.ok(api.players[0].activePlot, '«Королевский приём» не тронут');
+  assert.equal(api.discardPile.length, 0);
+}
+
+// --- 17. Пустой слот интриги обрабатывается молча ---
+{
+  const { api, get, set } = makeHarness([player({ id: 'p1' })]);
+  assert.equal(discardProtectiveIntrigueOnBluff(get, set, 'p1'), false);
+  assert.equal(api.discardPile.length, 0);
 }
 
 console.log('crownLoss.check: ok');

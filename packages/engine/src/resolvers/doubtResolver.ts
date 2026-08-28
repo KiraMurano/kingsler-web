@@ -6,6 +6,7 @@ import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing';
+import { discardProtectiveIntrigueOnBluff } from './crownLoss';
 import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
 import { resolveInstantEffect } from './instantResolver';
 import { beginCoronationIfNeeded } from './coronation';
@@ -315,6 +316,14 @@ export function executeRevealOutcome(
     },
     history: [outcome.message, ...state.history].slice(0, 50)
   }));
+
+  /* Защита рушится вместе с репутацией: пойманного на лжи «Стража покоев» и
+     «Охранная грамота» больше не прикрывают. Сжигается после `set` выше,
+     потому что читает и пишет уже применённое состояние, и до наград —
+     иначе `addSealsToPlayer` прочитал бы сгоревшую грамоту как живую. */
+  if (!wasTruth) {
+    discardProtectiveIntrigueOnBluff(get, set, actor.id);
+  }
 
   if (sealsWinnerId && sealsCount > 0) {
     get().addSealsToPlayer(sealsWinnerId, sealsCount);
