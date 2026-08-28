@@ -88,25 +88,24 @@ assert.equal(
 
 const noRole = player({ id: 'b1', name: 'Бот', hand: mintDeck(['Обыск покоев', 'Право вето']) });
 const rich = player({ id: 'p2', name: 'Анна', gold: 5, favor: 2 });
-assert.equal(shouldActivateConspiracyNow(noRole, rich, 1, null, () => 1), false);
+
+/* Заговор разряжается только на полных 4 зарядах: частичных ударов в правилах
+   больше нет, поэтому на 1–3 зарядах бот ждёт независимо от всего остального. */
+for (const charges of [0, 1, 2, 3]) {
+  assert.equal(
+    shouldActivateConspiracyNow(noRole, player({ ...rich, favor: 5 }), charges, null, () => 0),
+    false,
+    `на ${charges} зарядах Заговор не разряжается даже по лидеру`
+  );
+}
+
+// Полный заряд по цели с коронами — бить.
 assert.equal(
-  shouldActivateConspiracyNow(
-    player({ ...noRole, hand: mintDeck(['Наследник', 'Обыск покоев']) }),
-    rich,
-    2,
-    null,
-    () => 1
-  ),
-  false
-);
-assert.equal(
-  shouldActivateConspiracyNow(noRole, player({ ...rich, favor: 4 }), 3, null, () => 0),
+  shouldActivateConspiracyNow(noRole, player({ ...rich, favor: 4 }), 4, null, () => 0),
   true
 );
-assert.equal(
-  shouldActivateConspiracyNow(noRole, player({ ...rich, favor: 5 }), 3, null, () => 0),
-  true
-);
+
+// Срыв круга коронации — бить, даже с выигрышной ролью на руках.
 assert.equal(
   shouldActivateConspiracyNow(
     player({ ...noRole, hand: mintDeck(['Наследник', 'Шут']) }),
@@ -117,6 +116,26 @@ assert.equal(
   ),
   true
 );
+
+// Держатель «Охранной грамоты» — законная цель: удар сожжёт грамоту.
+assert.equal(
+  shouldActivateConspiracyNow(
+    noRole,
+    player({
+      ...rich,
+      favor: 0,
+      gold: 0,
+      activePlot: { id: 'ch', cardId: 'c1', type: 'Охранная грамота' }
+    }),
+    4,
+    null,
+    () => 1
+  ),
+  true,
+  'по грамоте бьём, даже когда отнимать больше нечего'
+);
+
+// Сам на пороге победы — не тратить ход на Заговор.
 assert.equal(
   shouldActivateConspiracyNow(player({ ...noRole, favor: 5 }), player({ ...rich, favor: 4 }), 4, null, () => 1),
   false
@@ -124,8 +143,7 @@ assert.equal(
 
 const poorLeader = player({ id: 'a', name: 'Лидер', favor: 5, gold: 0 });
 const fat = player({ id: 'b', name: 'Богач', favor: 1, gold: 6 });
-assert.equal(selectBestConspiracyTarget([fat, poorLeader], 3)?.id, 'a');
-assert.equal(selectBestConspiracyTarget([fat, poorLeader], 2)?.id, 'b');
+assert.equal(selectBestConspiracyTarget([fat, poorLeader], 4)?.id, 'a');
 
 const attacker = player({ id: 'atk', name: 'Атакующий' });
 const brokeTarget = player({ id: 'p2', name: 'Бедняк', gold: 0, favor: 3 });

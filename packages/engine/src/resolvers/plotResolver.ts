@@ -6,7 +6,13 @@ import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { beginCoronationIfNeeded } from './coronation';
-import { loseCrowns } from './crownLoss';
+import { burnCharter, loseCrowns } from './crownLoss';
+
+/** Заговор разряжается только полностью заряженным. */
+export const CONSPIRACY_FULL_CHARGE = 4;
+
+/** Сколько золота сбрасывает разряженный Заговор. */
+export const CONSPIRACY_GOLD_HIT = 3;
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -180,7 +186,9 @@ export function openConspiracyDialog(
   const actor = players.find(p => p.id === activePlayerId);
   if (!actor || actor.activePlot?.type !== 'Тайный заговор') return;
   const charges = actor.activePlot.charges ?? 0;
-  if (charges < 1) return;
+  /* Заговор разряжается только полностью заряженным: частичные удары
+     (1–3 заряда) убраны из правил. */
+  if (charges < CONSPIRACY_FULL_CHARGE) return;
 
   set({
     conspiracyPrompt: {
@@ -217,12 +225,13 @@ export function activateConspiracy(
   if (!player || !target || player.activePlot?.type !== 'Тайный заговор') return;
 
   const charges = player.activePlot.charges ?? 0;
-  if (charges < 1) return;
-  if (effect === 'crown' && charges < 3) return;
+  if (charges < CONSPIRACY_FULL_CHARGE) return;
   if (player.actionTokens < 1) return;
 
   const tokenCost = 1;
-  const cannotBeVetoed = charges >= 4;
+  /* Полностью заряженный Заговор вето не принимает. Само вето при этом
+     никуда не делось: его играют в момент выкладки карты на стол. */
+  const cannotBeVetoed = true;
 
   if (tokenCost > 0) {
     triggerResourceFloat(set, player.id, '-1 ⚡', false);
@@ -252,7 +261,7 @@ export function activateConspiracy(
     isVetoed: false,
     overlayInstant: null,
     history: [
-      `⚔️ ${player.name} свершает «Тайный заговор» (${charges} зар.)${cannotBeVetoed ? ' [🛡️ Нельзя отменить Вето]' : ''}!`,
+      `⚔️ ${player.name} свершает «Тайный заговор» (${charges}/${CONSPIRACY_FULL_CHARGE} зар.) [🛡️ Нельзя отменить Вето]!`,
       ...state.history
     ].slice(0, 50)
   }));
@@ -273,7 +282,6 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
     return;
   }
 
-  const charges = player.activePlot.charges ?? 0;
   const effect = action.conspiracyEffect ?? 'gold';
   const newDiscard: CardInstance[] = [
     ...discardPile,
@@ -281,7 +289,7 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
   ];
 
   if (effect === 'gold') {
-    const goldLoss = Math.min(charges, target.gold);
+    const goldLoss = Math.min(CONSPIRACY_GOLD_HIT, target.gold);
     const newPlayers = players.map(p => {
       if (p.id === target.id) return { ...p, gold: p.gold - goldLoss };
       if (p.id === player.id) return { ...p, activePlot: null };
@@ -292,7 +300,7 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
       discardPile: newDiscard,
       conspiracyPrompt: null,
       history: [
-        `⚔️ «Тайный заговор» (${charges} зар.): ${target.name} теряет ${goldLoss} 🪙 в казну!`,
+        `⚔️ «Тайный заговор»: ${target.name} теряет ${goldLoss} 🪙 в казну!`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -319,11 +327,16 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
     if (result.kind === 'lost') {
       set(state => ({
         history: [
-          `💥 «Тайный заговор» (${charges} зар.): ${target.name} лишается 1 👑 короны!`,
+          `💥 «Тайный заговор»: ${target.name} лишается 1 👑 короны!`,
           ...state.history
         ].slice(0, 50)
       }));
       triggerResourceFloat(set, player.id, `⚔️ Лишение 1 👑 у ${target.name}!`, true);
+    } else if (result.kind === 'blocked_by_charter') {
+      /* Корону грамота удержала — но сама её не пережила. Заговор бьёт по
+         защите так же, как слух: корона цела, грамота в сбросе. */
+      burnCharter(get, set, target.id, 'удара Заговора');
+      triggerResourceFloat(set, player.id, `⚔️ Грамота ${target.name} сорвана!`, true);
     }
   }
 

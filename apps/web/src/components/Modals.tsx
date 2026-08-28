@@ -9,6 +9,7 @@ import {
   TOTAL_DECK_SIZE
 } from '@kinglier/engine/cards';
 import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/types';
+import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '@kinglier/engine/resolvers/plotResolver';
 import { courtly } from '../lib/text';
 import { pickViewer } from '../lib/viewer';
 import { Dialog } from './ui/Overlay';
@@ -50,17 +51,19 @@ function ConspiracyDialog({
 }) {
   const opponents = players.filter(p => p.id !== selfId);
   const [targetId, setTargetId] = useState(opponents[0]?.id ?? '');
-  const [effect, setEffect] = useState<'gold' | 'crown'>(prompt.charges >= 3 ? 'crown' : 'gold');
+  const [effect, setEffect] = useState<'gold' | 'crown'>('crown');
 
   const target = opponents.find(p => p.id === targetId) ?? opponents[0];
-  const unvetoable = prompt.charges >= 4;
+  /* Диалог открывается только на полном заряде — Заговор частичных ударов
+     больше не наносит, так что вето здесь невозможно всегда. */
+  const targetHoldsCharter = target?.activePlot?.type === 'Охранная грамота';
 
   return (
     <Dialog
       open
       onClose={onClose}
       width={560}
-      title={`Тайный заговор · ${prompt.charges} из 4`}
+      title={`Тайный заговор · ${prompt.charges} из ${CONSPIRACY_FULL_CHARGE}`}
       description={
         <div style={{ display: 'flex', gap: 6 }}>
           <Tag tone="arcane">
@@ -68,16 +71,14 @@ function ConspiracyDialog({
               активация в ход · 1 <UiIcon kind="move" size="xs" />
             </span>
           </Tag>
-          {unvetoable && <Tag tone="danger">вето невозможно</Tag>}
+          <Tag tone="danger">вето невозможно</Tag>
         </div>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {unvetoable && (
-          <div className="notice notice--arcane">
-            Максимальный заряд: это действие нельзя отменить «Правом вето».
-          </div>
-        )}
+        <div className="notice notice--arcane">
+          Полный заряд: это действие нельзя отменить «Правом вето».
+        </div>
 
         <div>
           <div className="detail__label">Цель заговора</div>
@@ -118,7 +119,7 @@ function ConspiracyDialog({
               sub={
                 target ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                    Отнимет {Math.min(prompt.charges, target.gold)}{' '}
+                    Отнимет {Math.min(CONSPIRACY_GOLD_HIT, target.gold)}{' '}
                     <UiIcon kind="coin" size="xs" />
                   </span>
                 ) : undefined
@@ -130,19 +131,18 @@ function ConspiracyDialog({
             <Button
               tone={effect === 'crown' ? 'danger' : 'plain'}
               block
-              disabled={prompt.charges < 3}
               sub={
-                prompt.charges < 3 ? (
-                  'нужно 3 заряда'
+                targetHoldsCharter ? (
+                  <span>Сожжёт «Охранную грамоту» — корона устоит</span>
                 ) : (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                     Отнимет 1 <UiIcon kind="crown" size="xs" /> у {target?.name}
                   </span>
                 )
               }
-              onClick={() => prompt.charges >= 3 && setEffect('crown')}
+              onClick={() => setEffect('crown')}
             >
-              Лишить короны
+              {targetHoldsCharter ? 'Сжечь грамоту' : 'Лишить короны'}
             </Button>
           </div>
         </div>

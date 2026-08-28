@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import type { CardInstance, GameState, Player } from '../types.ts';
-import { burnCharterOnRumor, discardProtectiveIntrigueOnBluff, loseCrowns } from './crownLoss.ts';
+import { burnCharter, discardProtectiveIntrigueOnBluff, loseCrowns } from './crownLoss.ts';
 import { disruptPlayerPlotsOnLoss } from './plotResolver.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
@@ -223,7 +223,7 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   const result = loseCrowns(get, set, 'p1', 1, 'распущенных слухов');
   assert.deepEqual(result, { kind: 'blocked_by_charter' });
 
-  const burned = burnCharterOnRumor(get, set, 'p1');
+  const burned = burnCharter(get, set, 'p1', 'слухов');
   assert.equal(burned, true, 'слух сжигает грамоту');
   assert.equal(api.players[0].favor, 4, 'корона осталась при владельце');
   assert.equal(api.players[0].activePlot, null, 'грамота больше не лежит');
@@ -241,7 +241,7 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
       activePlot: { id: 'x', cardId: 'c1', type: 'Стража покоев' }
     })
   ]);
-  const burned = burnCharterOnRumor(get, set, 'p1');
+  const burned = burnCharter(get, set, 'p1', 'слухов');
   assert.equal(burned, false, 'слух жжёт только грамоту');
   assert.ok(api.players[0].activePlot, 'Стража осталась на месте');
 }

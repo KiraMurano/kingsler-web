@@ -364,9 +364,9 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         id: 'p1',
         name: 'Анна',
         actionTokens: 1,
-        activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 1 }
+        activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 4 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 2, hand: mintDeck(['Казначей', 'Рыцарь']) })
     ]
   });
   applyConspiracyEffect(get, set, action({
@@ -376,7 +376,8 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
     targetId: 'p2',
     conspiracyEffect: 'gold'
   }));
-  assert.equal(api.players.find(p => p.id === 'p2')!.gold, 4);
+  // Удар фиксирован в 3 🪙, но пустую казну не обобрать: у цели было всего 2.
+  assert.equal(api.players.find(p => p.id === 'p2')!.gold, 0);
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null);
 }
 
@@ -399,7 +400,8 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
     targetId: 'p2',
     conspiracyEffect: 'gold'
   }));
-  assert.equal(api.players.find(p => p.id === 'p2')!.gold, 1);
+  // Заговор всегда сбрасывает ровно 3 🪙, сколько бы зарядов ни было.
+  assert.equal(api.players.find(p => p.id === 'p2')!.gold, 2);
 }
 
 console.log('courtRules.check: ok');

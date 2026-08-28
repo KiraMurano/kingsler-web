@@ -82,19 +82,21 @@ export function loseCrowns(
 }
 
 /**
- * «Распустить слух» против держателя «Охранной грамоты»: корону слух не
- * забирает (её удержала грамота), но саму грамоту сжигает.
+ * Удар, который грамота держит, но который её же и подтачивает: корону он не
+ * забирает, а саму грамоту сжигает. Так работают «Распустить слух» и
+ * «Тайный заговор».
  *
- * Это единственная контрмера, доступная каждому за 5 🪙, и то, что не даёт
- * грамоте стать неснимаемой крепостью: иначе её брали бы только два
- * «Обыска покоев» на всю колоду.
+ * Это то, что не даёт грамоте стать неснимаемой крепостью: иначе её брали бы
+ * только два «Обыска покоев» на всю колоду.
  *
+ * @param reason существительное в родительном падеже: «слухов», «Заговора».
  * @returns была ли грамота сожжена.
  */
-export function burnCharterOnRumor(
+export function burnCharter(
   get: StateGetter,
   set: StateSetter,
-  victimId: string
+  victimId: string,
+  reason: string
 ): boolean {
   const { players } = get();
   const idx = players.findIndex(p => p.id === victimId);
@@ -112,7 +114,7 @@ export function burnCharterOnRumor(
     players: newPlayers,
     discardPile: [...state.discardPile, burned],
     history: [
-      `📜 Слухи подточили «Охранную грамоту» ${genOf(victim)}: корона цела, но грамота сгорела.`,
+      `📜 «Охранная грамота» ${genOf(victim)} не выдержала ${reason}: корона цела, но грамота сгорела.`,
       ...state.history
     ].slice(0, 50)
   }));

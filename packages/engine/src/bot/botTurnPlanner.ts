@@ -145,8 +145,10 @@ export function makeBotMove(botId: string): void {
       target &&
       shouldActivateConspiracyNow(bot, target, charges, state.coronationCandidateId)
     ) {
+      /* Корона (или сожжённая грамота) дороже трёх монет почти всегда:
+         золото бьётся только по тому, у кого отнимать больше нечего. */
       const effect: 'gold' | 'crown' =
-        charges >= 3 && target.favor >= 1 ? 'crown' : 'gold';
+        target.favor >= 1 || target.activePlot?.type === 'Охранная грамота' ? 'crown' : 'gold';
       useGameStore.getState().activateConspiracy(bot.id, target.id, effect, false);
       return;
     }

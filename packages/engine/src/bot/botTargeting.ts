@@ -4,6 +4,7 @@ import { faces, holds } from '../cardInstance';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
 import { canBeTargetedBy } from '../targeting';
+import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '../resolvers/plotResolver';
 
 /**
  * Выбор наилучшей цели для роли «Вор» (кража до 2 золота).
@@ -181,32 +182,26 @@ export function shouldActivateConspiracyNow(
   coronationCandidateId: string | null,
   rng: () => number = Math.random
 ): boolean {
-  if (charges < 1) return false;
+  /* Копить больше нечего: Заговор разряжается только на 4 зарядах, частичных
+     ударов в правилах нет. Остался один вопрос — бить сейчас или подождать
+     цель получше, рискуя «Обыском покоев». */
+  if (charges < CONSPIRACY_FULL_CHARGE) return false;
   if (bot.favor >= 5) return false;
 
-  const canCrown = charges >= 3 && target.favor >= 1;
-  const goldHit = Math.min(charges, target.gold);
+  const canCrown = target.favor >= 1 || target.activePlot?.type === 'Охранная грамота';
+  const goldHit = Math.min(CONSPIRACY_GOLD_HIT, target.gold);
   const hasWinRole = holds(bot.hand, 'Наследник') || holds(bot.hand, 'Шантажист');
   const hasAnyRole = faces(bot.hand).some(isRole);
 
+  // Срыв коронации и снос лидера — бить немедленно.
   if (canCrown && (target.favor >= 5 || coronationCandidateId === target.id)) return true;
-  if (charges >= 4 && (canCrown || goldHit >= 2)) return true;
 
-  if (hasWinRole) return false;
+  // Заряженный Заговор — приз для чужого «Обыска покоев». Держать его дольше
+  // нужного невыгодно, поэтому бьём, как только удар осмыслен.
+  if (canCrown || goldHit >= 2) return true;
 
-  if (charges === 3) {
-    if (canCrown && target.favor >= 3) return true;
-    if (goldHit >= 3 && !hasAnyRole) return true;
-    if (canCrown) {
-      const arch = getBotArchetype(bot);
-      return rng() < 0.40 + arch.targetAggression * 0.25;
-    }
-    return false;
-  }
+  if (hasWinRole || hasAnyRole) return false;
 
-  if (goldHit < charges) return false;
-  if (hasAnyRole) return false;
-  if (goldHit <= 1) return false;
   const arch = getBotArchetype(bot);
   return rng() < 0.12 + arch.greed * 0.4;
 }
