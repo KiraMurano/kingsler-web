@@ -112,90 +112,95 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         <PlotSlot plot={player.activePlot} ownerId={player.id} ownerName={player.name} />
       </div>
 
-      <div
-        className="seat__chip"
-        onClick={isTargetable ? onTarget : undefined}
-        title={isTargetable ? `Выбрать целью: ${player.name}` : undefined}
-      >
-        <Deltas events={deltas} kind="other" />
+      {/* Чип и рука — один ряд: только внутри него рука знает высоту чипа и
+          может встать с ним вровень. Растянуть её прямо в `.seat` нельзя —
+          тот тянется во всю высоту стола (см. комментарий к `.seat--left`). */}
+      <div className="seat__row">
+        <div
+          className="seat__chip"
+          onClick={isTargetable ? onTarget : undefined}
+          title={isTargetable ? `Выбрать целью: ${player.name}` : undefined}
+        >
+          <Deltas events={deltas} kind="other" />
 
-        <div className="seat__head">
-          <div className="seat__toprow">
-            <div className="seat__role">
-              {player.title ?? player.archetype?.title ?? 'Придворный'}
-            </div>
-            <span className="delta-anchor seat__bolts">
-              <Bolts tokens={player.actionTokens} />
-              <Deltas events={deltas} kind="act" />
-            </span>
-          </div>
-          <div className="seat__namerow">
-            <span className="seat__name">{player.name}</span>
-            {isTargetable && (
-              <span className="seat__role" style={{ color: 'var(--crimson-soft)' }}>
-                цель
+          <div className="seat__head">
+            <div className="seat__toprow">
+              <div className="seat__role">
+                {player.title ?? player.archetype?.title ?? 'Придворный'}
+              </div>
+              <span className="delta-anchor seat__bolts">
+                <Bolts tokens={player.actionTokens} />
+                <Deltas events={deltas} kind="act" />
               </span>
+            </div>
+            <div className="seat__namerow">
+              <span className="seat__name">{player.name}</span>
+              {isTargetable && (
+                <span className="seat__role" style={{ color: 'var(--crimson-soft)' }}>
+                  цель
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="seat__main">
+            <Portrait src={player.avatar} name={player.name} className="seat__portrait" />
+
+            <div className="seat__body">
+              <CrownsTrack favor={player.favor} compact events={deltas} />
+              <div className="seat__res">
+                <span className="delta-anchor">
+                  <Res kind="gold" value={player.gold} />
+                  <Deltas events={deltas} kind="gold" />
+                </span>
+                <span className="delta-anchor">
+                  <Seals count={player.seals} />
+                  <Deltas events={deltas} kind="seal" />
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* One line at a time: the bubble is absolutely positioned under the
+              chip, so `mode="wait"` lets the old line sink away before the new
+              one rises instead of printing the two on top of each other. */}
+          <AnimatePresence mode="wait">
+            {speech && (
+              <motion.div
+                key={speech}
+                className="bubble"
+                initial={{ opacity: 0, y: reduce ? 0 : 6 }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  transition: { duration: reduce ? 0.12 : dur.fade, ease: EASE }
+                }}
+                exit={{
+                  opacity: 0,
+                  y: reduce ? 0 : 8,
+                  transition: { duration: reduce ? 0.12 : SPEECH_OUT_S, ease: EASE }
+                }}
+              >
+                {speech}
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         </div>
 
-        <div className="seat__main">
-          <Portrait src={player.avatar} name={player.name} className="seat__portrait" />
-
-          <div className="seat__body">
-            <CrownsTrack favor={player.favor} compact events={deltas} />
-            <div className="seat__res">
-              <span className="delta-anchor">
-                <Res kind="gold" value={player.gold} />
-                <Deltas events={deltas} kind="gold" />
-              </span>
-              <span className="delta-anchor">
-                <Seals count={player.seals} />
-                <Deltas events={deltas} kind="seal" />
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* One line at a time: the bubble is absolutely positioned under the
-            chip, so `mode="wait"` lets the old line sink away before the new
-            one rises instead of printing the two on top of each other. */}
-        <AnimatePresence mode="wait">
-          {speech && (
-            <motion.div
-              key={speech}
-              className="bubble"
-              initial={{ opacity: 0, y: reduce ? 0 : 6 }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                transition: { duration: reduce ? 0.12 : dur.fade, ease: EASE }
-              }}
-              exit={{
-                opacity: 0,
-                y: reduce ? 0 : 8,
-                transition: { duration: reduce ? 0.12 : SPEECH_OUT_S, ease: EASE }
-              }}
+        {/* Holes, not cards. Both slots are always rendered so a card leaving
+            slot 0 does not slide slot 1 across, and the card that fills one is
+            drawn — back or face — by `CardLayer`. */}
+        <div className="seat__hand" title="Карты в руке">
+          {([0, 1] as const).map(slot => (
+            <CardAnchor
+              key={slot}
+              className="minislot"
+              zone={{ kind: 'hand', playerId: player.id, slot }}
             >
-              {speech}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Holes, not cards. Both slots are always rendered so a card leaving
-          slot 0 does not slide slot 1 across, and the card that fills one is
-          drawn — back or face — by `CardLayer`. */}
-      <div className="seat__hand" title="Карты в руке">
-        {([0, 1] as const).map(slot => (
-          <CardAnchor
-            key={slot}
-            className="minislot"
-            zone={{ kind: 'hand', playerId: player.id, slot }}
-          >
-            <span className="minicard minicard--empty" />
-          </CardAnchor>
-        ))}
+              <span className="minicard minicard--empty" />
+            </CardAnchor>
+          ))}
+        </div>
       </div>
     </div>
   );

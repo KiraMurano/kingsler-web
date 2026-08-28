@@ -259,9 +259,25 @@
 
 .seat--top .seat__hand {
   position: absolute;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   right: calc(100% + 8px);
-  transform: translateY(-50%);
+}
+
+/* Чип и рука стоят в одном ряду, растянутом по самому высокому — по чипу.
+   Рука берёт его высоту через `align-self: stretch`; в самом `.seat` это не
+   работает, потому что тот тянется во всю высоту стола ради центровки без
+   дробного трансформа. */
+.seat__row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* Карты смотрят наружу, к краю стола, — с обеих сторон. */
+.seat--left .seat__row {
+  flex-direction: row-reverse;
 }
 
 .seat__chip {
@@ -314,7 +330,9 @@
 
 .minislot {
   position: relative;
-  width: 24px;
+  flex: 1 1 0;
+  min-height: 0;
+  width: auto;
   aspect-ratio: 2 / 3;
 }
 
@@ -439,9 +457,10 @@
 .seat__hand {
   display: flex;
   flex-direction: column;
+  /* `center`, а не растяжка: ширину карте задаёт её пропорция, а не колонка. */
+  align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  align-self: center;
 }
 
 .minicard {
