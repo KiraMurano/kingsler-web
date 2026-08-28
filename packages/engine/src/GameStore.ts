@@ -118,7 +118,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       tossStartTimer = null;
     }
     botMemory.clear();
-    const deck = createInitialDeck(); // 44 unified cards
+    const deck = createInitialDeck(); // состав считается из CARD_COPIES_MAP
 
     const humanSeats = seats && seats.length > 0
       ? seats.slice(0, 4)
