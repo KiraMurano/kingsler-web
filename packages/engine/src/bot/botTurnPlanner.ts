@@ -177,6 +177,22 @@ export function makeBotMove(botId: string): void {
       } else if (plotCard === 'Золотая булла') {
         useGameStore.getState().playPlotAction('Золотая булла', plotId);
         return;
+      } else if (plotCard === 'Охранная грамота') {
+        /* Грамота — карта фаворита: она держит корону, но закрывает печати.
+           Пока корон мало, второй путь к победе дороже защиты. */
+        if (bot.favor >= 4) {
+          useGameStore.getState().playPlotAction('Охранная грамота', plotId);
+          return;
+        }
+      } else if (plotCard === 'Стража покоев') {
+        /* Стража окупается только когда есть что отнимать: пустого двор не
+           грабит, а слот интриги один. */
+        const isRich = opponents.every(p => p.gold <= bot.gold);
+        const isLeading = opponents.every(p => p.favor <= bot.favor);
+        if (bot.gold >= 4 || isRich || isLeading) {
+          useGameStore.getState().playPlotAction('Стража покоев', plotId);
+          return;
+        }
       } else if (plotCard === 'Тайный заговор') {
         useGameStore.getState().playPlotAction('Тайный заговор', plotId);
         return;
