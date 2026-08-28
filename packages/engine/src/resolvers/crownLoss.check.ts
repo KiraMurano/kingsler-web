@@ -113,4 +113,102 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   assert.ok(api.players[0].activePlot, 'потери не было — интрига цела');
 }
 
+// --- 7. Охранная грамота держит удар ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 4,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
+    })
+  ]);
+  const result = loseCrowns(get, set, 'p1', 1, 'шантажа');
+  assert.deepEqual(result, { kind: 'blocked_by_charter' });
+  assert.equal(api.players[0].favor, 4, 'корона на месте');
+  assert.ok(api.players[0].activePlot, 'грамота остаётся лежать — она не одноразовая');
+  assert.equal(api.discardPile.length, 0, 'ничего не ушло в сброс');
+}
+
+// --- 8. Грамота держит и удвоенный удар Ва-банка ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 5,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
+    })
+  ]);
+  const result = loseCrowns(get, set, 'p1', 2, 'шантажа');
+  assert.deepEqual(result, { kind: 'blocked_by_charter' });
+  assert.equal(api.players[0].favor, 5);
+}
+
+// --- 9. Грамота держит круг коронации ---
+{
+  const { api, get, set } = makeHarness(
+    [player({
+      id: 'p1',
+      favor: 6,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
+    })],
+    { coronationCandidateId: 'p1', coronationOriginId: 'p2' }
+  );
+  loseCrowns(get, set, 'p1', 1, 'обвинения в измене');
+  assert.equal(api.coronationCandidateId, 'p1', 'круг коронации не сорван');
+  assert.equal(api.players[0].favor, 6);
+}
+
+// --- 9б. Грамота держит и удар «Тайного заговора» ---
+// Блокировка не смотрит на источник, но каждая формулировка `reason` попадает
+// в историю — проверяется, что ни одна из них не проваливается мимо ветки.
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 3,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
+    })
+  ]);
+  const result = loseCrowns(get, set, 'p1', 1, 'удара Заговора', 'Заговор!');
+  assert.deepEqual(result, { kind: 'blocked_by_charter' });
+  assert.equal(api.players[0].favor, 3);
+  assert.ok(
+    api.history.some(h => h.includes('удара Заговора')),
+    'в истории названа причина, от которой грамота защитила'
+  );
+}
+
+// --- 10. Стража покоев корон НЕ защищает ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 3,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Стража покоев' }
+    })
+  ]);
+  const result = loseCrowns(get, set, 'p1', 1, 'обвинения в измене');
+  assert.deepEqual(result, { kind: 'lost', amount: 1 }, 'Стража защищает от ролей, а не от корон');
+  assert.equal(api.players[0].favor, 2);
+}
+
+// --- 11. Шантажист против грамоты: жертва цела, атакующий пуст ---
+// Страховочный путь: в партии Задача 7 не даёт объявить такую атаку вовсе.
+// Тест фиксирует, что даже в обход выбора цели корона не печатается из воздуха.
+{
+  const { api, get, set } = makeHarness([
+    player({ id: 'p1', favor: 1 }),
+    player({
+      id: 'p2',
+      favor: 4,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
+    })
+  ]);
+  const result = loseCrowns(get, set, 'p2', 1, 'шантажа');
+  const stolen = result.kind === 'lost' ? result.amount : 0;
+  assert.equal(stolen, 0, 'красть нечего — грамота удержала корону');
+  assert.equal(api.players[0].favor, 1, 'атакующий не получил чужой короны');
+  assert.equal(api.players[1].favor, 4, 'жертва не потеряла корону');
+}
+
 console.log('crownLoss.check: ok');
