@@ -3,12 +3,13 @@ import { isRole } from '../cards';
 import { faces, holds } from '../cardInstance';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
+import { canBeTargetedBy } from '../targeting';
 
 /**
  * Выбор наилучшей цели для роли «Вор» (кража до 2 золота).
  */
 export function selectBestThiefTarget(bot: Player, opponents: Player[]): Player | null {
-  const valid = opponents.filter(p => p.gold > 0);
+  const valid = opponents.filter(p => canBeTargetedBy(p, 'Вор'));
   if (valid.length === 0) return null;
 
   const archetype = getBotArchetype(bot);
@@ -40,7 +41,7 @@ export function selectBestThiefTarget(bot: Player, opponents: Player[]): Player 
  * Выбор наилучшей цели для роли «Шантажист» (кража 1 короны).
  */
 export function selectBestBlackmailerTarget(bot: Player, opponents: Player[]): Player | null {
-  const valid = opponents.filter(p => p.favor > 0);
+  const valid = opponents.filter(p => canBeTargetedBy(p, 'Шантажист'));
   if (valid.length === 0) return null;
 
   const archetype = getBotArchetype(bot);
@@ -240,9 +241,8 @@ export function selectBestRedirectionTarget(
 ): Player | null {
   const possibleTargets = allOpponents.filter(p => {
     if (p.id === currentTarget.id) return false;
-    if (roleClaim === 'Шантажист' && p.favor === 0) return false;
-    if (roleClaim === 'Вор' && p.gold === 0) return false;
-    return true;
+    if (!roleClaim) return true;
+    return canBeTargetedBy(p, roleClaim);
   });
   if (possibleTargets.length === 0) return null;
 

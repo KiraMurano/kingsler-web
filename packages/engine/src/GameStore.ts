@@ -20,6 +20,7 @@ import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
 import { addSealsToPlayer } from './resolvers/sealsResolver';
+import { canBeTargetedBy } from './targeting';
 import {
   disruptPlayerPlotsOnLoss,
   playPlotAction,
@@ -347,6 +348,16 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (actor.gold < actionData.costGold) {
       return;
+    }
+
+    /* Цель приходит от клиента как есть: `KinglierRoom` стампует только
+       `actorId`. Без этой проверки самописный клиент бил бы Вором по пустой
+       казне и Шантажистом сквозь «Стражу покоев». */
+    if (actionData.roleClaim && actionData.targetId) {
+      const victim = players.find(p => p.id === actionData.targetId);
+      if (!victim || !canBeTargetedBy(victim, actionData.roleClaim)) {
+        return;
+      }
     }
 
     if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= 5) {

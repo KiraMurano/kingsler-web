@@ -7,6 +7,7 @@ import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { loseCrowns } from './crownLoss';
+import { canBeTargetedBy } from '../targeting';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -115,7 +116,15 @@ export function playInstant(
     }
   } else if (instantType === 'Перенаправление' && targetPlayerId) {
     const newTarget = players.find(p => p.id === targetPlayerId);
-    if (pendingAction && newTarget) {
+    const claim = pendingAction?.roleClaim;
+    const redirectAllowed =
+      !!pendingAction &&
+      !!newTarget &&
+      !!claim &&
+      newTarget.id !== pendingAction.actorId &&
+      canBeTargetedBy(newTarget, claim);
+
+    if (redirectAllowed && pendingAction && newTarget) {
       const updatedAction = { ...pendingAction, targetId: targetPlayerId };
       set(state => ({
         players: updatedPlayers,

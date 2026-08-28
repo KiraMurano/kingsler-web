@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { canBeTargetedBy } from '@kinglier/engine/targeting';
 import { useShallow } from 'zustand/react/shallow';
 import { OpponentSeat } from './OpponentSeat';
 import { seatOpponents } from '../lib/seats';
@@ -36,13 +37,13 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
 
   const isValidTarget = (player: Player): boolean => {
     if (!pendingTargetAction || player.id === human?.id) return false;
+
     if (pendingTargetAction.instantType === 'Перенаправление') {
       if (pendingAction?.actorId === player.id) return false;
-      if (pendingAction?.roleClaim === 'Шантажист' && player.favor === 0) return false;
-      if (pendingAction?.roleClaim === 'Вор' && player.gold === 0) return false;
+      return !pendingAction?.roleClaim || canBeTargetedBy(player, pendingAction.roleClaim);
     }
-    if (pendingTargetAction.roleClaim === 'Шантажист' && player.favor === 0) return false;
-    return true;
+
+    return !pendingTargetAction.roleClaim || canBeTargetedBy(player, pendingTargetAction.roleClaim);
   };
 
   return (
