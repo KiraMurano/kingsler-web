@@ -11,7 +11,8 @@
  */
 import assert from 'node:assert/strict';
 import { useGameStore } from './GameStore.ts';
-import { TOSS_SPIN_MS, TOSS_START_MS } from './timing.ts';
+import { TOSS_BOT_READY_MS, TOSS_SPIN_MS, TOSS_START_MS } from './timing.ts';
+import { startBotEngine, stopBotEngine } from './Bot.ts';
 
 const HUMANS = [
   { id: 'p1', name: 'Аня' },
@@ -97,10 +98,14 @@ const HUMANS = [
   useGameStore.getState().markReady('p1');
   assert.deepEqual(useGameStore.getState().openingToss!.readyIds, ['p1'], 'a second click must not double-count');
 
-  // Бот нажать не может — и держать стол ему нечем.
-  const botId = useGameStore.getState().players.find(p => p.isBot)!.id;
-  useGameStore.getState().markReady(botId);
-  assert.deepEqual(useGameStore.getState().openingToss!.readyIds, ['p1'], 'bots do not sign the ready list');
+  // Чужого за столом нет — отметить некого.
+  useGameStore.getState().markReady('нет-такого');
+  assert.deepEqual(useGameStore.getState().openingToss!.readyIds, ['p1'], 'only players at the table may be ready');
+
+  // Боты отмечаются наравне со всеми: их кружки зажигаются из того же поля.
+  const botIds = useGameStore.getState().players.filter(p => p.isBot).map(p => p.id);
+  for (const id of botIds) useGameStore.getState().markReady(id);
+  assert.ok(useGameStore.getState().openingToss, 'p2 is still holding the table');
 
   // Последняя галочка не бросает игрока в партию тем же кадром: сначала
   // отсчёт, и только потом стол оживает.
@@ -120,12 +125,15 @@ const HUMANS = [
 {
   useGameStore.getState().startGame(HUMANS);
   useGameStore.getState().markReady('p1');
+  for (const bot of useGameStore.getState().players.filter(p => p.isBot)) {
+    useGameStore.getState().markReady(bot.id);
+  }
   assert.ok(useGameStore.getState().openingToss, 'still waiting for p2');
 
   useGameStore.setState(state => ({
     players: state.players.map(p => (p.id === 'p2' ? { ...p, isBot: true } : p))
   }));
-  useGameStore.getState()._settleOpeningToss();
+  useGameStore.getState().markReady('p2');
   assert.ok(
     useGameStore.getState().openingToss!.startsAt !== null,
     'a seat handed to a bot must stop holding the toss screen'
@@ -138,8 +146,7 @@ const HUMANS = [
 //    жребия следующей.
 {
   useGameStore.getState().startGame(HUMANS);
-  useGameStore.getState().markReady('p1');
-  useGameStore.getState().markReady('p2');
+  for (const p of useGameStore.getState().players) useGameStore.getState().markReady(p.id);
   assert.ok(useGameStore.getState().openingToss!.startsAt !== null, 'countdown running');
 
   useGameStore.getState().startGame(HUMANS);
@@ -147,6 +154,40 @@ const HUMANS = [
   const fresh = useGameStore.getState().openingToss;
   assert.ok(fresh, "the previous game's countdown must not lift the new toss screen");
   assert.deepEqual(fresh.readyIds, []);
+}
+
+// 7. Боты отмечаются сами и вразнобой — этим занят движок ботов.
+{
+  startBotEngine();
+  try {
+    useGameStore.getState().startGame(HUMANS);
+    const botIds = useGameStore.getState().players.filter(p => p.isBot).map(p => p.id);
+    assert.equal(botIds.length, 2, 'two seats must be bots in this table');
+
+    // До приземления монетки кружки ботов ещё не зажигаются: ряда готовности
+    // на экране в это время нет.
+    await new Promise(resolve => setTimeout(resolve, TOSS_SPIN_MS - 400));
+    assert.deepEqual(
+      useGameStore.getState().openingToss!.readyIds,
+      [],
+      'bots must not light up before the coin lands'
+    );
+
+    // Через пару секунд после приземления отметились оба — и только они.
+    await new Promise(resolve => setTimeout(resolve, 400 + TOSS_BOT_READY_MS + 400));
+    const ready = useGameStore.getState().openingToss!.readyIds;
+    assert.deepEqual([...ready].sort(), [...botIds].sort(), 'every bot must confirm on its own');
+    assert.ok(
+      useGameStore.getState().openingToss!.startsAt === null,
+      'the humans still have to press ready themselves'
+    );
+
+    useGameStore.getState().markReady('p1');
+    useGameStore.getState().markReady('p2');
+    assert.ok(useGameStore.getState().openingToss!.startsAt !== null, 'now the countdown may run');
+  } finally {
+    stopBotEngine();
+  }
 }
 
 console.log('GameStore.toss.check.ts passed.');

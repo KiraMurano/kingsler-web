@@ -1051,18 +1051,11 @@
   padding: 24px;
 }
 
-/* Колонка постоянной ширины — и всё в ней тянется на эту ширину.
-   Неровность была именно здесь: пилюли жили каждая по своему содержимому и
-   стояли по центру, поэтому их края расходились лесенкой. Общая колонка
-   выстраивает края в одну линию, а карточка вокруг всего этого не нужна —
-   стол и так под скримом. */
 .toss__col {
-  width: 340px;
-  max-width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
+  align-items: center;
+  gap: 22px;
 }
 
 /* Высота постоянная: монетка летает внутри площадки и не двигает ничего под
@@ -1070,26 +1063,24 @@
    сам крутится, она поворачивалась бы вместе с ним и грань уходила бы в
    плоскость экрана без всякого объёма. */
 .toss__stage {
-  height: 176px;
+  position: relative;
+  width: 100%;
+  height: 300px;
   display: grid;
   place-items: center;
-  perspective: 900px;
+  perspective: 1400px;
 }
 
-/* Внешний узел только летит. Свет даётся `box-shadow`, а не `filter`:
-   `filter` — группирующее свойство и схлопнул бы трёхмерный контекст внутри,
-   после чего `backface-visibility` перестаёт прятать изнанку.
-   Только тёплый ореол, без чёрной тени: тень рисует под монеткой тёмный круг,
-   и пока монетка стоит ребром, вместо неё видна дыра. */
+/* Внешний узел только летит; `preserve-3d` — на внутреннем, который крутится.
+   Разделены не ради порядка: `filter` или любое другое группирующее свойство
+   на вращающемся узле схлопнуло бы трёхмерный контекст, и
+   `backface-visibility` перестал бы прятать изнанку. */
 .toss__coin {
   position: relative;
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  box-shadow: 0 0 38px 8px rgba(200, 160, 74, 0.2);
+  width: 224px;
+  height: 224px;
 }
 
-/* Внутренний узел только крутится — и держит объём. */
 .toss__coin-spin {
   position: absolute;
   inset: 0;
@@ -1112,38 +1103,26 @@
 
 /* ---- Кто ходит первым ---- */
 
-.toss__verdict,
-.toss__ready {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.toss__verdict .eyebrow,
-.toss__ready .eyebrow {
-  text-align: center;
-}
-
-.toss__prompt--go {
-  color: var(--sage-soft);
-}
-
-/* Пилюля во всю колонку. Аватар слева — на той же вертикали, что и аватары в
-   строках готовности ниже. */
-.toss__who {
+/* Лежит поверх монетки, а не под ней: блок под монеткой пришлось бы чем-то
+   освобождать, и монетка прыгала бы вверх ровно в тот момент, когда на неё
+   смотрят. Фон почти непрозрачный — под ним светлая монета. */
+.toss__verdict {
+  position: absolute;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 9px 22px 9px 9px;
+  gap: 14px;
+  max-width: 100%;
+  padding: 10px 26px 10px 10px;
   border: 1px solid var(--line-mid);
   border-radius: 999px;
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-md);
+  background: rgba(10, 14, 22, 0.96);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.7);
 }
 
 .toss__portrait {
-  width: 46px;
-  height: 46px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   overflow: hidden;
   border: 1px solid var(--line-strong);
@@ -1151,7 +1130,7 @@
 }
 
 .toss__portrait .portrait__img,
-.readymark__portrait .portrait__img {
+.facemark__img .portrait__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1168,7 +1147,7 @@
 
 .toss__name {
   display: block;
-  font-size: 1.1rem;
+  font-size: 1.16rem;
   line-height: 1.2;
   color: var(--gold-pale);
   font-weight: 700;
@@ -1180,121 +1159,110 @@
 /* ---- Готовность ---- */
 
 .toss__ready {
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
-.toss__seats {
+.toss__marks {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
-/* Та же пилюля, тот же отступ слева: аватары двух блоков стоят по одной
-   вертикали, и колонка читается как одно целое. */
-.readymark {
+/* Обесцвеченный портрет — это «ещё не отметился». Цвет возвращается вместе с
+   зелёной рамкой, и по ряду сразу видно, кого ждут. */
+.facemark {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  padding: 2px;
+  border: 2px solid var(--line-cold);
+  transition:
+    border-color var(--dur-panel) var(--ease-out),
+    box-shadow var(--dur-panel) var(--ease-out);
+}
+
+.facemark__img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  filter: grayscale(1) brightness(0.72);
+  transition: filter var(--dur-panel) var(--ease-out);
+}
+
+.facemark--on {
+  border-color: var(--sage-soft);
+  box-shadow: 0 0 0 1px rgba(91, 154, 134, 0.35), 0 0 16px -2px rgba(91, 154, 134, 0.55);
+}
+
+.facemark--on .facemark__img {
+  filter: none;
+}
+
+.readybtn {
   display: flex;
   align-items: center;
-  gap: 13px;
-  width: 100%;
-  padding: 8px 16px 8px 9px;
-  border: 1px solid var(--line-cold);
+  gap: 12px;
+  padding: 7px 22px 7px 7px;
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--surface-raised);
   color: inherit;
   font: inherit;
-  text-align: left;
+  cursor: pointer;
   transition:
     border-color var(--dur-fade) var(--ease-out),
     background var(--dur-fade) var(--ease-out);
 }
 
-/* Своя неотмеченная строка — единственная нажимаемая, и это видно до наведения. */
-.readymark--mine {
-  cursor: pointer;
-  border-color: var(--line-strong);
-  background: var(--surface-raised);
-}
-
-.readymark--mine:hover {
+.readybtn:hover:not(:disabled) {
   border-color: var(--gold);
   background: var(--ink-600);
 }
 
-.readymark--on {
-  border-color: rgba(91, 154, 134, 0.45);
-  background: rgba(91, 154, 134, 0.09);
+.readybtn:disabled {
+  cursor: default;
 }
 
-.readymark__portrait {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 1px solid var(--line-cold);
-  flex-shrink: 0;
-  /* Аватар меньше, чем в пилюле выше, но его центр — на той же вертикали:
-     разница в размере съедается отступом. */
-  margin-left: 6px;
+.readybtn--on {
+  border-color: rgba(91, 154, 134, 0.55);
+  background: rgba(91, 154, 134, 0.1);
 }
 
-.readymark__name {
-  flex: 1;
-  min-width: 0;
+.readybtn .facemark {
+  width: 44px;
+  height: 44px;
+}
+
+.readybtn__label {
   font-family: var(--font-display);
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--text);
+  letter-spacing: 0.04em;
+  color: var(--gold-pale);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.readymark__state {
-  flex-shrink: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-.readymark--mine .readymark__state {
-  color: var(--gold-bright);
-}
-
-.readymark--on .readymark__state {
+.readybtn--on .readybtn__label {
   color: var(--sage-soft);
-}
-
-.readymark__box {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--line-mid);
-  border-radius: 50%;
-  color: var(--ink-900);
-  transition:
-    background var(--dur-fade) var(--ease-out),
-    border-color var(--dur-fade) var(--ease-out);
-}
-
-.readymark--mine .readymark__box {
-  border-color: var(--gold);
-}
-
-.readymark--on .readymark__box {
-  background: var(--sage-soft);
-  border-color: var(--sage-soft);
 }
 
 @media (max-width: 560px) {
   .toss__stage {
-    height: 150px;
+    height: 220px;
   }
 
   .toss__coin {
-    width: 92px;
-    height: 92px;
+    width: 160px;
+    height: 160px;
+  }
+
+  .toss__name {
+    font-size: 1rem;
   }
 }

@@ -13,7 +13,7 @@ const { Client } = await import('@colyseus/sdk');
 const { createServer } = await import('./app.ts');
 const { findOrCreateUserByEmail } = await import('./db.ts');
 const { JWT } = await import('colyseus');
-const { TOSS_START_MS } = await import('@kinglier/engine/timing');
+const { TOSS_BOT_READY_MS, TOSS_SPIN_MS, TOSS_START_MS } = await import('@kinglier/engine/timing');
 
 const PORT = 27892;
 createServer().listen(PORT);
@@ -77,20 +77,21 @@ async function tableWithHumanToMove() {
     // «Готов» — про себя: чужую готовность сервер отбивает.
     host.send('action', { method: 'markReady', args: ['p2'] });
     await sleep(200);
-    assert.deepEqual(
-      hostState!.openingToss!.readyIds,
-      [],
+    assert.ok(
+      !hostState!.openingToss!.readyIds.includes('p2'),
       'a player must not be able to press ready for someone else'
     );
 
     host.send('action', { method: 'markReady', args: ['p1'] });
     await sleep(200);
-    assert.deepEqual(hostState!.openingToss!.readyIds, ['p1'], 'the host must be able to ready up');
+    assert.ok(hostState!.openingToss!.readyIds.includes('p1'), 'the host must be able to ready up');
     assert.ok(hostState!.openingToss, 'the screen must hold until the guest is ready too');
 
+    // Готовы должны быть все, включая ботов: те отмечаются сами в пределах
+    // пары секунд после приземления монетки.
     guest.send('action', { method: 'markReady', args: ['p2'] });
-    await sleep(TOSS_START_MS + 400);
-    assert.equal(hostState!.openingToss, null, 'both humans ready must start the game');
+    await sleep(TOSS_SPIN_MS + TOSS_BOT_READY_MS + TOSS_START_MS + 600);
+    assert.equal(hostState!.openingToss, null, 'the whole table ready must start the game');
 
     const active = hostState!.players.find(p => p.id === hostState!.activePlayerId)!;
     if (!active.isBot) {

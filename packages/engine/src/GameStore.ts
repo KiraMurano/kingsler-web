@@ -217,15 +217,14 @@ export const useGameStore = create<GameState>((set, get) => ({
    * «Готов» на экране жребия.
    *
    * Экран снимается готовностью, а не таймером: партия начинается, когда её
-   * начали все, кто за столом живой. Боты в счёт не идут — им нечего нажимать;
-   * по той же причине место, отданное боту после дисконнекта, перестаёт
-   * держать стол (см. `_settleOpeningToss`).
+   * начал каждый за столом. Боты отмечаются сами и вразнобой — см.
+   * `botEngine`; здесь между ними и людьми разницы нет, иначе кружки ботов
+   * пришлось бы зажигать отдельным механизмом мимо состояния.
    */
   markReady: (playerId: string) => {
     const { openingToss, players } = get();
     if (!openingToss || openingToss.readyIds.includes(playerId)) return;
-    const player = players.find(p => p.id === playerId);
-    if (!player || player.isBot) return;
+    if (!players.some(p => p.id === playerId)) return;
 
     set({ openingToss: { ...openingToss, readyIds: [...openingToss.readyIds, playerId] } });
     get()._settleOpeningToss();
@@ -235,7 +234,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { openingToss, players } = get();
     if (!openingToss || openingToss.startsAt !== null) return;
 
-    const waiting = players.filter(p => !p.isBot && !openingToss.readyIds.includes(p.id));
+    const waiting = players.filter(p => !openingToss.readyIds.includes(p.id));
     if (waiting.length > 0) return;
 
     /* Не в тот же кадр: игрок ещё смотрит на список готовности, а стол уже

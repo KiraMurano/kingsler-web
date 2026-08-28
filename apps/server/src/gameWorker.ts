@@ -57,7 +57,8 @@ port.on('message', (msg: WorkerMessage) => {
         players: state.players.map(p => (p.id === msg.playerId ? { ...p, isBot: true } : p))
       }));
       // Ушедший не может нажать «Готов», а его место теперь ведёт бот —
-      // держать из-за него экран жребия больше некому.
+      // значит, оно отмечается само, как и остальные ботовские.
+      useGameStore.getState().markReady(msg.playerId);
       useGameStore.getState()._settleOpeningToss();
       break;
     default:

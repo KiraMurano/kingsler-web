@@ -1,6 +1,6 @@
 import { useGameStore } from '../GameStore';
 import { makeBotMove } from './botTurnPlanner';
-import { BOT_MOVE_MS, BOT_MOVE_JITTER_MS } from '../timing';
+import { BOT_MOVE_MS, BOT_MOVE_JITTER_MS, TOSS_BOT_READY_MS } from '../timing';
 import {
   handleDoubtPhase,
   handleTargetReactionPhase,
@@ -49,6 +49,34 @@ class BotTimerRegistry {
 
 const botTimers = new BotTimerRegistry();
 const scheduler: BotScheduler = (key, cb, delay) => botTimers.schedule(key, cb, delay);
+
+/**
+ * Боты подтверждают готовность на экране жребия — сами и вразнобой.
+ *
+ * Отсчёт идёт от приземления монетки, а не от начала партии: до тех пор
+ * кружков готовности на экране ещё нет, и бот, отметившийся в полёте, зажёгся
+ * бы до того, как игрок увидел ряд.
+ *
+ * Остаток полёта берётся из `landsAt`, поэтому подключившийся в середине не
+ * получает лишнюю паузу.
+ */
+function scheduleBotReadiness(state: ReturnType<typeof useGameStore.getState>): void {
+  const toss = state.openingToss;
+  if (!toss) return;
+  const untilLanded = Math.max(0, toss.landsAt - Date.now());
+
+  for (const bot of state.players) {
+    if (!bot.isBot || toss.readyIds.includes(bot.id)) continue;
+    botTimers.schedule(
+      `toss_ready_${bot.id}`,
+      () => {
+        const cur = useGameStore.getState();
+        if (cur.openingToss) cur.markReady(bot.id);
+      },
+      untilLanded + Math.random() * TOSS_BOT_READY_MS
+    );
+  }
+}
 
 let isEngineStarted = false;
 let isExecutingBotMove = false;
@@ -112,6 +140,15 @@ export function startBotEngine(): void {
   isEngineStarted = true;
 
   unsubscribeStore = useGameStore.subscribe((state, prevState) => {
+    // ------------------------------------------------------------------------
+    // 0. ЖРЕБИЙ: боты подтверждают готовность вразнобой
+    // ------------------------------------------------------------------------
+    // Новый бросок узнаётся по `landsAt`: он меняется ровно раз за партию,
+    // а `readyIds` внутри одного жребия меняется на каждой галочке.
+    if (state.openingToss && state.openingToss.landsAt !== prevState?.openingToss?.landsAt) {
+      scheduleBotReadiness(state);
+    }
+
     // ------------------------------------------------------------------------
     // 1. ХОД В СТАТУСЕ IDLE: Активный бот выбирает действие
     // ------------------------------------------------------------------------

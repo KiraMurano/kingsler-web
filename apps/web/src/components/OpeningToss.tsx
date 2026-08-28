@@ -19,7 +19,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { Easing } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
@@ -27,31 +26,56 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import { TOSS_SPIN_MS } from '@kinglier/engine/timing';
 import type { OpeningTossData, Player } from '@kinglier/engine/types';
 import { Portrait } from './Portrait';
+import { Tooltip } from './ui/Tooltip';
 
 /**
  * Сколько оборотов монетка делает за полёт.
  *
  * Число целое, поэтому монетка приземляется той же гранью, что и взлетела:
  * дробный остаток читается как «легла на ребро».
+ *
+ * Держать его маленьким. Оборотов было семь, и на такой скорости монетка не
+ * читается как монетка — виден мерцающий диск. Глаз должен успевать за каждым
+ * переворотом.
  */
-const SPINS = 7;
+const SPINS = 3;
 
-/** Откуда монетка вылетает и до чего поднимается, px. Вверх — отрицательное. */
-const START_Y = 130;
-const APEX_Y = -86;
-
-/** Доля полёта до верхней точки: вверх быстрее, вниз дольше. */
-const APEX_AT = 0.42;
+/** Ключевые высоты полёта, px. Вверх — отрицательное. */
+const START_Y = 210;
+const APEX_Y = -120;
+/** Отскок: монетка не прилипает к столу с первого касания. */
+const BOUNCE_Y = -26;
 
 /**
- * Разгон и торможение полёта.
+ * Доли полёта: верхняя точка, первое касание, верх отскока.
  *
- * Дуга разбита на два отрезка со своими кривыми, а не одной общей: одна кривая
- * на оба отрезка тормозит монетку и на взлёте, и на падении, и подброс читается
- * как рывок вверх с зависанием. Вверх — торможение, вниз — разгон: так и падает
- * тяжёлое.
+ * Подъём короче падения, а отскок — короче их обоих: так и падает тяжёлое.
  */
-const FLIGHT_EASE: Easing[] = ['easeOut', 'easeIn'];
+const TIMES = [0, 0.38, 0.74, 0.87, 1];
+
+/** Доля полёта до первого касания — на нём вращение и заканчивается. */
+const TOUCHDOWN_AT = TIMES[2];
+
+/**
+ * Своя кривая на каждый отрезок дуги.
+ *
+ * Одна общая кривая тормозит монетку и на взлёте, и на падении, и подброс
+ * читается как рывок вверх с зависанием. Здесь: вверх — торможение, вниз —
+ * разгон, и то же самое на отскоке.
+ */
+const FLIGHT_EASE: Easing[] = ['easeOut', 'easeIn', 'easeOut', 'easeIn'];
+
+/**
+ * Вращение: ровно почти весь полёт и торможение на последнем полуобороте.
+ *
+ * Монетке в воздухе незачем ускоряться и замедляться, но и встать как вкопанной
+ * она не может — последний оборот доводится с замедлением, уже на подлёте.
+ *
+ * Заканчивается ровно на первом касании, а не на конце полёта: монетка должна
+ * коснуться стола плашмя, а не докручиваться на отскоке.
+ */
+const SPIN_EASE: Easing[] = ['linear', 'easeOut'];
+const SPIN_TIMES = [0, 0.72, 1];
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
@@ -59,10 +83,10 @@ const EASE = [0.23, 1, 0.32, 1] as const;
 const TossOverlay: React.FC<{
   toss: OpeningTossData;
   winner: Player;
-  humans: Player[];
+  others: Player[];
   viewer: Player | undefined;
   onReady: () => void;
-}> = ({ toss, winner, humans, viewer, onReady }) => {
+}> = ({ toss, winner, others, viewer, onReady }) => {
   const reduce = !!useReducedMotion();
 
   /* Остаток полёта, снятый один раз при монтировании: подключившийся в
@@ -78,15 +102,8 @@ const TossOverlay: React.FC<{
     return () => window.clearTimeout(id);
   }, [landed, flightS]);
 
-  const starting = toss.startsAt !== null;
   const viewerReady = !!viewer && toss.readyIds.includes(viewer.id);
   const fade = { duration: reduce ? 0.12 : 0.34, ease: EASE };
-
-  const prompt = starting
-    ? 'Все готовы — начинаем'
-    : viewerReady
-      ? 'Ждём остальных'
-      : 'Подтвердите готовность';
 
   return createPortal(
     <div className="scrim toss" role="status" aria-live="polite">
@@ -102,25 +119,33 @@ const TossOverlay: React.FC<{
               узле (он только летит), а `preserve-3d` — на внутреннем. */}
           <motion.div
             className="toss__coin"
-            initial={reduce ? { opacity: 0 } : { y: START_Y, scale: 0.7, opacity: 0 }}
+            initial={reduce ? { opacity: 0 } : { y: START_Y, scale: 0.72, opacity: 0 }}
             animate={
               reduce
                 ? { opacity: 1 }
-                : { y: [START_Y, APEX_Y, 0], scale: [0.7, 1.08, 1], opacity: [0, 1, 1] }
+                : {
+                    y: [START_Y, APEX_Y, 0, BOUNCE_Y, 0],
+                    scale: [0.72, 1.06, 1, 1, 1],
+                    opacity: [0, 1, 1, 1, 1]
+                  }
             }
             transition={
               reduce
                 ? { duration: 0.2 }
-                : { duration: flightS, ease: FLIGHT_EASE, times: [0, APEX_AT, 1] }
+                : { duration: flightS, ease: FLIGHT_EASE, times: TIMES }
             }
           >
-            {/* Вращение ровное: у монетки в воздухе нет причин ускоряться и
-                замедляться, а общая с полётом кривая делала именно это. */}
             <motion.div
               className="toss__coin-spin"
               initial={{ rotateX: 0 }}
-              animate={{ rotateX: reduce ? 0 : SPINS * 360 }}
-              transition={{ duration: reduce ? 0 : flightS, ease: 'linear' }}
+              animate={{
+                rotateX: reduce ? 0 : [0, SPINS * 360 - 180, SPINS * 360]
+              }}
+              transition={
+                reduce
+                  ? { duration: 0 }
+                  : { duration: flightS * TOUCHDOWN_AT, ease: SPIN_EASE, times: SPIN_TIMES }
+              }
             >
               {/* Обе грани — одна и та же монета: у монеты нет стороны, на
                   которой она перестаёт быть монетой. Вторая грань нужна не
@@ -131,22 +156,24 @@ const TossOverlay: React.FC<{
               <img className="toss__face" src="/assets/ui/coin-500.webp" alt="" />
             </motion.div>
           </motion.div>
-        </div>
-
-        <motion.div
-          className="toss__verdict"
-          animate={{ opacity: landed ? 1 : 0 }}
-          transition={fade}
-        >
-          <div className="eyebrow">Жребий брошен</div>
-          <div className="toss__who">
+          <motion.div
+            className="toss__verdict"
+            initial={{ opacity: 0, scale: reduce ? 1 : 0.94 }}
+            animate={{ opacity: landed ? 1 : 0, scale: landed ? 1 : 0.94 }}
+            transition={fade}
+          >
             <Portrait src={winner.avatar} name={winner.name} className="toss__portrait" />
             <span className="toss__line">
               Первым ходит <span className="toss__name">{winner.name}</span>
             </span>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
+        {/* Ряд готовности: слева кружки остальных, справа своя кнопка.
+            Цвет здесь — единственный носитель состояния: пока игрок не
+            отметился, его портрет обесцвечен, и по ряду сразу видно, кого ещё
+            ждут. Имя прячется в подсказку — четыре подписи в строку не
+            помещаются и превращают ряд в список. */}
         <motion.div
           className="toss__ready"
           animate={{ opacity: landed ? 1 : 0 }}
@@ -154,44 +181,37 @@ const TossOverlay: React.FC<{
           style={{ pointerEvents: landed ? 'auto' : 'none' }}
           aria-hidden={!landed}
         >
-          <div className={`eyebrow ${starting ? 'toss__prompt--go' : ''}`}>{prompt}</div>
-
-          <div className="toss__seats">
-            {humans.map(player => {
-              const ready = toss.readyIds.includes(player.id);
-              const isViewer = player.id === viewer?.id;
-              const actionable = isViewer && !ready;
-              return (
-                <button
-                  key={player.id}
-                  type="button"
-                  className={[
-                    'readymark',
-                    ready ? 'readymark--on' : '',
-                    actionable ? 'readymark--mine' : ''
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  /* Нажимается только своя строка: чужую готовность подтвердить
-                     нельзя, и `disabled` честнее молча проглоченного клика. */
-                  disabled={!actionable}
-                  onClick={actionable ? onReady : undefined}
+          <div className="toss__marks">
+            {others.map(player => (
+              /* Кружок ничего не делает по нажатию, поэтому подсказка
+                 открывается обычным тапом, а не удержанием. */
+              <Tooltip key={player.id} text={player.name} tapToOpen>
+                <span
+                  className={`facemark ${toss.readyIds.includes(player.id) ? 'facemark--on' : ''}`}
                 >
-                  {/* Аватар первым — как и в пилюле с именем выше: круглые
-                      кружки обеих строк встают по одной вертикали, и колонка
-                      перестаёт выглядеть собранной из разных кусков. */}
-                  <Portrait src={player.avatar} name={player.name} className="readymark__portrait" />
-                  <span className="readymark__name">{player.name}</span>
-                  <span className="readymark__state">
-                    {ready ? 'готов' : isViewer ? 'нажмите' : 'ждём'}
-                  </span>
-                  <span className="readymark__box">
-                    {ready && <Check size={14} strokeWidth={3} />}
-                  </span>
-                </button>
-              );
-            })}
+                  <Portrait src={player.avatar} name={player.name} className="facemark__img" />
+                </span>
+              </Tooltip>
+            ))}
           </div>
+
+          {viewer && (
+            <button
+              type="button"
+              className={`readybtn ${viewerReady ? 'readybtn--on' : ''}`}
+              disabled={viewerReady}
+              onClick={viewerReady ? undefined : onReady}
+            >
+              {/* Подсказка на живой кнопке открывается удержанием: обычный тап
+                  должен нажимать кнопку, а не объяснять её. */}
+              <Tooltip text={viewer.name}>
+                <span className={`facemark ${viewerReady ? 'facemark--on' : ''}`}>
+                  <Portrait src={viewer.avatar} name={viewer.name} className="facemark__img" />
+                </span>
+              </Tooltip>
+              <span className="readybtn__label">Готов</span>
+            </button>
+          )}
         </motion.div>
       </div>
     </div>,
@@ -213,9 +233,13 @@ export const OpeningToss: React.FC = () => {
   const winner = players.find(p => p.id === openingToss.winnerId);
   if (!winner) return null;
 
-  const humans = players.filter(p => !p.isBot);
   /* Оффлайн `viewerId` не задан — там живой игрок ровно один, и это он. */
-  const viewer = viewerId ? humans.find(p => p.id === viewerId) : humans[0];
+  const viewer = viewerId
+    ? players.find(p => p.id === viewerId)
+    : players.find(p => !p.isBot);
+  /* В ряду весь стол, а не только люди: боты отмечаются сами, и их кружки —
+     половина того, что на этом экране вообще происходит. */
+  const others = players.filter(p => p.id !== viewer?.id);
 
   return (
     /* `key` по `landsAt`: новая партия получает свежий полёт вместо
@@ -224,7 +248,7 @@ export const OpeningToss: React.FC = () => {
       key={openingToss.landsAt}
       toss={openingToss}
       winner={winner}
-      humans={humans}
+      others={others}
       viewer={viewer}
       onReady={() => viewer && markReady(viewer.id)}
     />

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { GameWorkerClient } from './GameWorkerClient.ts';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
-import { TOSS_START_MS } from '@kinglier/engine/timing';
+import { TOSS_BOT_READY_MS, TOSS_SPIN_MS, TOSS_START_MS } from '@kinglier/engine/timing';
 
 const worker = new GameWorkerClient();
 const states: GameStateData[] = [];
@@ -45,7 +45,18 @@ worker.call('performAction', [{
 await new Promise(resolve => setTimeout(resolve, 300));
 assert.equal(states.length, countUnderToss, 'the worker must swallow actions while the toss is in the air');
 
-// Экран жребия снимается готовностью, а не временем: отмечаются оба живых.
+// Экран жребия снимается готовностью, а не временем — и готовы должны быть
+// все, включая ботов. Боты отмечаются сами в пределах пары секунд после
+// приземления монетки, поэтому сперва ждём их.
+await new Promise(resolve => setTimeout(resolve, TOSS_SPIN_MS + TOSS_BOT_READY_MS + 400));
+const botsReady = states[states.length - 1].openingToss!.readyIds;
+assert.equal(
+  botsReady.length,
+  2,
+  'both bots must have confirmed on their own by now'
+);
+assert.ok(!botsReady.includes('p1') && !botsReady.includes('p2'), 'humans confirm themselves');
+
 worker.call('markReady', ['p1']);
 worker.call('markReady', ['p2']);
 await new Promise(resolve => setTimeout(resolve, TOSS_START_MS + 400));
