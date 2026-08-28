@@ -1,7 +1,9 @@
 import type { Role, PlotType, InstantType, GameCard } from './cards';
 import type { CardId, CardInstance } from './cardInstance';
+import type { GameRules } from './rules';
 export type { Role, PlotType, InstantType, GameCard } from './cards';
 export type { CardId, CardInstance } from './cardInstance';
+export type { GameRules } from './rules';
 
 export type BotPersonalityType = 'gambler' | 'cautious' | 'pragmatic' | 'provocateur' | 'opportunist';
 
@@ -159,6 +161,14 @@ export interface ConspiracyPromptData {
 export type TurnSubPhase = 'NORMAL_ACTION_PHASE' | 'CARD_PLAY_PHASE';
 
 export interface GameState {
+  /**
+   * Правила этой партии: пороги, цены, состав колоды.
+   *
+   * Живут в состоянии, а не в отдельном канале, чтобы онлайн-клиенты получали
+   * их тем же путём, что и всё остальное: `GameStateData` выводится из
+   * `GameState` структурно, а `redactStateForPlayer` разливает через `...rest`.
+   */
+  rules: GameRules;
   players: Player[];
   activePlayerId: string;
   /** Only set in online mode: which seat this browser's connection is. Undefined offline. */
@@ -219,7 +229,10 @@ export interface GameState {
   history: string[];
 
   // Action methods
-  startGame: (seats?: { id: string; name: string; avatar?: string; title?: string }[]) => void;
+  startGame: (
+    seats?: { id: string; name: string; avatar?: string; title?: string }[],
+    rules?: Partial<GameRules>
+  ) => void;
   /** «Готов» на экране жребия. Когда отметились все живые — партия начинается. */
   markReady: (playerId: string) => void;
   performAction: (action: Omit<Action, 'id'>) => void;

@@ -20,6 +20,7 @@ import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
 import { addSealsToPlayer } from './resolvers/sealsResolver';
+import { DEFAULT_RULES, normalizeRules } from './rules';
 import { canBeTargetedBy } from './targeting';
 import {
   disruptPlayerPlotsOnLoss,
@@ -65,6 +66,7 @@ let tossStartTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useGameStore = create<GameState>((set, get) => ({
   // State Properties
+  rules: DEFAULT_RULES,
   players: [],
   deck: [],
   discardPile: [],
@@ -112,14 +114,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   // GAME LIFECYCLE
   // --------------------------------------------------------------------------
 
-  startGame: (seats) => {
+  startGame: (seats, rulesInput) => {
     timerManager.clearAll();
     if (tossStartTimer !== null) {
       clearTimeout(tossStartTimer);
       tossStartTimer = null;
     }
     botMemory.clear();
-    const deck = createInitialDeck(); // состав считается из CARD_COPIES_MAP
+    /* Правила нормализуются здесь, а не у вызывающего: и оффлайн-экран, и
+       сервер, и тесты попадают в движок через эту дверь, и всем им должно
+       достаться одно и то же валидное состояние. */
+    const rules = normalizeRules({ ...DEFAULT_RULES, ...rulesInput });
+    const deck = createInitialDeck(rules.deck);
 
     const humanSeats = seats && seats.length > 0
       ? seats.slice(0, 4)
@@ -173,6 +179,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const firstPlayer = players[Math.floor(Math.random() * players.length)];
 
     set({
+      rules,
       players,
       deck,
       discardPile: [],

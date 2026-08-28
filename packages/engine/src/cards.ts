@@ -67,15 +67,22 @@ export function isInstant(card: GameCard): card is InstantType {
 }
 
 /**
- * Создает полную колоду из всех карт согласно CARD_COPIES_MAP.
+ * Собирает колоду по карте копий: сколько какой карты замешано.
+ *
+ * Принимает саму карту копий, а не `GameRules`: правила уже импортируют этот
+ * модуль ради `CARD_COPIES_MAP` и списков карт, и обратный импорт замкнул бы
+ * цикл. Без аргумента собирается сегодняшний состав по умолчанию.
+ *
  * Ids are minted after the shuffle, so they are stable but arbitrary — a card's
  * identity says nothing about which card it is.
  */
-export function createInitialDeck(): CardInstance[] {
+export function createInitialDeck(
+  copies: Partial<Record<GameCard, number>> = CARD_COPIES_MAP
+): CardInstance[] {
   const deck: GameCard[] = [];
 
-  for (const [card, count] of Object.entries(CARD_COPIES_MAP)) {
-    for (let i = 0; i < count; i++) {
+  for (const [card, count] of Object.entries(copies)) {
+    for (let i = 0; i < (count ?? 0); i++) {
       deck.push(card as GameCard);
     }
   }
