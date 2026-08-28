@@ -22,7 +22,19 @@ import type { CardId } from '@kinglier/engine/cardInstance';
 export type PileKind = 'deck' | 'discard';
 
 const flying: Record<PileKind, Set<CardId>> = { deck: new Set(), discard: new Set() };
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const listeners = new Set<() => void>();
+
+/**
+ * Предохранитель: сколько отметка живёт, если о приземлении так и не сказали.
+ *
+ * Слой карт ведёт карты пружинами и не всегда объявляет прибытие — при
+ * заминке кадров пружина может подходить к цели асимптотически и не попасть
+ * в порог. Без предохранителя такая карта числилась бы летящей вечно, и
+ * счётчик остался бы занижен до конца партии. Число взято с запасом: дольше
+ * самого длинного перелёта через стол.
+ */
+const STRANDED_MS = 1800;
 
 function notify(): void {
   for (const listener of listeners) listener();
@@ -32,11 +44,17 @@ function notify(): void {
 export function markFlyingToPile(kind: PileKind, id: CardId): void {
   if (flying[kind].has(id)) return;
   flying[kind].add(id);
+  const key = `${kind}:${id}`;
+  clearTimeout(timers.get(key));
+  timers.set(key, setTimeout(() => markLandedAtPile(kind, id), STRANDED_MS));
   notify();
 }
 
 /** Карта долетела — или передумала лететь и ушла в другую зону. */
 export function markLandedAtPile(kind: PileKind, id: CardId): void {
+  const key = `${kind}:${id}`;
+  clearTimeout(timers.get(key));
+  timers.delete(key);
   if (!flying[kind].delete(id)) return;
   notify();
 }

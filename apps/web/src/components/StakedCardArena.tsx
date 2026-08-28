@@ -157,19 +157,34 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
     );
     return (
       <div className="staked">
+        {/*
+          Ристалище, а не короб.
+          Ничего непрозрачного поверх карт здесь нет и быть не может: слой карт
+          лежит выше арены, и всякая плашка, поднятая над ним, закрыла бы те
+          самые карты, ради которых нарисована. Поэтому «рамка» — это подсвет
+          снизу и две золотые линии, а слово стоит под картами, где им не
+          мешает.
+        */}
         <div className="duel">
-          <div className="duel__side">
-            <CardAnchor zone={{ kind: 'duel', side: 'attacker' }}>
-              <ClaimBadge text={claimBadge(attackerClaim, target)} />
-            </CardAnchor>
+          <div className="duel__lists" aria-hidden />
+
+          <div className="duel__row">
+            <div className="duel__side">
+              <CardAnchor zone={{ kind: 'duel', side: 'attacker' }}>
+                <ClaimBadge text={claimBadge(attackerClaim, target)} />
+              </CardAnchor>
+            </div>
+            <div className="duel__side">
+              <CardAnchor zone={{ kind: 'duel', side: 'defender' }}>
+                <ClaimBadge text={String(defenderClaim)} />
+              </CardAnchor>
+            </div>
           </div>
 
-          <span className="duel__vs">дуэль</span>
-
-          <div className="duel__side">
-            <CardAnchor zone={{ kind: 'duel', side: 'defender' }}>
-              <ClaimBadge text={String(defenderClaim)} />
-            </CardAnchor>
+          <div className="duel__cry">
+            <span className="duel__rule" aria-hidden />
+            <span className="duel__word">Дуэль</span>
+            <span className="duel__rule duel__rule--r" aria-hidden />
           </div>
         </div>
       </div>

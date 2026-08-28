@@ -1186,19 +1186,50 @@
   color: var(--text-muted);
 }
 
-/* Duel clash */
+/* ==========================================================================
+   ДУЭЛЬ — ристалище
+   ==========================================================================
+   Плашки под картами нет намеренно. Слой карт лежит выше арены, и любая
+   непрозрачная коробка, поднятая над ним, закрыла бы обе дуэльные карты. Всё,
+   что рисует здесь дуэль, — свет из-под карт и две линии: они лежат ниже карт
+   и им не мешают, а роль «рамки» берёт на себя подсвет. */
 .duel {
   position: relative;
   z-index: var(--z-tabled);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 12px 18px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(180, 64, 90, 0.5);
-  background: rgba(22, 10, 15, 0.94);
-  box-shadow: var(--shadow-lg);
+  gap: 10px;
+  padding: 18px 26px 12px;
   pointer-events: auto;
+}
+
+/* Свет из-под сходящихся карт: тёплое ядро на месте удара и холодная тень по
+   краям, чтобы стычка вырезалась из сукна. */
+.duel__lists {
+  position: absolute;
+  inset: -18% -12%;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, rgba(255, 186, 92, 0.22) 0%, rgba(255, 150, 40, 0.08) 42%, rgba(6, 8, 12, 0) 72%),
+    radial-gradient(closest-side, rgba(4, 6, 10, 0.82) 0%, rgba(4, 6, 10, 0.45) 58%, rgba(4, 6, 10, 0) 100%);
+  animation: duel-forge 2.6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+/* Горн дышит: свет чуть ходит, и стычка не выглядит остановленным кадром. */
+@keyframes duel-forge {
+  from { opacity: 0.82; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1.03); }
+}
+
+/* Карты сходятся вплотную — зазор ровно такой, чтобы клинки читались
+   скрестившимися, а не лежащими рядом. */
+.duel__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .duel__side {
@@ -1208,20 +1239,46 @@
   gap: 5px;
 }
 
+/* Клич под картами, а не между ними: в промежутке ему было тесно и слово
+   вставало столбиком. */
+.duel__cry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.duel__word {
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  text-transform: uppercase;
+  color: var(--gold-pale);
+  text-shadow: 0 0 18px rgba(255, 170, 70, 0.45);
+}
+
+.duel__rule {
+  width: 54px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(232, 200, 119, 0.75));
+}
+
+.duel__rule--r {
+  background: linear-gradient(270deg, transparent, rgba(232, 200, 119, 0.75));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .duel__lists { animation: none; }
+}
+
 .duel__tag {
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-}
-
-.duel__vs {
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  color: var(--crimson-soft);
-  writing-mode: vertical-rl;
 }
 
 /* ==========================================================================
@@ -2150,4 +2207,25 @@
   font-family: var(--font-display);
   letter-spacing: 0.3em;
   color: var(--text-dim);
+}
+
+/* Кнопка отладки. Видна только в сборке разработчика — в бой не уедет, но и
+   в толпе кнопок теряться не должна. */
+.iconbtn--dev {
+  color: var(--violet-soft);
+  border-color: rgba(139, 114, 196, 0.35);
+}
+
+.iconbtn--dev:hover {
+  color: var(--violet-soft);
+  background: rgba(139, 114, 196, 0.12);
+  border-color: var(--violet);
+}
+
+/* Холст стычки. Поверх карт — искра, пролетающая за картой, это не искра. */
+.clash {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-above-cards);
+  pointer-events: none;
 }

@@ -8,6 +8,7 @@ import { TopBar } from './components/TopBar';
 import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
 import { CardPiles } from './components/CardPiles';
+import { DuelClash } from './components/DuelClash';
 import { Hand } from './components/Hand';
 import { PlayerCrest } from './components/PlayerCrest';
 import { PhasePanel } from './components/PhasePanel';
@@ -497,6 +498,7 @@ export default function App({
       <TopBar
         codexOpen={codexOpen}
         chronicleOpen={chronicleOpen}
+        isDuel={turnPhase === 'DUEL_ATTACKER_WINDOW' || turnPhase === 'DUEL_OUTCOME'}
         onOpenCodex={() => setCodexOpen(true)}
         onOpenChronicle={() => setChronicleOpen(open => !open)}
         onOpenRules={() => setRulesOpen(true)}
@@ -546,6 +548,10 @@ export default function App({
             </div>
 
             <CardLayer cards={placedCards} />
+
+            {/* Искры стычки. Сами себя порталят поверх карт и молчат, пока
+                дуэльные карты не сойдутся. */}
+            <DuelClash />
           </main>
         </CardInteractionProvider>
       </AnchorProvider>
