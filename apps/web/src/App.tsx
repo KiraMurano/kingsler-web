@@ -128,6 +128,11 @@ export default function App({
   const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
   const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
   const [openMenuCardId, setOpenMenuCardId] = useState<CardId | null>(null);
+
+  /* Карты, отмеченные к обмену. `null` — выбор не открыт, `[]` — открыт и
+     пока пуст. Живёт здесь, а не в сторе: движок про черновик выбора ничего
+     не знает и знать не должен, он получает готовое действие. */
+  const [exchangePick, setExchangePick] = useState<CardId[] | null>(null);
   const [bluffCardId, setBluffCardId] = useState<CardId | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
@@ -228,7 +233,8 @@ export default function App({
           vetoDeadlineAt,
           coronationCandidateId,
           revealOutcome,
-          duelOutcome
+          duelOutcome,
+          exchangePick
         },
         human?.id ?? ''
       ),
@@ -248,6 +254,7 @@ export default function App({
       coronationCandidateId,
       revealOutcome,
       duelOutcome,
+      exchangePick,
       human
     ]
   );
@@ -256,6 +263,9 @@ export default function App({
   const runBarAction = (kind: BarActionKind) => {
     if (!human) return;
     switch (kind) {
+      case 'exchange-confirm':
+        confirmExchange();
+        break;
       case 'court-actions':
         setCourtActionsOpen(true);
         break;
@@ -293,6 +303,7 @@ export default function App({
      `performAction`), но и показывать невозможный выбор незачем. */
   useEffect(() => {
     setPendingTarget(null);
+    setExchangePick(null);
   }, [view.phase, activePlayerId]);
 
   const confirmTarget = (targetId: string) => {
@@ -327,7 +338,46 @@ export default function App({
   /* Клик по своей карте только раскрывает меню — играет уже пункт меню.
      Повторный клик по той же карте закрывает: карта сама себе переключатель. */
   const handleCardClick = (cardId: CardId) => {
+    /* Пока идёт выбор к обмену, карта — это флажок, а не меню: клик отмечает,
+       повторный снимает отметку. Больше двух карт в руке не бывает, так что
+       ограничивать число отмеченных нечем и незачем. */
+    if (exchangePick) {
+      setExchangePick(current =>
+        (current ?? []).includes(cardId)
+          ? (current ?? []).filter(id => id !== cardId)
+          : [...(current ?? []), cardId]
+      );
+      return;
+    }
     setOpenMenuCardId(current => (current === cardId ? null : cardId));
+  };
+
+  /** Сбросить отмеченное и тут же добрать столько же. */
+  const confirmExchange = () => {
+    const picked = exchangePick ?? [];
+    if (!human || picked.length === 0) return;
+
+    const named = picked
+      .map(id => human.hand.find(c => c.id === id))
+      .filter((c): c is NonNullable<typeof c> => !!c);
+    if (named.length === 0) return;
+
+    const list = named.map(c => `«${c.card}»`).join(', ');
+    setExchangePick(null);
+    setOpenMenuCardId(null);
+    performAction({
+      type: 'normal',
+      name: named.length === 1 ? 'Сменить карту' : 'Сменить 2 карты',
+      stakedCardId: named[0].id,
+      stakedCardIds: named.map(c => c.id),
+      actorId: human.id,
+      costGold: 0,
+      costTokens: 1,
+      description:
+        named.length === 1
+          ? `Сбросил карту ${list} и взял новую.`
+          : `Сбросил обе карты (${list}) и взял две новые.`
+    });
   };
 
   /** «Разыграть» — карта играется тем, что она есть, без заявки чужой роли. */
@@ -488,7 +538,8 @@ export default function App({
     onInspect: setInspectedCard,
     claimFor: claimedRoleFor,
     isOwnHand: isOwnHandCard,
-    isSelected: placed => openMenuCardId === placed.id,
+    isSelected: placed =>
+      openMenuCardId === placed.id || !!exchangePick?.includes(placed.id),
     isPlayable: placed =>
       isOwnHandCard(placed) && (isMyTurn || isTargetReaction || vetoReady(placed.face.known)),
   };
@@ -517,6 +568,14 @@ export default function App({
               <Arena
                 pendingTargetAction={pendingTarget}
                 onCancelTarget={() => setPendingTarget(null)}
+                prompt={
+                  exchangePick
+                    ? {
+                        text: 'Выберите карты для смены',
+                        onCancel: () => setExchangePick(null)
+                      }
+                    : null
+                }
                 onInspectCard={setInspectedCard}
               />
 
@@ -574,6 +633,10 @@ export default function App({
         <CourtActionsDialog
           onClose={() => setCourtActionsOpen(false)}
           onInspectCard={setInspectedCard}
+          onStartExchange={() => {
+            setOpenMenuCardId(null);
+            setExchangePick([]);
+          }}
         />
       )}
 

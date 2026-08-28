@@ -7,9 +7,21 @@ import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
 import { dur } from '../motion/tokens.ts';
 
+/** Что просят сделать за столом и как от этого отказаться. */
+export interface ArenaPrompt {
+  text: React.ReactNode;
+  onCancel: () => void;
+}
+
 interface ArenaProps {
   pendingTargetAction: PendingTargetAction | null;
   onCancelTarget: () => void;
+  /**
+   * Просьба, висящая над столом: выбрать жертву, отметить карты к обмену.
+   * Баннер один на всех — сколько бы поводов его показать ни завелось, выглядят
+   * и ведут себя они одинаково.
+   */
+  prompt?: ArenaPrompt | null;
   /**
    * Vestigial: card inspection moved to the card layer along with the cards
    * themselves. Kept so `App` still typechecks until it stops passing it.
@@ -20,7 +32,7 @@ interface ArenaProps {
 /** Где стоит баннер: доля высоты стола, отсчитанная от его нижнего края. */
 const BAR_BOTTOM = 0.28;
 
-export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarget }) => {
+export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarget, prompt }) => {
   const reduce = !!useReducedMotion();
   /* `.targetbar` centres itself with the `translate` property rather than
      with `transform`, precisely so that the two never fight: `transform`
@@ -41,7 +53,19 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
    */
   const arena = useRef<HTMLElement>(null);
   const [at, setAt] = useState<{ x: number; bottom: number } | null>(null);
-  const open = !!pendingTargetAction;
+  const banner: ArenaPrompt | null =
+    prompt ??
+    (pendingTargetAction
+      ? {
+          text: (
+            <>
+              Выберите цель для <strong>«{pendingTargetAction.name}»</strong>
+            </>
+          ),
+          onCancel: onCancelTarget
+        }
+      : null);
+  const open = !!banner;
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -69,7 +93,7 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
 
       {createPortal(
         <AnimatePresence>
-          {pendingTargetAction && at && (
+          {banner && at && (
             <motion.div
               key="targetbar"
               className="targetbar"
@@ -79,10 +103,8 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
               exit={{ opacity: 0, y: rise }}
               transition={{ duration: reduce ? 0.12 : dur.fade, ease: [0.4, 0, 0.2, 1] }}
             >
-              <span>
-                Выберите цель для <strong>«{pendingTargetAction.name}»</strong>
-              </span>
-              <Button tone="danger" size="sm" onClick={onCancelTarget}>
+              <span>{banner.text}</span>
+              <Button tone="danger" size="sm" onClick={banner.onCancel}>
                 Отмена
               </Button>
             </motion.div>

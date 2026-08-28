@@ -53,6 +53,7 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     coronationCandidateId: null,
     revealOutcome: null,
     duelOutcome: null,
+    exchangePick: null,
     ...over
   };
 }
@@ -379,6 +380,39 @@ function action(over: Partial<Action> = {}): Action {
   );
   assert.match(поЖивому.event, /на Мурена/, 'ник живого игрока не склоняется');
   assert.doesNotMatch(поЖивому.event, /Мурену/);
+}
+
+/* Выбор карт к обмену забирает правую колонку себе.
+ *
+ * Пока идут отметки, «Завершить ход» из колонки уходит: ход, отданный
+ * посреди выбора, — это ход, отданный по случайности. Отмена живёт в баннере
+ * над столом, а не среди кнопок. */
+{
+  const hand = player('p1').hand;
+
+  const idle = deriveTableView(input(), 'p1');
+  assert.ok(
+    idle.bar.some(b => b.kind === 'court-actions'),
+    'без выбора колонка обычная'
+  );
+
+  const empty = deriveTableView(input({ exchangePick: [] }), 'p1');
+  assert.deepEqual(
+    empty.bar.map(b => b.kind),
+    ['exchange-confirm'],
+    'выбор оставляет в колонке одну кнопку'
+  );
+  assert.equal(empty.bar[0].disabled, true, 'ни одна карта не отмечена — жать нечего');
+
+  const one = deriveTableView(input({ exchangePick: [hand[0].id] }), 'p1');
+  assert.equal(one.bar[0].label, 'Сменить 1 карту');
+  assert.equal(one.bar[0].disabled, false);
+
+  const two = deriveTableView(input({ exchangePick: [hand[0].id, hand[1].id] }), 'p1');
+  assert.equal(two.bar[0].label, 'Сменить 2 карты');
+
+  assert.notEqual(one.id, two.id, 'отметка меняет картинку, значит и подпись под ней');
+  assert.notEqual(idle.id, empty.id, 'открытый выбор — уже другая картинка');
 }
 
 console.log('tableView.check: ok');

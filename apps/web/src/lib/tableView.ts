@@ -49,6 +49,7 @@ export interface PlayerRef {
 }
 
 export type BarActionKind =
+  | 'exchange-confirm'
   | 'court-actions'
   | 'conspiracy'
   | 'end-turn'
@@ -151,6 +152,17 @@ export interface TableViewInput {
   coronationCandidateId: string | null;
   revealOutcome: RevealOutcome | null;
   duelOutcome: DuelOutcome | null;
+  /**
+   * Какие карты руки отмечены к обмену, пока идёт выбор. `null` — выбор не
+   * открыт.
+   *
+   * Единственное поле здесь, которого нет в сторе: это состояние интерфейса,
+   * ровно как прицел. Но правая колонка обязана показывать «Сменить N карт»
+   * согласованно с тем, что подсвечено на столе, а согласованность в этом
+   * приложении держит одна модель — значит, выбор входит в неё, а не живёт
+   * рядом второй правдой.
+   */
+  exchangePick: CardId[] | null;
 }
 
 const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avatar });
@@ -313,6 +325,25 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
 
   switch (phase) {
     case 'turn': {
+      /* Пока выбирают карты к обмену, колонка показывает только этот выбор.
+         Отмена живёт в баннере над столом, а «Завершить ход» посреди выбора —
+         это ход, отданный по случайности. */
+      if (input.exchangePick) {
+        const picked = input.exchangePick.length;
+        return [
+          {
+            kind: 'exchange-confirm',
+            spendsToken: true,
+            tokenBlocked: !hasTokens,
+            label: picked === 1 ? 'Сменить 1 карту' : picked === 2 ? 'Сменить 2 карты' : 'Сменить карты',
+            tone: 'gold',
+            disabled: picked === 0 || !hasTokens,
+            hint: 'Сбросить отмеченные карты и тут же добрать столько же',
+            reason: picked === 0 ? 'Ни одна карта не отмечена.' : noTokens
+          }
+        ];
+      }
+
       const courtReason =
         input.hasUsedNormalActionThisTurn || input.turnSubPhase !== 'NORMAL_ACTION_PHASE'
           ? 'Действие двора уже было в этом ходу.'
@@ -597,6 +628,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     phase,
     title,
     titleName ?? '',
+    input.exchangePick ? `pick:${input.exchangePick.join('.')}` : '',
     guidance,
     event,
     bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
