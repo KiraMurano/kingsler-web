@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { GameWorkerClient } from './GameWorkerClient.ts';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
+import { TOSS_START_MS } from '@kinglier/engine/timing';
 
 const worker = new GameWorkerClient();
 const states: GameStateData[] = [];
@@ -47,7 +48,7 @@ assert.equal(states.length, countUnderToss, 'the worker must swallow actions whi
 // Экран жребия снимается готовностью, а не временем: отмечаются оба живых.
 worker.call('markReady', ['p1']);
 worker.call('markReady', ['p2']);
-await new Promise(resolve => setTimeout(resolve, 300));
+await new Promise(resolve => setTimeout(resolve, TOSS_START_MS + 400));
 const settled = states[states.length - 1];
 assert.equal(settled.openingToss, null, 'both humans ready must lift the toss screen');
 

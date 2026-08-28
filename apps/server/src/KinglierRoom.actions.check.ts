@@ -13,6 +13,7 @@ const { Client } = await import('@colyseus/sdk');
 const { createServer } = await import('./app.ts');
 const { findOrCreateUserByEmail } = await import('./db.ts');
 const { JWT } = await import('colyseus');
+const { TOSS_START_MS } = await import('@kinglier/engine/timing');
 
 const PORT = 27892;
 createServer().listen(PORT);
@@ -25,7 +26,7 @@ const client = new Client(`ws://localhost:${PORT}`);
 type State = {
   players: { id: string; gold: number; isBot: boolean }[];
   activePlayerId: string;
-  openingToss: { winnerId: string; readyIds: string[] } | null;
+  openingToss: { winnerId: string; readyIds: string[]; startsAt: number | null } | null;
 };
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -88,7 +89,7 @@ async function tableWithHumanToMove() {
     assert.ok(hostState!.openingToss, 'the screen must hold until the guest is ready too');
 
     guest.send('action', { method: 'markReady', args: ['p2'] });
-    await sleep(300);
+    await sleep(TOSS_START_MS + 400);
     assert.equal(hostState!.openingToss, null, 'both humans ready must start the game');
 
     const active = hostState!.players.find(p => p.id === hostState!.activePlayerId)!;

@@ -1,15 +1,16 @@
 /**
- * Стартовый жребий: монетка взлетает, крутится и падает, поверх неё проступает
- * имя того, кто ходит первым, — и стол ждёт, пока каждый живой игрок скажет
+ * Стартовый жребий: монетка взлетает, крутится и падает, под ней проступает имя
+ * того, кто ходит первым, — и стол ждёт, пока каждый живой игрок скажет
  * «Готов».
  *
- * Компонент ничего не решает: победителя выбрал движок, а готовность лежит в
- * том же `openingToss`. И оффлайн, и все клиенты онлайн-стола читают одно поле
- * состояния, поэтому бросок и галочки у всех одни.
+ * Компонент ничего не решает: победителя выбрал движок, готовность и отсчёт до
+ * первого хода лежат в том же `openingToss`. И оффлайн, и все клиенты
+ * онлайн-стола читают одно поле состояния, поэтому бросок, галочки и момент
+ * старта у всех одни.
  *
- * Стадия считается от `openingToss.landsAt`, а не от монтирования. Игрок,
- * переподключившийся в середине броска, должен досмотреть остаток и увидеть
- * имя — а не начать круг заново и не пропустить надпись вовсе.
+ * Всё нарисовано с самого начала и только проступает по прозрачности: блок,
+ * который появляется, своей высотой сдвигал бы сцену ровно в тот момент, когда
+ * монетка приземляется. Панель держит постоянный размер от первого кадра.
  *
  * Оверлей лежит порталом в `body` поверх всего: скрим — это ещё и заслонка.
  * Пока экран жребия держится, стол ходов не принимает — воркер отбивает всё,
@@ -36,8 +37,8 @@ import { Portrait } from './Portrait';
 const SPINS = 7;
 
 /** Откуда монетка вылетает и до чего поднимается, px. Вверх — отрицательное. */
-const START_Y = 220;
-const APEX_Y = -150;
+const START_Y = 130;
+const APEX_Y = -86;
 
 /** Доля полёта до верхней точки: вверх быстрее, вниз дольше. */
 const APEX_AT = 0.42;
@@ -52,15 +53,9 @@ const APEX_AT = 0.42;
  */
 const FLIGHT_EASE: Easing[] = ['easeOut', 'easeIn'];
 
-const VERDICT_EASE = [0.23, 1, 0.32, 1] as const;
+const EASE = [0.23, 1, 0.32, 1] as const;
 
-/** Насколько монетка уходит в фон, когда поверх неё встаёт имя. */
-const COIN_BEHIND = { opacity: 0.18, scale: 1.5 };
-
-/**
- * Один бросок. Смонтирован ровно на время своего жребия — `key` по `landsAt` в
- * `OpeningToss` даёт новой партии свежий полёт вместо доигрывания прошлого.
- */
+/** Один бросок: смонтирован ровно на время своего жребия. */
 const TossOverlay: React.FC<{
   toss: OpeningTossData;
   winner: Player;
@@ -83,91 +78,89 @@ const TossOverlay: React.FC<{
     return () => window.clearTimeout(id);
   }, [landed, flightS]);
 
+  const starting = toss.startsAt !== null;
   const viewerReady = !!viewer && toss.readyIds.includes(viewer.id);
+  const fade = { duration: reduce ? 0.12 : 0.34, ease: EASE };
+
+  const prompt = starting
+    ? 'Все готовы — начинаем'
+    : viewerReady
+      ? 'Ждём остальных'
+      : 'Подтвердите готовность';
 
   return createPortal(
     <div className="scrim toss" role="status" aria-live="polite">
-      <div className="toss__panel">
-        {/* Сцена фиксированного размера: имя встаёт ПОВЕРХ монетки, а не под
-            ней. Блок под монеткой пришлось бы чем-то освобождать, и монетка
-            прыгала бы вверх ровно в тот момент, когда на неё смотрят. */}
+      <div className="toss__col">
+        {/* Площадка постоянной высоты: монетка летит внутри неё и никуда не
+            двигает то, что ниже. */}
         <div className="toss__stage">
+          {/* Полёт и вращение — два узла, а не один.
+              Свечение монеты нельзя дать `filter`-ом на вращающемся элементе:
+              `filter` — группирующее свойство, он схлопывает трёхмерный
+              контекст, и `backface-visibility` перестаёт прятать изнанку —
+              монетка мигает сама сквозь себя. Поэтому свет живёт на внешнем
+              узле (он только летит), а `preserve-3d` — на внутреннем. */}
           <motion.div
-            className="toss__coinbox"
-            animate={landed ? COIN_BEHIND : { opacity: 1, scale: 1 }}
-            transition={{ duration: reduce ? 0.12 : 0.45, ease: VERDICT_EASE }}
+            className="toss__coin"
+            initial={reduce ? { opacity: 0 } : { y: START_Y, scale: 0.7, opacity: 0 }}
+            animate={
+              reduce
+                ? { opacity: 1 }
+                : { y: [START_Y, APEX_Y, 0], scale: [0.7, 1.08, 1], opacity: [0, 1, 1] }
+            }
+            transition={
+              reduce
+                ? { duration: 0.2 }
+                : { duration: flightS, ease: FLIGHT_EASE, times: [0, APEX_AT, 1] }
+            }
           >
-            {/* Полёт и вращение — два узла, а не один.
-                Свечение монеты нельзя дать `filter`-ом на вращающемся
-                элементе: `filter` — группирующее свойство, он схлопывает
-                трёхмерный контекст, и `backface-visibility` перестаёт прятать
-                изнанку — вместо короны зритель видит ту же монету вверх
-                ногами. Поэтому свет живёт на внешнем узле (он только летит), а
-                `preserve-3d` — на внутреннем (он только крутится). */}
+            {/* Вращение ровное: у монетки в воздухе нет причин ускоряться и
+                замедляться, а общая с полётом кривая делала именно это. */}
             <motion.div
-              className="toss__coin"
-              initial={reduce ? { opacity: 0 } : { y: START_Y, scale: 0.7, opacity: 0 }}
-              animate={
-                reduce
-                  ? { opacity: 1 }
-                  : { y: [START_Y, APEX_Y, 0], scale: [0.7, 1.1, 1], opacity: [0, 1, 1] }
-              }
-              transition={
-                reduce
-                  ? { duration: 0.2 }
-                  : { duration: flightS, ease: FLIGHT_EASE, times: [0, APEX_AT, 1] }
-              }
+              className="toss__coin-spin"
+              initial={{ rotateX: 0 }}
+              animate={{ rotateX: reduce ? 0 : SPINS * 360 }}
+              transition={{ duration: reduce ? 0 : flightS, ease: 'linear' }}
             >
-              {/* Вращение ровное: у монетки в воздухе нет причин ускоряться и
-                  замедляться, а общая с полётом кривая делала именно это. */}
-              <motion.div
-                className="toss__coin-spin"
-                initial={{ rotateX: 0 }}
-                animate={{ rotateX: reduce ? 0 : SPINS * 360 }}
-                transition={{ duration: reduce ? 0 : flightS, ease: 'linear' }}
-              >
-                <img className="toss__face toss__face--crown" src="/assets/ui/crown-500.webp" alt="" />
-                <img className="toss__face toss__face--coin" src="/assets/ui/coin-500.webp" alt="" />
-              </motion.div>
+              {/* Обе грани — одна и та же монета: у монеты нет стороны, на
+                  которой она перестаёт быть монетой. Вторая грань нужна не
+                  ради другой картинки, а чтобы `backface-visibility` не гасил
+                  её на половине оборота; развёрнута заранее, иначе встала бы к
+                  зрителю зеркально. */}
+              <img className="toss__face toss__face--back" src="/assets/ui/coin-500.webp" alt="" />
+              <img className="toss__face" src="/assets/ui/coin-500.webp" alt="" />
             </motion.div>
           </motion.div>
-
-          {landed && (
-            <motion.div
-              className="toss__verdict"
-              initial={{ opacity: 0, scale: reduce ? 1 : 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: reduce ? 0.12 : 0.34, ease: VERDICT_EASE }}
-            >
-              <div className="toss__eyebrow">Жребий брошен</div>
-              <div className="toss__who">
-                <Portrait src={winner.avatar} name={winner.name} className="toss__portrait" />
-                <div className="toss__line">
-                  Первым ходит <span className="toss__name">{winner.name}</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
         </div>
 
-        {/* Список готовности отрисован с самого начала и только гаснет: если
-            он появлялся бы вместе с именем, его высота сдвигала бы всю сцену
-            ровно в тот момент, когда монетка приземляется. */}
+        <motion.div
+          className="toss__verdict"
+          animate={{ opacity: landed ? 1 : 0 }}
+          transition={fade}
+        >
+          <div className="eyebrow">Жребий брошен</div>
+          <div className="toss__who">
+            <Portrait src={winner.avatar} name={winner.name} className="toss__portrait" />
+            <span className="toss__line">
+              Первым ходит <span className="toss__name">{winner.name}</span>
+            </span>
+          </div>
+        </motion.div>
+
         <motion.div
           className="toss__ready"
           animate={{ opacity: landed ? 1 : 0 }}
-          transition={{ duration: reduce ? 0.12 : 0.34, ease: VERDICT_EASE }}
+          transition={fade}
           style={{ pointerEvents: landed ? 'auto' : 'none' }}
           aria-hidden={!landed}
         >
-          <div className="toss__eyebrow">
-            {viewerReady ? 'Ждём остальных' : 'Подтвердите готовность'}
-          </div>
+          <div className={`eyebrow ${starting ? 'toss__prompt--go' : ''}`}>{prompt}</div>
+
           <div className="toss__seats">
             {humans.map(player => {
               const ready = toss.readyIds.includes(player.id);
               const isViewer = player.id === viewer?.id;
-              const label = ready ? 'Готов' : isViewer ? 'Я готов' : 'Ещё не готов';
+              const actionable = isViewer && !ready;
               return (
                 <button
                   key={player.id}
@@ -175,20 +168,25 @@ const TossOverlay: React.FC<{
                   className={[
                     'readymark',
                     ready ? 'readymark--on' : '',
-                    isViewer ? 'readymark--mine' : ''
+                    actionable ? 'readymark--mine' : ''
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  /* Кнопка только у себя: чужую готовность нажать нельзя, и
-                     `disabled` здесь честнее, чем молча проглоченный клик. */
-                  disabled={!isViewer || ready}
-                  onClick={isViewer && !ready ? onReady : undefined}
+                  /* Нажимается только своя строка: чужую готовность подтвердить
+                     нельзя, и `disabled` честнее молча проглоченного клика. */
+                  disabled={!actionable}
+                  onClick={actionable ? onReady : undefined}
                 >
-                  <span className="readymark__box">{ready && <Check size={13} strokeWidth={3} />}</span>
+                  {/* Аватар первым — как и в пилюле с именем выше: круглые
+                      кружки обеих строк встают по одной вертикали, и колонка
+                      перестаёт выглядеть собранной из разных кусков. */}
                   <Portrait src={player.avatar} name={player.name} className="readymark__portrait" />
-                  <span className="readymark__text">
-                    <span className="readymark__name">{player.name}</span>
-                    <span className="readymark__state">{label}</span>
+                  <span className="readymark__name">{player.name}</span>
+                  <span className="readymark__state">
+                    {ready ? 'готов' : isViewer ? 'нажмите' : 'ждём'}
+                  </span>
+                  <span className="readymark__box">
+                    {ready && <Check size={14} strokeWidth={3} />}
                   </span>
                 </button>
               );
@@ -220,6 +218,8 @@ export const OpeningToss: React.FC = () => {
   const viewer = viewerId ? humans.find(p => p.id === viewerId) : humans[0];
 
   return (
+    /* `key` по `landsAt`: новая партия получает свежий полёт вместо
+       доигрывания прошлого. */
     <TossOverlay
       key={openingToss.landsAt}
       toss={openingToss}

@@ -143,6 +143,11 @@ export interface OpeningTossData {
   landsAt: number;
   /** Кто нажал «Готов». Боты в счёт не идут — они готовы всегда. */
   readyIds: string[];
+  /**
+   * Когда стол оживёт. Не `null` только после последней галочки: готовы все,
+   * идёт отсчёт до первого хода.
+   */
+  startsAt: number | null;
 }
 
 export interface ConspiracyPromptData {

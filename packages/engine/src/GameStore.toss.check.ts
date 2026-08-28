@@ -11,7 +11,7 @@
  */
 import assert from 'node:assert/strict';
 import { useGameStore } from './GameStore.ts';
-import { TOSS_SPIN_MS } from './timing.ts';
+import { TOSS_SPIN_MS, TOSS_START_MS } from './timing.ts';
 
 const HUMANS = [
   { id: 'p1', name: 'Аня' },
@@ -35,6 +35,7 @@ const HUMANS = [
     'landsAt must be an absolute deadline one coin flight away'
   );
   assert.deepEqual(openingToss.readyIds, [], 'nobody is ready before anyone says so');
+  assert.equal(openingToss.startsAt, null, 'the countdown must not run before everyone is ready');
   assert.ok(
     history.some(line => line.includes('Жребий брошен')),
     'the chronicle must record the toss'
@@ -101,8 +102,18 @@ const HUMANS = [
   useGameStore.getState().markReady(botId);
   assert.deepEqual(useGameStore.getState().openingToss!.readyIds, ['p1'], 'bots do not sign the ready list');
 
+  // Последняя галочка не бросает игрока в партию тем же кадром: сначала
+  // отсчёт, и только потом стол оживает.
   useGameStore.getState().markReady('p2');
-  assert.equal(useGameStore.getState().openingToss, null, 'the last human ready must start the game');
+  const counting = useGameStore.getState().openingToss;
+  assert.ok(counting, 'the last ready must start a countdown, not the game itself');
+  assert.ok(
+    counting.startsAt !== null && counting.startsAt > Date.now(),
+    'startsAt must be a deadline in the future'
+  );
+
+  await new Promise(resolve => setTimeout(resolve, TOSS_START_MS + 250));
+  assert.equal(useGameStore.getState().openingToss, null, 'the countdown must hand the table over');
 }
 
 // 5. Место, отданное боту, перестаёт держать стол: ушедший «Готов» не нажмёт.
@@ -115,11 +126,27 @@ const HUMANS = [
     players: state.players.map(p => (p.id === 'p2' ? { ...p, isBot: true } : p))
   }));
   useGameStore.getState()._settleOpeningToss();
-  assert.equal(
-    useGameStore.getState().openingToss,
-    null,
+  assert.ok(
+    useGameStore.getState().openingToss!.startsAt !== null,
     'a seat handed to a bot must stop holding the toss screen'
   );
+  await new Promise(resolve => setTimeout(resolve, TOSS_START_MS + 250));
+  assert.equal(useGameStore.getState().openingToss, null);
+}
+
+// 6. Новая партия обрывает чужой отсчёт: иначе таймер прошлой снял бы экран
+//    жребия следующей.
+{
+  useGameStore.getState().startGame(HUMANS);
+  useGameStore.getState().markReady('p1');
+  useGameStore.getState().markReady('p2');
+  assert.ok(useGameStore.getState().openingToss!.startsAt !== null, 'countdown running');
+
+  useGameStore.getState().startGame(HUMANS);
+  await new Promise(resolve => setTimeout(resolve, TOSS_START_MS + 250));
+  const fresh = useGameStore.getState().openingToss;
+  assert.ok(fresh, "the previous game's countdown must not lift the new toss screen");
+  assert.deepEqual(fresh.readyIds, []);
 }
 
 console.log('GameStore.toss.check.ts passed.');

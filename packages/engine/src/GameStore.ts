@@ -15,7 +15,7 @@ import { botMemory, clearBotTimer } from './Bot';
 import { ALL_BOT_CANDIDATES, getBotArchetype, type BotCandidate } from './botsConfig';
 import { accOf, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
-import { ACTION_HOLD_MS, TOSS_SPIN_MS } from './timing';
+import { ACTION_HOLD_MS, TOSS_SPIN_MS, TOSS_START_MS } from './timing';
 import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
@@ -50,6 +50,16 @@ import { checkEndgameAndAdvanceTurn, endTurn } from './resolvers/turnResolver';
 
 export { ALL_BOT_CANDIDATES, getBotArchetype };
 export type { BotCandidate };
+
+/**
+ * Отсчёт от последней галочки «Готов» до первого хода.
+ *
+ * Своя ручка, а не `timerManager`: у того один слот отложенного вызова, и его
+ * чистит `clearAll()` — а его зовёт почти каждое действие и начало хода.
+ * Отсчёт, потерявший таймер, не закончится никогда, и стол останется под
+ * оверлеем навсегда.
+ */
+let tossStartTimer: ReturnType<typeof setTimeout> | null = null;
 
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -102,6 +112,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startGame: (seats) => {
     timerManager.clearAll();
+    if (tossStartTimer !== null) {
+      clearTimeout(tossStartTimer);
+      tossStartTimer = null;
+    }
     botMemory.clear();
     const deck = createInitialDeck(); // 44 unified cards
 
@@ -161,7 +175,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       deck,
       discardPile: [],
       activePlayerId: firstPlayer.id,
-      openingToss: { winnerId: firstPlayer.id, landsAt: Date.now() + TOSS_SPIN_MS, readyIds: [] },
+      openingToss: {
+        winnerId: firstPlayer.id,
+        landsAt: Date.now() + TOSS_SPIN_MS,
+        readyIds: [],
+        startsAt: null
+      },
       turnPhase: 'IDLE',
       turnSubPhase: 'NORMAL_ACTION_PHASE',
       hasUsedNormalActionThisTurn: false,
@@ -214,9 +233,20 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   _settleOpeningToss: () => {
     const { openingToss, players } = get();
-    if (!openingToss) return;
+    if (!openingToss || openingToss.startsAt !== null) return;
+
     const waiting = players.filter(p => !p.isBot && !openingToss.readyIds.includes(p.id));
-    if (waiting.length === 0) set({ openingToss: null });
+    if (waiting.length > 0) return;
+
+    /* Не в тот же кадр: игрок ещё смотрит на список готовности, а стол уже
+       подменился бы под ним. Отсчёт живёт в состоянии, поэтому онлайн-стол
+       оживает у всех разом, а не у каждого по своему таймеру. */
+    set({ openingToss: { ...openingToss, startsAt: Date.now() + TOSS_START_MS } });
+    if (tossStartTimer !== null) clearTimeout(tossStartTimer);
+    tossStartTimer = setTimeout(() => {
+      tossStartTimer = null;
+      set({ openingToss: null });
+    }, TOSS_START_MS);
   },
 
   restartGame: () => {

@@ -1048,50 +1048,45 @@
   z-index: var(--z-toast);
   display: grid;
   place-items: center;
+  padding: 24px;
 }
 
-.toss__panel {
+/* Колонка постоянной ширины — и всё в ней тянется на эту ширину.
+   Неровность была именно здесь: пилюли жили каждая по своему содержимому и
+   стояли по центру, поэтому их края расходились лесенкой. Общая колонка
+   выстраивает края в одну линию, а карточка вокруг всего этого не нужна —
+   стол и так под скримом. */
+.toss__col {
+  width: 340px;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 26px;
+  align-items: stretch;
+  gap: 10px;
 }
 
-/* Квадрат постоянного размера. Имя встаёт поверх монетки, а не под ней —
-   иначе его высота толкала бы монетку вверх ровно в момент приземления. */
+/* Высота постоянная: монетка летает внутри площадки и не двигает ничего под
+   собой. Перспектива живёт здесь, а не на самой монете — на элементе, который
+   сам крутится, она поворачивалась бы вместе с ним и грань уходила бы в
+   плоскость экрана без всякого объёма. */
 .toss__stage {
-  position: relative;
-  width: 300px;
-  height: 220px;
+  height: 176px;
   display: grid;
   place-items: center;
-  /* Перспектива живёт на сцене, а не на самой монете: на элементе, который
-     сам крутится, она поворачивалась бы вместе с ним и грань уходила бы в
-     плоскость экрана без всякого объёма. */
   perspective: 900px;
-}
-
-/* Порядок наложения задан явно: имя читается поверх монетки, а не наоборот.
-   Оба узла позиционированы, и полагаться тут на порядок в разметке — значит
-   поставить читаемость главной надписи в зависимость от того, кто из них
-   окажется ниже по JSX. */
-.toss__coinbox {
-  position: absolute;
-  z-index: 0;
-  display: grid;
-  place-items: center;
 }
 
 /* Внешний узел только летит. Свет даётся `box-shadow`, а не `filter`:
    `filter` — группирующее свойство и схлопнул бы трёхмерный контекст внутри,
-   после чего `backface-visibility` перестаёт прятать изнанку и вместо короны
-   показывается та же монета вверх ногами. */
+   после чего `backface-visibility` перестаёт прятать изнанку.
+   Только тёплый ореол, без чёрной тени: тень рисует под монеткой тёмный круг,
+   и пока монетка стоит ребром, вместо неё видна дыра. */
 .toss__coin {
   position: relative;
-  width: 128px;
-  height: 128px;
+  width: 112px;
+  height: 112px;
   border-radius: 50%;
-  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.65), 0 0 34px 6px rgba(200, 160, 74, 0.28);
+  box-shadow: 0 0 38px 8px rgba(200, 160, 74, 0.2);
 }
 
 /* Внутренний узел только крутится — и держит объём. */
@@ -1111,34 +1106,35 @@
   -webkit-backface-visibility: hidden;
 }
 
-/* Корона — обратная грань: развёрнута заранее, чтобы при повороте монеты
-   встать к зрителю лицом, а не зеркально. */
-.toss__face--crown {
+.toss__face--back {
   transform: rotateX(180deg);
 }
 
-.toss__verdict {
-  position: relative;
-  z-index: 1;
+/* ---- Кто ходит первым ---- */
+
+.toss__verdict,
+.toss__ready {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.toss__verdict .eyebrow,
+.toss__ready .eyebrow {
   text-align: center;
 }
 
-.toss__eyebrow {
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+.toss__prompt--go {
+  color: var(--sage-soft);
 }
 
+/* Пилюля во всю колонку. Аватар слева — на той же вертикали, что и аватары в
+   строках готовности ниже. */
 .toss__who {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 22px 10px 10px;
+  gap: 13px;
+  padding: 9px 22px 9px 9px;
   border: 1px solid var(--line-mid);
   border-radius: 999px;
   background: var(--surface-raised);
@@ -1146,8 +1142,8 @@
 }
 
 .toss__portrait {
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   overflow: hidden;
   border: 1px solid var(--line-strong);
@@ -1163,38 +1159,44 @@
 }
 
 .toss__line {
+  min-width: 0;
   font-family: var(--font-display);
-  font-size: 1.15rem;
-  color: var(--text-soft);
-  white-space: nowrap;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  color: var(--text-muted);
 }
 
 .toss__name {
+  display: block;
+  font-size: 1.1rem;
+  line-height: 1.2;
   color: var(--gold-pale);
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- Готовность ---- */
 
 .toss__ready {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  margin-top: 6px;
 }
 
 .toss__seats {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* Та же пилюля, тот же отступ слева: аватары двух блоков стоят по одной
+   вертикали, и колонка читается как одно целое. */
 .readymark {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 16px 8px 10px;
+  gap: 13px;
+  width: 100%;
+  padding: 8px 16px 8px 9px;
   border: 1px solid var(--line-cold);
   border-radius: 999px;
   background: var(--surface);
@@ -1203,45 +1205,82 @@
   text-align: left;
   transition:
     border-color var(--dur-fade) var(--ease-out),
-    background var(--dur-fade) var(--ease-out),
-    opacity var(--dur-fade) var(--ease-out);
+    background var(--dur-fade) var(--ease-out);
 }
 
-/* Своя строка — единственная кликабельная, и это видно до наведения. */
-.readymark--mine:not(.readymark--on) {
+/* Своя неотмеченная строка — единственная нажимаемая, и это видно до наведения. */
+.readymark--mine {
   cursor: pointer;
   border-color: var(--line-strong);
   background: var(--surface-raised);
 }
 
-.readymark--mine:not(.readymark--on):hover {
+.readymark--mine:hover {
   border-color: var(--gold);
   background: var(--ink-600);
 }
 
-/* Чужая неотмеченная строка приглушена: это состояние, а не кнопка. */
-.readymark:disabled:not(.readymark--on) {
-  opacity: 0.62;
+.readymark--on {
+  border-color: rgba(91, 154, 134, 0.45);
+  background: rgba(91, 154, 134, 0.09);
 }
 
-.readymark--on {
-  border-color: rgba(91, 154, 134, 0.5);
-  background: rgba(91, 154, 134, 0.1);
+.readymark__portrait {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--line-cold);
+  flex-shrink: 0;
+  /* Аватар меньше, чем в пилюле выше, но его центр — на той же вертикали:
+     разница в размере съедается отступом. */
+  margin-left: 6px;
+}
+
+.readymark__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readymark__state {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.readymark--mine .readymark__state {
+  color: var(--gold-bright);
+}
+
+.readymark--on .readymark__state {
+  color: var(--sage-soft);
 }
 
 .readymark__box {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
   border: 1px solid var(--line-mid);
-  border-radius: 6px;
-  background: var(--surface-sunken);
+  border-radius: 50%;
   color: var(--ink-900);
   transition:
     background var(--dur-fade) var(--ease-out),
     border-color var(--dur-fade) var(--ease-out);
+}
+
+.readymark--mine .readymark__box {
+  border-color: var(--gold);
 }
 
 .readymark--on .readymark__box {
@@ -1249,54 +1288,13 @@
   border-color: var(--sage-soft);
 }
 
-.readymark__portrait {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 1px solid var(--line-cold);
-  flex-shrink: 0;
-}
-
-.readymark__text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.readymark__name {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.readymark__state {
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.readymark--on .readymark__state {
-  color: var(--sage-soft);
-}
-
 @media (max-width: 560px) {
   .toss__stage {
-    width: 100%;
-    height: 190px;
+    height: 150px;
   }
 
   .toss__coin {
-    width: 96px;
-    height: 96px;
-  }
-
-  .toss__line {
-    font-size: 1rem;
-    white-space: normal;
+    width: 92px;
+    height: 92px;
   }
 }
