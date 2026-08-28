@@ -5,7 +5,8 @@ import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
-import { fallenCoronationPatch, beginCoronationIfNeeded } from './coronation';
+import { beginCoronationIfNeeded } from './coronation';
+import { loseCrowns } from './crownLoss';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -264,7 +265,7 @@ export function activateConspiracy(
 }
 
 export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action: Action): void {
-  const { players, discardPile, coronationCandidateId } = get();
+  const { players, discardPile } = get();
   const player = players.find(p => p.id === action.actorId);
   const target = players.find(p => p.id === action.targetId);
   if (!player || !target || player.activePlot?.type !== 'Тайный заговор') {
@@ -301,28 +302,29 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
     }
     triggerResourceFloat(set, player.id, `⚔️ Сброс ${goldLoss} 🪙!`, true);
   } else {
-    const favorLoss = Math.min(1, target.favor);
-    const newTargetFavor = Math.max(0, target.favor - favorLoss);
-    const newPlayers = players.map(p => {
-      if (p.id === target.id) return { ...p, favor: newTargetFavor };
-      if (p.id === player.id) return { ...p, activePlot: null };
-      return p;
-    });
+    /* Карта Заговора уходит в сброс ДО вызова `loseCrowns`: тот читает
+       игроков из стора, и `set` после него затёр бы его правку своим
+       снимком. */
+    const newPlayers = players.map(p =>
+      p.id === player.id ? { ...p, activePlot: null } : p
+    );
     set(state => ({
       players: newPlayers,
       discardPile: newDiscard,
-      ...fallenCoronationPatch(coronationCandidateId, target.id, newTargetFavor),
       conspiracyPrompt: null,
-      history: [
-        `💥 «Тайный заговор» (${charges} зар.): ${target.name} лишается 1 👑 короны!`,
-        ...state.history
-      ].slice(0, 50)
+      history: state.history
     }));
-    if (favorLoss > 0) {
-      get()._disruptPlayerPlotsOnLoss(target.id, 'удара Заговора');
-      triggerResourceFloat(set, target.id, '-1 👑 Заговор!', false);
+
+    const result = loseCrowns(get, set, target.id, 1, 'удара Заговора', 'Заговор!');
+    if (result.kind === 'lost') {
+      set(state => ({
+        history: [
+          `💥 «Тайный заговор» (${charges} зар.): ${target.name} лишается 1 👑 короны!`,
+          ...state.history
+        ].slice(0, 50)
+      }));
+      triggerResourceFloat(set, player.id, `⚔️ Лишение 1 👑 у ${target.name}!`, true);
     }
-    triggerResourceFloat(set, player.id, `⚔️ Лишение 1 👑 у ${target.name}!`, true);
   }
 
   timerManager.scheduleDelay(() => {

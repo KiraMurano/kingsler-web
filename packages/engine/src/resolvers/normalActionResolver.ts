@@ -5,7 +5,8 @@ import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS, EXCHANGE_DRAW_MS } from '../timing';
-import { fallenCoronationPatch } from './coronation';
+import { genOf } from '../utils/russianText';
+import { loseCrowns } from './crownLoss';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -22,8 +23,6 @@ export function executeNormalAction(
   if (actorIdx === -1) return;
   let actor = newPlayers[actorIdx];
 
-  let rumorVictimId: string | null = null;
-
   if (action.name.includes('Просить') || action.name.includes('содержание')) {
     actor = { ...actor, gold: actor.gold + 1 };
     newPlayers[actorIdx] = actor;
@@ -36,16 +35,16 @@ export function executeNormalAction(
     }
   } else if (action.name.includes('Слух') || action.name.includes('слух')) {
     if (action.targetId) {
-      const targetIdx = newPlayers.findIndex(p => p.id === action.targetId);
-      if (targetIdx !== -1 && newPlayers[targetIdx].favor > 0) {
-        newPlayers[targetIdx] = { ...newPlayers[targetIdx], favor: newPlayers[targetIdx].favor - 1 };
-        triggerResourceFloat(set, action.targetId, '-1 👑', false);
-        rumorVictimId = action.targetId;
-
-        if (get().coronationCandidateId === action.targetId && newPlayers[targetIdx].favor < 6) {
+      // `loseCrowns` читает игроков из стора, поэтому накопленные правки
+      // сначала кладутся туда, а после вызова перечитываются обратно.
+      set({ players: newPlayers });
+      const result = loseCrowns(get, set, action.targetId, 1, 'распущенных слухов');
+      newPlayers = [...get().players];
+      if (result.kind === 'lost') {
+        const victim = newPlayers.find(p => p.id === action.targetId);
+        if (victim) {
           set(state => ({
-            ...fallenCoronationPatch(state.coronationCandidateId, action.targetId!, newPlayers[targetIdx].favor),
-            history: [`⚖️ Коронация ${newPlayers[targetIdx].name} сорвана слухами! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
+            history: [`📜 Слухи о ${genOf(victim)} расползлись по двору: -1 👑!`, ...state.history].slice(0, 50)
           }));
         }
       }
@@ -124,9 +123,6 @@ export function executeNormalAction(
   }
 
   set({ players: newPlayers });
-  if (rumorVictimId) {
-    get()._disruptPlayerPlotsOnLoss(rumorVictimId, 'распущенных слухов');
-  }
 
   timerManager.scheduleDelay(() => {
     get()._checkEndgameAndAdvanceTurn();

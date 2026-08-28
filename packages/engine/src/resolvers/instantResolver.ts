@@ -6,7 +6,7 @@ import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
-import { fallenCoronationPatch } from './coronation';
+import { loseCrowns } from './crownLoss';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -260,31 +260,19 @@ export function resolveInstantEffect(
 
   if (instantType === 'Обвинение в измене' && action.targetId) {
     const victim = players.find(p => p.id === action.targetId);
-    if (victim && victim.favor > 0) {
-      const newPlayers = players.map(p =>
-        p.id === victim.id ? { ...p, favor: p.favor - 1 } : p
-      );
-      set(state => ({
-        players: newPlayers,
-        ...fallenCoronationPatch(state.coronationCandidateId, victim.id, victim.favor - 1),
-        history: [
-          `⛓️ «Обвинение в измене»: ${victim.name} теряет -1 👑!`,
-          ...(state.coronationCandidateId === victim.id && victim.favor - 1 < 6
-            ? [`⚖️ Коронация ${victim.name} сорвана Обвинением в измене! Влияние упало ниже 6 👑!`]
-            : []),
-          ...state.history
-        ].slice(0, 50)
-      }));
-      get()._disruptPlayerPlotsOnLoss(victim.id, 'обвинения в измене');
-      triggerResourceFloat(set, victim.id, '-1 👑 Измена!', false);
-      triggerResourceFloat(set, actor.id, `⛓️ Донос на ${victim.name}!`, true);
-    } else if (victim) {
-      set(state => ({
-        history: [
-          `⛓️ «Обвинение в измене» против ${victim.name} не сработало: у цели 0 👑!`,
-          ...state.history
-        ].slice(0, 50)
-      }));
+    if (victim) {
+      const result = loseCrowns(get, set, victim.id, 1, 'обвинения в измене', 'Измена!');
+      if (result.kind === 'lost') {
+        set(state => ({
+          history: [`⛓️ «Обвинение в измене»: ${victim.name} теряет -1 👑!`, ...state.history].slice(0, 50)
+        }));
+        triggerResourceFloat(set, actor.id, `⛓️ Донос на ${victim.name}!`, true);
+      } else if (result.kind === 'no_crowns') {
+        set(state => ({
+          history: [`⛓️ «Обвинение в измене» против ${victim.name} не сработало: у цели 0 👑!`, ...state.history].slice(0, 50)
+        }));
+      }
+      // kind === 'blocked_by_charter': строку в историю уже написала грамота.
     }
     if (isOwnTurn) holdThenAdvance();
     return;

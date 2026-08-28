@@ -2,7 +2,7 @@ import type { Action, GameState } from '../types';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
-import { fallenCoronationPatch } from './coronation';
+import { loseCrowns } from './crownLoss';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -71,31 +71,29 @@ export function resolveRoleActionEffect(
       get()._checkEndgameAndAdvanceTurn();
     }, ACTION_HOLD_MS);
   } else if (role === 'Шантажист' && action.targetId) {
-    const targetIdx = newPlayers.findIndex(p => p.id === action.targetId);
-    let stolen = 0;
-    if (targetIdx !== -1 && newPlayers[targetIdx].favor > 0) {
-      const maxSteal = isVB ? 2 : 1;
-      stolen = Math.min(maxSteal, newPlayers[targetIdx].favor);
-      newPlayers[targetIdx] = { ...newPlayers[targetIdx], favor: newPlayers[targetIdx].favor - stolen };
-
-      const nextFavor = Math.min(6, actor.favor + stolen);
-      const actualGained = nextFavor - actor.favor;
-      actor = { ...actor, favor: nextFavor };
-      newPlayers[actorIdx] = actor;
-      triggerResourceFloat(set, action.targetId, `-${stolen} 👑`, false);
-      triggerResourceFloat(set, actor.id, `+${actualGained} 👑${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
-
-      if (get().coronationCandidateId === action.targetId && newPlayers[targetIdx].favor < 6) {
-        set(state => ({
-          ...fallenCoronationPatch(state.coronationCandidateId, action.targetId!, newPlayers[targetIdx].favor),
-          history: [`⚖️ Коронация ${newPlayers[targetIdx].name} сорвана шантажом! Влияние упало ниже 6 👑!`, ...state.history].slice(0, 50)
-        }));
-      }
-    }
     set({ players: newPlayers });
+    const maxSteal = isVB ? 2 : 1;
+    const result = loseCrowns(get, set, action.targetId, maxSteal, 'шантажа');
+    newPlayers = [...get().players];
+
+    /* Шантажист крадёт, а не уничтожает: себе он забирает ровно столько,
+       сколько реально снялось с жертвы. Под «Охранной грамотой» это ноль.
+
+       В обычной партии сюда с грамотой не попасть — её держателя нет в списке
+       целей Шантажиста. Ветка остаётся страховкой: она описывает, что
+       происходит, если защита всё же оказалась на месте к моменту применения
+       эффекта. */
+    const stolen = result.kind === 'lost' ? result.amount : 0;
     if (stolen > 0) {
-      get()._disruptPlayerPlotsOnLoss(action.targetId, 'шантажа');
+      const idx = newPlayers.findIndex(p => p.id === action.actorId);
+      const thief = newPlayers[idx];
+      const nextFavor = Math.min(6, thief.favor + stolen);
+      const actualGained = nextFavor - thief.favor;
+      newPlayers[idx] = { ...thief, favor: nextFavor };
+      set({ players: newPlayers });
+      triggerResourceFloat(set, thief.id, `+${actualGained} 👑${isVB ? ' (x2 Ва-банк!)' : ''}`, true);
     }
+
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();
     }, ACTION_HOLD_MS);
