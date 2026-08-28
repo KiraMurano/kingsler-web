@@ -1,6 +1,5 @@
 import React from 'react';
-import { BookOpen, Scale, LogOut, ScrollText, Swords } from 'lucide-react';
-import { startDevDuel, endDevDuel } from '../dev/devDuel.ts';
+import { BookOpen, Scale, LogOut, ScrollText } from 'lucide-react';
 
 interface TopBarProps {
   onOpenCodex: () => void;
@@ -9,8 +8,6 @@ interface TopBarProps {
   onExit: () => void;
   codexOpen: boolean;
   chronicleOpen: boolean;
-  /** Идёт ли дуэль — для dev-тумблера, чтобы он умел и выключать. */
-  isDuel?: boolean;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -19,8 +16,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenRules,
   onExit,
   codexOpen,
-  chronicleOpen,
-  isDuel = false
+  chronicleOpen
 }) => (
   <header className="topbar">
     <div className="topbar__side">
@@ -33,21 +29,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         <ScrollText size={15} />
         Летопись
       </button>
-
-      {/* Дуэль в партии случается редко и не по заказу, а смотреть на стычку
-          надо часто. Кнопка ставит стол в дуэль из того же состояния, что
-          построил бы движок, и живёт только в сборке разработчика. */}
-      {import.meta.env.DEV && (
-        <button
-          type="button"
-          className="iconbtn iconbtn--dev"
-          onClick={() => (isDuel ? endDevDuel() : startDevDuel())}
-          title="dev: дуэль"
-        >
-          <Swords size={15} />
-          {isDuel ? 'Стоп' : 'Дуэль'}
-        </button>
-      )}
     </div>
 
     <div className="brand">

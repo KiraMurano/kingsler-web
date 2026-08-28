@@ -498,7 +498,6 @@ export default function App({
       <TopBar
         codexOpen={codexOpen}
         chronicleOpen={chronicleOpen}
-        isDuel={turnPhase === 'DUEL_ATTACKER_WINDOW' || turnPhase === 'DUEL_OUTCOME'}
         onOpenCodex={() => setCodexOpen(true)}
         onOpenChronicle={() => setChronicleOpen(open => !open)}
         onOpenRules={() => setRulesOpen(true)}

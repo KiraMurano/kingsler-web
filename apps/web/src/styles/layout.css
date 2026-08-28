@@ -2209,19 +2209,6 @@
   color: var(--text-dim);
 }
 
-/* Кнопка отладки. Видна только в сборке разработчика — в бой не уедет, но и
-   в толпе кнопок теряться не должна. */
-.iconbtn--dev {
-  color: var(--violet-soft);
-  border-color: rgba(139, 114, 196, 0.35);
-}
-
-.iconbtn--dev:hover {
-  color: var(--violet-soft);
-  background: rgba(139, 114, 196, 0.12);
-  border-color: var(--violet);
-}
-
 /* Холст стычки. Поверх карт — искра, пролетающая за картой, это не искра. */
 .clash {
   position: fixed;
