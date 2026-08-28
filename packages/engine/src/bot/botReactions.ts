@@ -121,12 +121,15 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
     players
   );
 
+  /* Дуэль у ботов стоит столько же, сколько у человека: правило одно на всех. */
+  const duelTokenCost = useGameStore.getState().rules.duelCostsToken ? 1 : 0;
+
   let chosenAction: 'accept' | 'doubt' | 'duel' = 'accept';
 
   if (hasCard) {
     if (doubtEval.shouldDoubt && doubtEval.score >= 0.98 && target.actionTokens >= 1) {
       chosenAction = 'doubt';
-    } else if (target.actionTokens >= 1) {
+    } else if (target.actionTokens >= duelTokenCost) {
       chosenAction = 'duel';
     }
   } else {
@@ -138,7 +141,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
         fakeDuelChance = 0.65;
       }
 
-      if (target.actionTokens >= 1 && Math.random() < fakeDuelChance) {
+      if (target.actionTokens >= duelTokenCost && Math.random() < fakeDuelChance) {
         chosenAction = 'duel';
       } else {
         chosenAction = 'accept';

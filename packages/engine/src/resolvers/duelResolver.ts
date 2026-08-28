@@ -20,23 +20,30 @@ export function targetDeclareDuel(
   cardId: CardId
 ): void {
   timerManager.clearAll();
-  const { pendingAction, turnPhase, players } = get();
+  const { pendingAction, turnPhase, players, rules } = get();
   if (turnPhase !== 'TARGET_REACTION_WINDOW' || !pendingAction || pendingAction.targetId !== targetId) return;
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   const target = players.find(p => p.id === targetId);
   if (!actor || !target) return;
-  if (target.actionTokens < 1) return;
+
+  /* Стоит ли защита на дуэли жетона хода — настройка партии. С выключенным
+     тумблером щит бесплатен и доступен даже при 0 ⚡: это ровно тот случай,
+     когда лидера бьют по кругу, а отбиваться ему нечем. */
+  const tokenCost = rules.duelCostsToken ? 1 : 0;
+  if (target.actionTokens < tokenCost) return;
 
   const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
   const staked = byId(target.hand, cardId) ?? target.hand[0];
   if (!staked) return;
 
-  triggerResourceFloat(set, target.id, '-1 ⚡', false);
+  if (tokenCost > 0) {
+    triggerResourceFloat(set, target.id, '-1 ⚡', false);
+  }
 
   set(state => ({
     players: state.players.map(p =>
-      p.id === target.id ? { ...p, actionTokens: p.actionTokens - 1 } : p
+      p.id === target.id ? { ...p, actionTokens: p.actionTokens - tokenCost } : p
     ),
     turnPhase: 'DUEL_ATTACKER_WINDOW',
     pendingDuelDefenderCardId: staked.id,
@@ -47,7 +54,7 @@ export function targetDeclareDuel(
       ...state.activeSpeechReactions,
       [target.id]: `«ДУЭЛЬ! Мой щит — ${blockingRole}!»`
     },
-    history: [`🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}» (потрачен 1 ⚡)!`, ...state.history].slice(0, 50)
+    history: [`🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}»${tokenCost > 0 ? ' (потрачен 1 ⚡)' : ' (бесплатно)'}!`, ...state.history].slice(0, 50)
   }));
 
   // Charge active conspiracies on duel declaration

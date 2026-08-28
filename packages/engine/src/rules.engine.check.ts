@@ -233,4 +233,56 @@ function acted(meId: string, action: Parameters<ReturnType<typeof useGameStore.g
   );
 }
 
+// ==========================================================================
+// Дуэль тратит жетон хода
+// ==========================================================================
+
+/** Ставит стол в окно реакции жертвы на атаку Шантажиста. */
+async function underAttack(rules: object) {
+  const meId = table(rules);
+  const victim = useGameStore.getState().players[1].id;
+  patch(meId, { gold: 9, hand: hand(['Шантажист', 'Шут']) });
+  patch(victim, { favor: 3, activePlot: null, hand: hand(['Рыцарь', 'Шут']) });
+
+  const staked = useGameStore.getState().players.find(p => p.id === meId)!.hand[0].id;
+  useGameStore.getState().performAction({
+    type: 'role', name: 'Шантажист', actorId: meId, targetId: victim,
+    roleClaim: 'Шантажист', stakedCardId: staked, costGold: 0, costTokens: 1, description: ''
+  });
+  assert.equal(useGameStore.getState().turnPhase, 'TARGET_REACTION_WINDOW', 'жертва в окне реакции');
+  return victim;
+}
+
+// --- Тумблер включён: жетон списан ---
+{
+  const victim = await underAttack({ duelCostsToken: true });
+  patch(victim, { actionTokens: 2 });
+  const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
+  useGameStore.getState().targetDeclareDuel(victim, shield);
+  assert.equal(useGameStore.getState().turnPhase, 'DUEL_ATTACKER_WINDOW', 'дуэль объявлена');
+  assert.equal(useGameStore.getState().players.find(p => p.id === victim)!.actionTokens, 1, 'жетон списан');
+  timerManager.clearAll();
+}
+
+// --- Тумблер включён, жетонов нет: дуэль невозможна ---
+{
+  const victim = await underAttack({ duelCostsToken: true });
+  patch(victim, { actionTokens: 0 });
+  const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
+  useGameStore.getState().targetDeclareDuel(victim, shield);
+  assert.equal(useGameStore.getState().turnPhase, 'TARGET_REACTION_WINDOW', 'без жетона щит не поднять');
+  timerManager.clearAll();
+}
+
+// --- Тумблер выключен: дуэль бесплатна и доступна при 0 жетонов ---
+{
+  const victim = await underAttack({ duelCostsToken: false });
+  patch(victim, { actionTokens: 0 });
+  const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
+  useGameStore.getState().targetDeclareDuel(victim, shield);
+  assert.equal(useGameStore.getState().turnPhase, 'DUEL_ATTACKER_WINDOW', 'бесплатная дуэль доступна без жетонов');
+  assert.equal(useGameStore.getState().players.find(p => p.id === victim)!.actionTokens, 0, 'жетоны не ушли в минус');
+  timerManager.clearAll();
+}
+
 console.log('rules.engine.check: ok');
