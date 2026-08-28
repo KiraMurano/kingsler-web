@@ -1,6 +1,7 @@
 import type { CardInstance, Player, Role } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
+import { useGameStore } from '../GameStore';
 
 export interface DoubtDecision {
   shouldDoubt: boolean;
@@ -64,10 +65,14 @@ export function evaluateBotDoubt(
   }
 
   // 4. Тактические и ситуационные модификаторы
+  /* Пороги «берёт решающую корону» и «мне уже есть что терять» считаются от
+     правил партии: при победе на трёх коронах лидер с двумя опаснее, чем с
+     пятью при шести. */
+  const crownsToWin = useGameStore.getState().rules.crownsToWin;
   let tacticalBonus = 0;
 
   // Лидер пытается взять решающую корону Наследником
-  if (claimedRole === 'Наследник' && actor.favor >= 4) {
+  if (claimedRole === 'Наследник' && actor.favor >= Math.max(1, crownsToWin - 2)) {
     tacticalBonus += 0.45;
   }
 
@@ -77,7 +82,7 @@ export function evaluateBotDoubt(
   }
 
   // Самозащита от Шантажиста при высоких коронах
-  if (claimedRole === 'Шантажист' && targetId === bot.id && bot.favor >= 3) {
+  if (claimedRole === 'Шантажист' && targetId === bot.id && bot.favor >= Math.max(1, crownsToWin - 3)) {
     tacticalBonus += 0.30;
   }
 

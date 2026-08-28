@@ -105,6 +105,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
     }
   }
 
+  const { rules } = useGameStore.getState();
   const blockingRole: Role = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
   const hasCard = holds(target.hand, blockingRole);
   const archetype = getBotArchetype(target);
@@ -137,7 +138,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
       chosenAction = 'doubt';
     } else {
       let fakeDuelChance = 0.25 * archetype.blockBluffRate;
-      if (pendingAction.roleClaim === 'Шантажист' && target.favor >= 4) {
+      if (pendingAction.roleClaim === 'Шантажист' && target.favor >= Math.max(1, rules.crownsToWin - 2)) {
         fakeDuelChance = 0.65;
       }
 
@@ -241,7 +242,7 @@ export function handleVetoPhase(state: GameState, schedule: BotScheduler): void 
 
     // Блокировка Наследника, берущего решающую корону
     const actor = players.find(p => p.id === pendingAction.actorId);
-    if (pendingAction.roleClaim === 'Наследник' && actor && actor.favor >= 4) {
+    if (pendingAction.roleClaim === 'Наследник' && actor && actor.favor >= Math.max(1, rules.crownsToWin - 2)) {
       shouldVeto = true;
     }
 

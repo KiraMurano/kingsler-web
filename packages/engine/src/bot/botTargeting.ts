@@ -4,7 +4,21 @@ import { faces, holds } from '../cardInstance';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
 import { canBeTargetedBy } from '../targeting';
+import { useGameStore } from '../GameStore';
 import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '../resolvers/plotResolver';
+
+/**
+ * Пороги «уже опасен» и «на пороге победы» считаются от правил партии, а не от
+ * прежней шестёрки: при победе на трёх коронах лидер с двумя так же страшен,
+ * как с пятью при шести.
+ */
+function thresholds(): { nearWin: number; dangerous: number } {
+  const crownsToWin = useGameStore.getState().rules.crownsToWin;
+  return {
+    nearWin: Math.max(1, crownsToWin - 1),
+    dangerous: Math.max(1, crownsToWin - 2)
+  };
+}
 
 /**
  * Выбор наилучшей цели для роли «Вор» (кража до 2 золота).
@@ -29,8 +43,9 @@ export function selectBestThiefTarget(bot: Player, opponents: Player[]): Player 
     }
 
     // Бонус атаки на лидера по коронам
-    if (a.favor >= 4) scoreA += 2.0;
-    if (b.favor >= 4) scoreB += 2.0;
+    const { dangerous } = thresholds();
+    if (a.favor >= dangerous) scoreA += 2.0;
+    if (b.favor >= dangerous) scoreB += 2.0;
 
     return scoreB - scoreA;
   });
@@ -59,9 +74,10 @@ export function selectBestBlackmailerTarget(bot: Player, opponents: Player[]): P
       scoreB -= 8.0;
     }
 
-    // Критический приоритет: если цель имеет 5+ корон (близка к победе)
-    if (a.favor >= 5) scoreA += 10.0;
-    if (b.favor >= 5) scoreB += 10.0;
+    // Критический приоритет: цель на пороге победы
+    const { nearWin } = thresholds();
+    if (a.favor >= nearWin) scoreA += 10.0;
+    if (b.favor >= nearWin) scoreB += 10.0;
 
     return scoreB - scoreA;
   });
@@ -118,13 +134,13 @@ export function shouldPlaySearchNow(
   if (!plot) return false;
 
   // Свой ход на 5 👑 важнее: обыск заканчивает ход, коронацию не взять.
-  if (bot.favor >= 5) return false;
+  if (bot.favor >= thresholds().nearWin) return false;
 
   const nextId = nextPlayerId(ctx.players, ctx.activePlayerId);
   const morningPlot = plot.type === 'Королевский приём' || plot.type === 'Золотая булла';
   const urgent =
     (plot.type === 'Тайный заговор' && (plot.charges ?? 0) >= 2) ||
-    target.favor >= 5 ||
+    target.favor >= thresholds().nearWin ||
     ctx.coronationCandidateId === target.id ||
     (target.id === nextId && morningPlot);
   if (urgent) return true;
@@ -161,8 +177,9 @@ export function selectBestConspiracyTarget(
   valid.sort((a, b) => {
     const score = (p: Player) => {
       let s = p.favor * 3 + p.gold;
-      if (p.favor >= 5) s += 12;
-      else if (p.favor >= 4) s += 4;
+      const { nearWin: nw, dangerous: dg } = thresholds();
+      if (p.favor >= nw) s += 12;
+      else if (p.favor >= dg) s += 4;
       if (charges >= 3 && p.favor > 0) s += 6;
       return s;
     };
@@ -194,7 +211,7 @@ export function shouldActivateConspiracyNow(
   const hasAnyRole = faces(bot.hand).some(isRole);
 
   // Срыв коронации и снос лидера — бить немедленно.
-  if (canCrown && (target.favor >= 5 || coronationCandidateId === target.id)) return true;
+  if (canCrown && (target.favor >= thresholds().nearWin || coronationCandidateId === target.id)) return true;
 
   // Заряженный Заговор — приз для чужого «Обыска покоев». Держать его дольше
   // нужного невыгодно, поэтому бьём, как только удар осмыслен.
@@ -217,8 +234,9 @@ export function selectBestRumorTarget(opponents: Player[]): Player | null {
   valid.sort((a, b) => {
     let scoreA = a.favor * 3 + a.gold;
     let scoreB = b.favor * 3 + b.gold;
-    if (a.favor >= 5) scoreA += 10;
-    if (b.favor >= 5) scoreB += 10;
+    const { nearWin: nw } = thresholds();
+    if (a.favor >= nw) scoreA += 10;
+    if (b.favor >= nw) scoreB += 10;
     return scoreB - scoreA;
   });
 
@@ -260,8 +278,9 @@ export function selectBestDossierTarget(bot: Player, opponents: Player[]): Playe
     let scoreA = (a.favor * 2.0) + (archA.bluffRate * 4.0 * archetype.targetAggression);
     let scoreB = (b.favor * 2.0) + (archB.bluffRate * 4.0 * archetype.targetAggression);
 
-    if (a.favor >= 4) scoreA += 3.0;
-    if (b.favor >= 4) scoreB += 3.0;
+    const { dangerous: dg } = thresholds();
+    if (a.favor >= dg) scoreA += 3.0;
+    if (b.favor >= dg) scoreB += 3.0;
 
     return scoreB - scoreA;
   });

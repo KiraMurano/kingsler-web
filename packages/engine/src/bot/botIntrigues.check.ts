@@ -82,7 +82,7 @@ const unsubscribe = useGameStore.subscribe(state => {
    висит 5 с на каждое действие, и честная партия идёт минуты. Считаем партию
    застрявшей, если состояние не менялось STALL_MS. */
 const STALL_MS = 45_000;
-const RUN_MS = 150_000;
+const RUN_MS = 330_000;
 const started = Date.now();
 let lastChange = Date.now();
 let frames = 0;
@@ -92,7 +92,11 @@ useGameStore.subscribe(() => {
   lastChange = Date.now();
 });
 
-useGameStore.getState().startGame();
+/* Порог победы 3, а не дефолтные 5: окно вето висит 5 с на каждое действие, и
+   партия до пяти корон идёт больше десяти минут реального времени. На трёх
+   она успевает закончиться — а заодно проверяется, что боты играют по
+   правилам партии, а не по зашитым числам. */
+useGameStore.getState().startGame(undefined, { crownsToWin: 3 });
 
 /* Карты в руки раздаются явно, а не вытягиваются из колоды: иначе тест зависит
    от перемешивания и краснеет через раз — в колоде 51 карта, и за короткое
@@ -104,7 +108,7 @@ useGameStore.setState({
   openingToss: null,
   players: useGameStore.getState().players.map((p, i) => {
     const base = { ...p, isBot: true };
-    if (i === 0) return { ...base, favor: 4, hand: mintDeck(['Охранная грамота', 'Наследник']) };
+    if (i === 0) return { ...base, favor: 2, hand: mintDeck(['Охранная грамота', 'Наследник']) };
     if (i === 1) return { ...base, gold: 5, hand: mintDeck(['Стража покоев', 'Рыцарь']) };
     return base;
   })
@@ -131,6 +135,10 @@ const timer = setInterval(() => {
   assert.ok(
     guardSeen + charterSeen > 0,
     'розданные в руки Стража и Грамота так и не легли на стол — боты их не разыгрывают'
+  );
+  assert.ok(
+    state.winnerId,
+    `на пороге 3 партия обязана закончиться за ${RUN_MS / 1000} с. Счёт ${score}`
   );
 
   /* Адресные атаки в коротком окне могут и не случиться: ранняя игра идёт

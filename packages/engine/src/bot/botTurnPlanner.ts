@@ -40,12 +40,25 @@ export function makeBotMove(botId: string): void {
   const archetype = getBotArchetype(bot);
   const leader = [...opponents].sort((a, b) => b.favor - a.favor)[0];
 
+  /* Цены и пороги — из правил партии, а не литералами.
+   *
+   * Цена здесь не косметика: движок списывает ровно `costGold` из заявки. С
+   * зашитой пятёркой бот платил бы за слух пять монет при любой настройке.
+   * А кап пира, зашитый пятёркой, при малом пороге победы заставлял бы бота
+   * снова и снова заявлять невозможное действие. */
+  const { rules } = state;
+  const feastCap = rules.crownsToWin - 1;
+  /* «Почти победил» и «уже опасен» считаются от порога, а не от шестёрки:
+     на пороге 3 лидер с двумя коронами так же страшен, как с пятью на шести. */
+  const nearWin = Math.max(1, rules.crownsToWin - 1);
+  const dangerous = Math.max(1, rules.crownsToWin - 2);
+
   // ==========================================================================
   // ШАГ 1: ФАЗА ОБЫЧНЫХ ДЕЙСТВИЙ (ФАЗА 2)
   // ==========================================================================
   if (state.turnSubPhase === 'NORMAL_ACTION_PHASE' && !state.hasUsedNormalActionThisTurn) {
-    // 1. Критический слух по лидеру с 5+ коронами
-    if (leader && leader.favor >= 5 && bot.gold >= 5) {
+    // 1. Критический слух по лидеру на пороге победы
+    if (leader && leader.favor >= nearWin && bot.gold >= rules.rumorCost) {
       const rumorTarget = selectBestRumorTarget(opponents);
       if (rumorTarget) {
         useGameStore.getState().performAction({
@@ -53,30 +66,30 @@ export function makeBotMove(botId: string): void {
           name: 'Распустить слух',
           actorId: bot.id,
           targetId: rumorTarget.id,
-          costGold: 5,
+          costGold: rules.rumorCost,
           costTokens: 1,
-          description: `Заплатил 5 🪙: ${rumorTarget.name} теряет 1 👑.`
+          description: `Заплатил ${rules.rumorCost} 🪙: ${rumorTarget.name} теряет 1 👑.`
         });
         return;
       }
     }
 
-    // 2. Пир при высоком золоте для набора темпа (до 5 корон)
-    const feastChance = bot.favor >= 4 ? 0.75 : 0.40;
-    if (bot.favor < 5 && bot.gold >= 3 && Math.random() < feastChance) {
+    // 2. Пир при высоком золоте для набора темпа (до потолка пира)
+    const feastChance = bot.favor >= dangerous ? 0.75 : 0.40;
+    if (bot.favor < feastCap && bot.gold >= rules.feastCost && Math.random() < feastChance) {
       useGameStore.getState().performAction({
         type: 'normal',
         name: 'Устроить пир',
         actorId: bot.id,
-        costGold: 3,
+        costGold: rules.feastCost,
         costTokens: 1,
-        description: 'Заплатил 3 🪙 и получил +1 👑.'
+        description: `Заплатил ${rules.feastCost} 🪙 и получил +1 👑.`
       });
       return;
     }
 
     // 3. Тактический слух при избытке золота
-    if (bot.gold >= 5 && leader && leader.favor >= 3 && Math.random() < 0.60) {
+    if (bot.gold >= rules.rumorCost && leader && leader.favor >= dangerous && Math.random() < 0.60) {
       const rumorTarget = selectBestRumorTarget(opponents);
       if (rumorTarget) {
         useGameStore.getState().performAction({
@@ -84,9 +97,9 @@ export function makeBotMove(botId: string): void {
           name: 'Распустить слух',
           actorId: bot.id,
           targetId: rumorTarget.id,
-          costGold: 5,
+          costGold: rules.rumorCost,
           costTokens: 1,
-          description: `Заплатил 5 🪙: ${rumorTarget.name} теряет 1 👑.`
+          description: `Заплатил ${rules.rumorCost} 🪙: ${rumorTarget.name} теряет 1 👑.`
         });
         return;
       }
@@ -182,7 +195,7 @@ export function makeBotMove(botId: string): void {
       } else if (plotCard === 'Охранная грамота') {
         /* Грамота — карта фаворита: она держит корону, но закрывает печати.
            Пока корон мало, второй путь к победе дороже защиты. */
-        if (bot.favor >= 4) {
+        if (bot.favor >= dangerous) {
           useGameStore.getState().playPlotAction('Охранная грамота', plotId);
           return;
         }
@@ -232,7 +245,7 @@ export function makeBotMove(botId: string): void {
   }
 
   const upheavalId = idOf(bot.hand, 'Дворцовый переполох');
-  if (upheavalId && leader && leader.favor >= 3 && Math.random() < 0.65) {
+  if (upheavalId && leader && leader.favor >= dangerous && Math.random() < 0.65) {
     useGameStore.getState().playInstant(bot.id, 'Дворцовый переполох', upheavalId, leader.id);
     return;
   }
@@ -413,7 +426,7 @@ export function makeBotMove(botId: string): void {
     const mustAct = bot.actionTokens >= 2 && !state.hasUsedNormalActionThisTurn && !state.hasPlayedPlotThisTurn;
     if (mustAct || Math.random() < archetype.bluffRate) {
       const possibleBluffs: Role[] = [];
-      if (bot.favor >= 3) possibleBluffs.push('Наследник');
+      if (bot.favor >= dangerous) possibleBluffs.push('Наследник');
       if (bot.gold < 3) possibleBluffs.push('Казначей', 'Рыцарь', 'Шут');
       if (leader && leader.favor > 0) possibleBluffs.push('Шантажист');
 
