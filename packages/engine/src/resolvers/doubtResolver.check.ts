@@ -86,6 +86,77 @@ assert.equal(
   'every non-actor human has now passed (bot has 0 tokens) — the check is settled and the veto window opens'
 );
 
+/* --- Окно сомнения одноразовое: заявленную проверку уже не отменить. ---
+ *
+ * Софтлок, ради которого этот случай написан. `passDoubt` не смотрел, не
+ * объявил ли кто-то проверку раньше: поздняя «Верю» звала `timerManager.
+ * clearAll()`, снимала отложенное вскрытие и уводила действие по ветке «двор
+ * не оспорил». Проверка при этом уже состоялась — жетон потрачен, заговоры
+ * заряжены, — а `pendingDoubtDoubterId` очищается ровно в одном месте, во
+ * вскрытии, которого больше не будет. Флаг оставался поднятым навсегда: боты
+ * (у них guard `!pendingDoubtDoubterId`) переставали и сомневаться, и
+ * пропускать, а правая колонка застревала на виде `reveal` и не показывала
+ * человеку «Верю / Не верю». Партия вставала намертво. */
+{
+  /* Ровно расстановка из отчёта: ходит бот, проверяет другой бот, а человек
+     сидит наблюдателем — его «Верю» и приходило последним. */
+  useGameStore.getState().startGame();
+  useGameStore.setState({
+    players: [
+      human('p1', ['Вор', 'Шут']),
+      { ...bot('b1', ['Казначей', 'Рыцарь']), actionTokens: 2 },
+      { ...bot('b2', ['Наследник', 'Шут']), actionTokens: 2 }
+    ],
+    activePlayerId: 'b1'
+  });
+
+  useGameStore.getState().performAction({
+    type: 'role',
+    name: 'Казначей',
+    roleClaim: 'Казначей',
+    actorId: 'b1',
+    stakedCardId: useGameStore.getState().players.find(p => p.id === 'b1')!.hand[0].id,
+    costGold: 0,
+    costTokens: 1,
+    description: ''
+  });
+  assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW');
+
+  useGameStore.getState().doubtAction('b2');
+  assert.equal(useGameStore.getState().pendingDoubtDoubterId, 'b2', 'проверка заявлена');
+
+  // Поздняя «Верю» от человека — уже ничего не решает.
+  useGameStore.getState().passDoubt('p1');
+  assert.equal(
+    useGameStore.getState().pendingDoubtDoubterId,
+    'b2',
+    'проверка остаётся заявленной — «Верю» её не снимает'
+  );
+  assert.ok(
+    !useGameStore.getState().history.some(h => h.includes('не оспорено')),
+    'действие не может считаться неоспоренным после объявленной проверки'
+  );
+
+  // И вторая проверка поверх первой тоже не проходит.
+  useGameStore.getState().doubtAction('p1');
+  assert.equal(
+    useGameStore.getState().pendingDoubtDoubterId,
+    'b2',
+    'проверяет тот, кто успел первым'
+  );
+
+  // Вскрытие всё-таки происходит — и снимает флаг.
+  await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS + 300));
+  assert.ok(useGameStore.getState().revealOutcome, 'отложенное вскрытие состоялось');
+  assert.equal(
+    useGameStore.getState().pendingDoubtDoubterId,
+    null,
+    'вскрытие снимает флаг — иначе следующий ход не получит окна сомнения'
+  );
+
+  timerManager.clearAll();
+}
+
 // --- The VETO_WINDOW belongs to the clock, not to a click. ---
 // There is no "Продолжить" any more: nobody — not even every non-actor human
 // together — can shorten the window, because a window that closes early is

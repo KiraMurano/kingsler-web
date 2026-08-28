@@ -20,9 +20,14 @@ export function doubtAction(
   set: StateSetter,
   doubterId: string
 ): void {
-  timerManager.clearAll();
-  const { pendingAction, turnPhase, players } = get();
+  const { pendingAction, turnPhase, players, pendingDoubtDoubterId } = get();
   if ((turnPhase !== 'DOUBT_WINDOW' && turnPhase !== 'TARGET_REACTION_WINDOW') || !pendingAction || !pendingAction.roleClaim) return;
+
+  /* Проверяет тот, кто успел первым. Второй «Не верю» поверх заявленного
+     снял бы отложенное вскрытие (`clearAll` ниже) и списал бы ещё один жетон
+     за проверку, которой не будет. */
+  if (pendingDoubtDoubterId) return;
+  timerManager.clearAll();
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   const doubter = players.find(p => p.id === doubterId);
@@ -75,9 +80,30 @@ export function passDoubt(
   set: StateSetter,
   playerId: string
 ): void {
-  timerManager.clearAll();
-  const { turnPhase, pendingAction, players, discardPile, coronationCandidateId, pendingDoubtPassedIds } = get();
+  const {
+    turnPhase,
+    pendingAction,
+    players,
+    discardPile,
+    coronationCandidateId,
+    pendingDoubtPassedIds,
+    pendingDoubtDoubterId
+  } = get();
   if (turnPhase !== 'DOUBT_WINDOW' || !pendingAction || !pendingAction.roleClaim) return;
+
+  /*
+   * Окно сомнения одноразовое: заявленную проверку «Верю» уже не отменяет.
+   *
+   * Без этой проверки поздний клик снимал отложенное вскрытие своим
+   * `clearAll()` и уводил действие по ветке «двор не оспорил». Проверка при
+   * этом уже состоялась — жетон потрачен, заговоры заряжены, — а
+   * `pendingDoubtDoubterId` гасится ровно в одном месте, во вскрытии,
+   * которого после этого не будет. Флаг оставался поднятым навсегда: боты
+   * переставали и сомневаться, и пропускать, правая колонка застревала на
+   * виде `reveal`, и партия вставала намертво.
+   */
+  if (pendingDoubtDoubterId) return;
+  timerManager.clearAll();
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
