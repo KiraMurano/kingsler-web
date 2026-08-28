@@ -755,6 +755,22 @@
   background: rgba(200, 160, 74, 0.05);
 }
 
+/* Имя и бейджи в одну строку. `baseline` увёл бы капсулы вниз на разницу
+   кеглей — по центру они стоят на одной оси с именем. */
+.detail__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 10px;
+}
+
+.detail__badges {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .detail__lore {
   font-size: 0.82rem;
   font-style: italic;
