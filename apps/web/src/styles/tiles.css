@@ -164,3 +164,9 @@
   .tilegrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tile { min-height: 158px; }
 }
+
+/* Четыре плитки в три колонки встают 3 + 1, и одинокая нижняя читается как
+   сбой вёрстки, а не как выбор. Списки чётной длины идут парами. */
+.tilegrid--pairs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

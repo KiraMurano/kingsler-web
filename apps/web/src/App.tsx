@@ -17,7 +17,7 @@ import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
 import { CardDetailModal } from './components/CardDetailModal';
 import { BluffDialog } from './components/BluffDialog';
-import { NormalActionsPopup } from './components/NormalActionsPopup';
+import { CourtActionsDialog } from './components/CourtActionsDialog';
 import { Button } from './components/ui/Button';
 import { AnchorProvider } from './motion/AnchorRegistry.tsx';
 import { CardInteractionProvider, CardLayer } from './motion/CardLayer.tsx';
@@ -118,7 +118,7 @@ export default function App({
     }))
   );
 
-  const [normalActionsOpen, setNormalActionsOpen] = useState(false);
+  const [courtActionsOpen, setCourtActionsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [codexOpen, setCodexOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
@@ -242,7 +242,7 @@ export default function App({
     if (!human) return;
     switch (kind) {
       case 'court-actions':
-        setNormalActionsOpen(true);
+        setCourtActionsOpen(true);
         break;
       case 'conspiracy':
         openConspiracyDialog(false);
@@ -413,7 +413,7 @@ export default function App({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      setNormalActionsOpen(false);
+      setCourtActionsOpen(false);
       setOpenMenuCardId(null);
       setBluffCardId(null);
       setRulesOpen(false);
@@ -553,8 +553,8 @@ export default function App({
       {bluffCardId && (
         <BluffDialog stakedCardId={bluffCardId} onClose={() => setBluffCardId(null)} />
       )}
-      {normalActionsOpen && (
-        <NormalActionsPopup onClose={() => setNormalActionsOpen(false)} />
+      {courtActionsOpen && (
+        <CourtActionsDialog onClose={() => setCourtActionsOpen(false)} />
       )}
 
       <Modals
