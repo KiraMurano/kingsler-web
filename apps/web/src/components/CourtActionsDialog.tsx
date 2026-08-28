@@ -1,10 +1,10 @@
 /**
- * Действия двора — четыре плитки той же формы, что и роли в блефе.
+ * Действия двора — четыре строки, а не плитки.
  *
- * У этих действий нет арта: они не карты, а ходы, и рисовать им портрет было
- * бы враньём о том, что лежит на столе. Вместо арта иконка на градиенте —
- * форма, отступы и жест наведения те же, поэтому два списка читаются как один
- * язык, а не как два разных экрана.
+ * Это ходы, а не карты: у них нет ни арта, ни лица, и крупная плитка обещала
+ * больше, чем в них есть. Строка ровно по содержанию: название и одна фраза,
+ * в которой уже названа цена. Отдельная плашка со стоимостью и подпись под ней
+ * говорили одно и то же дважды.
  *
  * «Сменить карты» раскрывается на месте: выбор, какую карту сбросить, — это
  * продолжение того же решения, и уводить его во вторую модалку значило бы
@@ -12,22 +12,34 @@
  */
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, Coins, Crown, RefreshCw, ScrollText } from 'lucide-react';
+import type { GameCard } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import { dur } from '../motion/tokens.ts';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
-import { Tile } from './ui/Tile';
 import { Dialog } from './ui/Overlay';
 import { UiIcon } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
 
 const FEAST_CROWN_CAP = 5;
-const ICON = 28;
 
-export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+/**
+ * Недоступная строка не получает `disabled`, а гаснет классом.
+ *
+ * `disabled` на кнопке глушит клики и по всему, что внутри неё, а внутри
+ * «Распустить слух» живёт ссылка на «Королевский приём» — прочитать про карту
+ * должно быть можно и тогда, когда на само действие не хватает золота.
+ * Кнопка при этом остаётся кнопкой и остаётся в обходе с клавиатуры;
+ * недоступность объявляет `aria-disabled`.
+ */
+const row = (off: boolean) => `opt${off ? ' opt--off' : ''}`;
+
+export const CourtActionsDialog: React.FC<{
+  onClose: () => void;
+  onInspectCard: (card: GameCard) => void;
+}> = ({ onClose, onInspectCard }) => {
   const { players, viewerId, performAction } = useGameStore(
     useShallow(s => ({
       players: s.players,
@@ -40,13 +52,14 @@ export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose 
   if (!human) return null;
 
   const hasTokens = human.actionTokens >= 1;
-  const feastBlocked = human.favor >= FEAST_CROWN_CAP;
+  const feastOff = !hasTokens || human.gold < 3 || human.favor >= FEAST_CROWN_CAP;
+  const rumourOff = !hasTokens || human.gold < 5;
 
   return (
     <Dialog
       open
       onClose={onClose}
-      width={640}
+      width={460}
       title="Действия двора"
       description={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -59,7 +72,7 @@ export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose 
         </span>
       }
     >
-      {/* `wait`: наложенные друг на друга сетка и выбор карт читаются как
+      {/* `wait`: наложенные друг на друга список и выбор карт читаются как
           грязь — тот же довод, что в `PhasePanel`. */}
       <AnimatePresence mode="wait" initial={false}>
         {exchangeOpen ? (
@@ -136,19 +149,18 @@ export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose 
         ) : (
           <motion.div
             key="actions"
-            className="tilegrid tilegrid--pairs"
+            className="optlist"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: dur.panel }}
           >
-            <Tile
-              icon={<Coins size={ICON} />}
-              name="Просить содержание"
-              meta={<>+1 <UiIcon kind="coin" size="xs" /></>}
-              desc="Одна монета из королевской казны, без риска."
-              disabled={!hasTokens}
+            <button
+              type="button"
+              className={row(!hasTokens)}
+              aria-disabled={!hasTokens}
               onClick={() => {
+                if (!hasTokens) return;
                 onClose();
                 performAction({
                   type: 'normal',
@@ -159,27 +171,19 @@ export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose 
                   description: 'Получает 1 🪙 из казны.'
                 });
               }}
-            />
+            >
+              <div className="opt__name">Просить содержание</div>
+              <div className="opt__desc">
+                Возьмите 1 <UiIcon kind="coin" size="xs" /> из королевской казны.
+              </div>
+            </button>
 
-            <Tile
-              icon={<Crown size={ICON} />}
-              name="Устроить пир"
-              meta={
-                feastBlocked ? (
-                  <>предел {FEAST_CROWN_CAP} <UiIcon kind="crown" size="xs" /></>
-                ) : (
-                  <>3 <UiIcon kind="coin" size="xs" /> <ArrowRight size={11} /> +1{' '}
-                  <UiIcon kind="crown" size="xs" /></>
-                )
-              }
-              desc={
-                <>
-                  Купить корону влияния. Так можно дойти лишь до {FEAST_CROWN_CAP}{' '}
-                  <UiIcon kind="crown" size="xs" /> — победную корону придётся отбирать в спорах.
-                </>
-              }
-              disabled={!hasTokens || human.gold < 3 || feastBlocked}
+            <button
+              type="button"
+              className={row(feastOff)}
+              aria-disabled={feastOff}
               onClick={() => {
+                if (feastOff) return;
                 onClose();
                 performAction({
                   type: 'normal',
@@ -190,18 +194,20 @@ export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose 
                   description: 'Платит 3 🪙 и получает +1 👑.'
                 });
               }}
-            />
+            >
+              <div className="opt__name">Устроить пир</div>
+              <div className="opt__desc">
+                Потратьте 3 <UiIcon kind="coin" size="xs" />, чтобы купить 1{' '}
+                <UiIcon kind="crown" size="xs" />. Победную корону таким образом получить нельзя.
+              </div>
+            </button>
 
-            <Tile
-              icon={<ScrollText size={ICON} />}
-              name="Распустить слух"
-              meta={
-                <>5 <UiIcon kind="coin" size="xs" /> <ArrowRight size={11} /> -1{' '}
-                <UiIcon kind="crown" size="xs" /></>
-              }
-              desc="Сбивает корону у соперника, срывает Королевский приём и круг коронации."
-              disabled={!hasTokens || human.gold < 5}
+            <button
+              type="button"
+              className={row(rumourOff)}
+              aria-disabled={rumourOff}
               onClick={() => {
+                if (rumourOff) return;
                 onClose();
                 startTargeting({
                   type: 'normal',
@@ -210,16 +216,39 @@ export const CourtActionsDialog: React.FC<{ onClose: () => void }> = ({ onClose 
                   description: 'Заплатил 5 🪙: выбранный игрок теряет -1 👑.'
                 });
               }}
-            />
+            >
+              <div className="opt__name">Распустить слух</div>
+              <div className="opt__desc">
+                Потратьте 5 <UiIcon kind="coin" size="xs" />, чтобы немедленно сбросить 1{' '}
+                <UiIcon kind="crown" size="xs" /> у соперника. Срывает{' '}
+                {/* Название карты — не текст, а ссылка на неё: игрок читает про
+                    «Королевский приём» ровно там, где впервые о нём услышал.
+                    `span`, а не `button`: строка сама кнопка, и кнопка внутри
+                    кнопки — невалидная разметка. */}
+                <span
+                  className="cardlink"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onInspectCard('Королевский приём');
+                  }}
+                >
+                  Королевский приём
+                </span>
+                .
+              </div>
+            </button>
 
-            <Tile
-              icon={<RefreshCw size={ICON} />}
-              name="Сменить карты"
-              meta={<>1 <UiIcon kind="move" size="xs" /></>}
-              desc="Сбросьте одну или обе карты и немедленно доберите новые."
-              disabled={!hasTokens}
-              onClick={() => setExchangeOpen(true)}
-            />
+            <button
+              type="button"
+              className={row(!hasTokens)}
+              aria-disabled={!hasTokens}
+              onClick={() => hasTokens && setExchangeOpen(true)}
+            >
+              <div className="opt__name">Сменить карты</div>
+              <div className="opt__desc">
+                Сбросьте одну или обе карты и немедленно доберите новые.
+              </div>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

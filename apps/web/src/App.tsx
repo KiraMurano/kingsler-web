@@ -548,14 +548,19 @@ export default function App({
         onSelectCard={setInspectedCard}
       />
 
-      <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
-
       {bluffCardId && (
         <BluffDialog stakedCardId={bluffCardId} onClose={() => setBluffCardId(null)} />
       )}
       {courtActionsOpen && (
-        <CourtActionsDialog onClose={() => setCourtActionsOpen(false)} />
+        <CourtActionsDialog
+          onClose={() => setCourtActionsOpen(false)}
+          onInspectCard={setInspectedCard}
+        />
       )}
+
+      {/* Стоит последней из диалогов: её открывают из «Действий двора», и при
+          равном z-index кто ниже по разметке, тот и сверху. */}
+      <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
 
       <Modals
         showRules={rulesOpen}

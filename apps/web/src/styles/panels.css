@@ -402,6 +402,51 @@
   color: var(--text-muted);
 }
 
+/* Недоступная строка гаснет цветом, а не `opacity`: прозрачность накрывает всю
+   строку целиком, вместе со ссылкой на карту, которая остаётся живой. */
+.opt--off {
+  cursor: not-allowed;
+}
+
+.opt--off .opt__name {
+  color: rgba(244, 232, 200, 0.36);
+}
+
+.opt--off .opt__desc {
+  color: rgba(139, 143, 156, 0.45);
+}
+
+.opt--off .ui-icon {
+  opacity: 0.45;
+}
+
+/* `:not(:disabled)` в правиле наведения ничего не отсекает у строки, которая
+   больше не `disabled`, — гасим подсветку отдельно. */
+.opt--off:hover {
+  border-color: var(--line-cold);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Название карты внутри текста строки: ведёт в её описание. Не `a` и не
+   `button` — строка сама кнопка, — поэтому подчёркивание рисуем сами. */
+.cardlink {
+  color: var(--gold-pale);
+  border-bottom: 1px dotted rgba(244, 232, 200, 0.5);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.cardlink:hover {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+/* Строка погасла, ссылка — нет: про карту читают независимо от того, по
+   карману ли действие. */
+.opt--off .cardlink {
+  cursor: pointer;
+}
+
 .opt__thumb {
   width: 34px;
   aspect-ratio: 2 / 3;
