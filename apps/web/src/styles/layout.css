@@ -472,6 +472,12 @@
   align-items: center;
 }
 
+/* Метка, по родителю которой капсула находит своё место. Ничего не рисует и
+   не занимает места — сама капсула живёт в портале. */
+.delta-origin {
+  display: none;
+}
+
 .bolt {
   display: inline-flex;
   align-items: center;
@@ -584,13 +590,13 @@
   color: var(--gold-pale);
 }
 
-/* Floating resource deltas */
+/* Floating resource deltas.
+   `fixed` и портал в `body`: координаты приходят инлайном из `Deltas`, а слой
+   берётся выше карт — иначе капсула ныряет под колоду и под карты соседа. */
 .delta {
-  position: absolute;
-  left: 50%;
-  top: -6px;
+  position: fixed;
   transform: translateX(-50%);
-  z-index: var(--z-float);
+  z-index: var(--z-above-cards);
   padding: 3px 9px;
   border-radius: 999px;
   font-size: 0.78rem;
