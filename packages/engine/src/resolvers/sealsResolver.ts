@@ -21,6 +21,19 @@ export function addSealsToPlayer(
   const player = players[pIdx];
   if (player.favor >= 6) return;
 
+  /* Цена «Охранной грамоты»: пока она лежит, печати держателю не идут.
+     Именно не идут, а не копятся — иначе защита была бы бесплатной, а после
+     сброса грамоты в игрока прилетала бы пачка отложенных корон. */
+  if (player.activePlot?.type === 'Охранная грамота') {
+    set(state => ({
+      history: [
+        `📜 «Охранная грамота» ${player.name}: печать (+${count} ⚜️) не начислена — такова цена защиты.`,
+        ...state.history
+      ].slice(0, 50)
+    }));
+    return;
+  }
+
   const totalSeals = player.seals + count;
   const gainedCrowns = Math.floor(totalSeals / 2);
   const newFavor = player.favor + gainedCrowns;
