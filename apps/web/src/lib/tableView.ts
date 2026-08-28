@@ -102,6 +102,14 @@ export interface TableView {
   phase: PhaseKind;
   title: string;
   /**
+   * Имя, дописываемое к заголовку через двоеточие.
+   *
+   * Живёт отдельно от `title`, потому что заголовок набран капителью, а ник —
+   * это то, как игрок себя назвал: «Герцог Виктор», а не «ГЕРЦОГ ВИКТОР».
+   * Регистр чужого имени менять не наше дело.
+   */
+  titleName?: string;
+  /**
    * Что происходит и что от игрока требуется — одной фразой.
    *
    * Правая колонка не повторяет то, что и так нарисовано за столом: чьи это
@@ -451,8 +459,14 @@ function titleFor(phase: PhaseKind, actor: PlayerRef | null): string {
     case 'coronation':
       return 'Круг коронации';
     default:
-      return actor ? `Ход: ${actor.name}` : 'Ожидание';
+      return actor ? 'Ход' : 'Ожидание';
   }
+}
+
+/** Имя в заголовке — только там, где заголовок кого-то называет. */
+function titleNameFor(phase: PhaseKind, actor: PlayerRef | null): string | undefined {
+  if (phase !== 'waiting' || !actor) return undefined;
+  return actor.name;
 }
 
 /**
@@ -564,7 +578,9 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
   const actorPlayer = input.players.find(
     p => p.id === (input.pendingAction?.actorId ?? input.activePlayerId)
   );
-  const title = titleFor(phase, actorPlayer ? ref(actorPlayer) : null);
+  const actorRef = actorPlayer ? ref(actorPlayer) : null;
+  const title = titleFor(phase, actorRef);
+  const titleName = titleNameFor(phase, actorRef);
   const guidance = guidanceFor(phase, input, viewer);
   const event = eventFor(input);
   const bar = barFor(phase, viewer, input);
@@ -580,6 +596,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
   const id = [
     phase,
     title,
+    titleName ?? '',
     guidance,
     event,
     bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
@@ -592,6 +609,7 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     id,
     phase,
     title,
+    titleName,
     guidance,
     event,
     deadlineAt: phase === 'veto' ? input.vetoDeadlineAt : null,

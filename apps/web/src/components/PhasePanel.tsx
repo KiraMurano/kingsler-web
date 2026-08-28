@@ -53,7 +53,16 @@ export const PhasePanel: React.FC<{ view: TableView }> = ({ view }) => {
           exit={{ opacity: 0, y: travel }}
           transition={{ duration: fade, ease: EASE }}
         >
-          <div className="phase__title">{view.title}</div>
+          <div className="phase__title">
+            {view.title}
+            {view.titleName && (
+              <>
+                {': '}
+                {/* Ник — как его завёл игрок: капитель заголовка сюда не идёт. */}
+                <span className="phase__title-name">{view.titleName}</span>
+              </>
+            )}
+          </div>
 
 
           {/* Один блок, а не два: сначала что случилось, следом что делать.

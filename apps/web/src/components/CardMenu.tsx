@@ -29,6 +29,15 @@ import type { CardMenuKind, CardMenuOption } from '../lib/tableView.ts';
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 
+/**
+ * Насколько гаснет недоступный пункт.
+ *
+ * Гасим здесь, а не правилом `:disabled` в таблице стилей: `animate` пишет
+ * `opacity` инлайном, а инлайн бьёт таблицу — глухая кнопка выглядела ровно
+ * как живая, и о запрете говорил только тултип.
+ */
+const DIM = 0.45;
+
 /** Просвет над картой. Считает подъём выбранной карты и её рост на наведении. */
 const CLEARANCE = 28;
 
@@ -86,7 +95,7 @@ export const CardMenu: React.FC<{
                 disabled={o.disabled}
                 initial={{ opacity: 0, y: reduce ? 0 : 6 }}
                 animate={{
-                  opacity: 1,
+                  opacity: o.disabled ? DIM : 1,
                   y: 0,
                   transition: {
                     delay: reduce ? 0 : i * dur.stagger,

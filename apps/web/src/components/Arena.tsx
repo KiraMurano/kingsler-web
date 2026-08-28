@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { StakedCardArena } from './StakedCardArena';
 import { Button } from './ui/Button';
@@ -16,6 +17,9 @@ interface ArenaProps {
   onInspectCard?: (card: GameCard) => void;
 }
 
+/** Где стоит баннер: доля высоты стола, отсчитанная от его нижнего края. */
+const BAR_BOTTOM = 0.28;
+
 export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarget }) => {
   const reduce = !!useReducedMotion();
   /* `.targetbar` centres itself with the `translate` property rather than
@@ -23,8 +27,39 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
      belongs to motion here. */
   const rise = reduce ? 0 : 8;
 
+  /*
+   * Баннер выбора цели рисуется порталом в `body`, а не внутри арены.
+   *
+   * Арена живёт на `z-index: 70` и этим заводит собственную стопку, а слой
+   * карт — на 75. Что бы баннер себе ни назначил, он оставался под картами:
+   * лежащая рядом интрига наезжала на него. Поднять саму арену нельзя — её
+   * же мебель встанет поверх карт, которые в неё летят.
+   *
+   * Координаты снимаются с самой арены: она растянута `inset: 0` по столу,
+   * так что её прямоугольник — это и есть стол. Пока баннер открыт, стол не
+   * переезжает, поэтому хватает замера при появлении и пересчёта на resize.
+   */
+  const arena = useRef<HTMLElement>(null);
+  const [at, setAt] = useState<{ x: number; bottom: number } | null>(null);
+  const open = !!pendingTargetAction;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const r = arena.current?.getBoundingClientRect();
+      if (!r) return;
+      setAt({
+        x: r.left + r.width / 2,
+        bottom: window.innerHeight - (r.bottom - r.height * BAR_BOTTOM)
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open]);
+
   return (
-    <section className="arena">
+    <section className="arena" ref={arena}>
       {/* Deck and discard used to be two invisible points just inside the
           felt's rim. They are real piles now, standing outside the table
           where they cannot collide with a seat panel — see `CardPiles`. */}
@@ -32,25 +67,29 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
         <StakedCardArena />
       </div>
 
-      <AnimatePresence>
-        {pendingTargetAction && (
-          <motion.div
-            key="targetbar"
-            className="targetbar"
-            initial={{ opacity: 0, y: rise }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: rise }}
-            transition={{ duration: reduce ? 0.12 : dur.fade, ease: [0.4, 0, 0.2, 1] }}
-          >
-            <span>
-              Выберите цель для <strong>«{pendingTargetAction.name}»</strong>
-            </span>
-            <Button tone="danger" size="sm" onClick={onCancelTarget}>
-              Отмена
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
+          {pendingTargetAction && at && (
+            <motion.div
+              key="targetbar"
+              className="targetbar"
+              style={{ left: at.x, bottom: at.bottom }}
+              initial={{ opacity: 0, y: rise }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: rise }}
+              transition={{ duration: reduce ? 0.12 : dur.fade, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <span>
+                Выберите цель для <strong>«{pendingTargetAction.name}»</strong>
+              </span>
+              <Button tone="danger" size="sm" onClick={onCancelTarget}>
+                Отмена
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </section>
   );
 };
