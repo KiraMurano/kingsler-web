@@ -24,7 +24,6 @@
 import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
-import { usePileArrivals } from '../motion/pileTally.ts';
 import type { Zone } from '../motion/zones.ts';
 
 const CARD_BACK = '/assets/cards/back-dual-face.webp';
@@ -56,11 +55,13 @@ const Pile: React.FC<{
  */
 export const CardPiles: React.FC = () => {
   const deckCount = useGameStore(s => s.deck.length);
-  /* Движок кладёт карту в сброс в тот же миг, когда решает её судьбу, а лететь
-     ей ещё почти секунду. Считаем доехавшее: подпись не должна обгонять
-     картинку — см. `pileTally`. */
-  const discardInFlight = usePileArrivals('discard');
-  const discardCount = Math.max(0, useGameStore(s => s.discardPile.length) - discardInFlight);
+  /* Прямо из состояния, без поправки на полёт.
+     Счётчик пробовали задерживать до приземления карты, чтобы подпись не
+     обгоняла картинку. Держать это честно не на чем: слой карт объявляет
+     прибытие, только когда пружина попадает в порог `0.6 px`, а при заминке
+     кадров она туда не попадает — и число металось. Спешащая на секунду
+     подпись — меньшее зло, чем неустойчивая. */
+  const discardCount = useGameStore(s => s.discardPile.length);
 
   return (
     <div className="piles">
