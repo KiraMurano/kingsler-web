@@ -269,6 +269,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     pendingDoubtDoubterId: null as string | null,
     isVaBanqueActive: false,
     isVetoed: false,
+    vetoChain: 0,
     isPendingActionAfterTruthChallenge: false,
     revealOutcome: null as GameState['revealOutcome'],
     activeSpeechReactions: {} as Record<string, string>,

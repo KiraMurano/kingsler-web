@@ -75,6 +75,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     hasPlayedPlotThisTurn: false,
     isVaBanqueActive: false,
     isVetoed: false,
+    vetoChain: 0,
     isPendingActionAfterTruthChallenge: false,
     revealOutcome: null,
     duelOutcome: null,

@@ -49,6 +49,7 @@ import {
 } from './resolvers/doubtResolver';
 import { playInstant } from './resolvers/instantResolver';
 import { checkEndgameAndAdvanceTurn, endTurn } from './resolvers/turnResolver';
+import { vetoReset } from './resolvers/vetoChain';
 
 export { ALL_BOT_CANDIDATES, getBotArchetype };
 export type { BotCandidate };
@@ -88,7 +89,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   vetoDeadlineAt: null,
 
   isVaBanqueActive: false,
-  isVetoed: false,
+  ...vetoReset(),
   isPendingActionAfterTruthChallenge: false,
 
   pendingDuelDefenderCardId: null,
@@ -203,7 +204,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       vetoDeadlineAt: null,
       overlayInstant: null,
       isVaBanqueActive: false,
-      isVetoed: false,
+      ...vetoReset(),
       isPendingActionAfterTruthChallenge: false,
       pendingDuelDefenderCardId: null,
       pendingDuelDefenderRoleClaim: null,
@@ -422,7 +423,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasUsedNormalActionThisTurn: action.type === 'normal' ? true : state.hasUsedNormalActionThisTurn,
       hasPlayedRoleThisTurn: action.type === 'role' ? true : state.hasPlayedRoleThisTurn,
       isVaBanqueActive: withVaBanque,
-      isVetoed: false,
+      ...vetoReset(),
       overlayInstant: withVaBanque ? { card: 'Ва-банк', actorId: actor.id } : null,
       isPendingActionAfterTruthChallenge: false
     }));

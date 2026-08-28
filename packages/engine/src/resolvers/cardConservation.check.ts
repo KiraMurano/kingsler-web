@@ -53,6 +53,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     pendingDuelDefenderCardId: null as CardId | null,
     isVaBanqueActive: false,
     isVetoed: false,
+    vetoChain: 0,
     isPendingActionAfterTruthChallenge: false,
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,

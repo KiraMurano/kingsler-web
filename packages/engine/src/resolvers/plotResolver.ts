@@ -7,6 +7,7 @@ import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { beginCoronationIfNeeded } from './coronation';
 import { burnCharter, loseCrowns } from './crownLoss';
+import { vetoReset } from './vetoChain';
 
 /** Заговор разряжается только полностью заряженным. */
 export const CONSPIRACY_FULL_CHARGE = 4;
@@ -86,7 +87,7 @@ export function playPlotAction(
     players: newPlayers,
     pendingAction: action,
     hasPlayedPlotThisTurn: true,
-    isVetoed: false,
+    ...vetoReset(),
     overlayInstant: null,
     isPendingActionAfterTruthChallenge: false,
     turnSubPhase: 'CARD_PLAY_PHASE',
@@ -258,7 +259,7 @@ export function activateConspiracy(
       : state.players,
     pendingAction: action,
     conspiracyPrompt: null,
-    isVetoed: false,
+    ...vetoReset(),
     overlayInstant: null,
     history: [
       `⚔️ ${player.name} свершает «Тайный заговор» (${charges}/${CONSPIRACY_FULL_CHARGE} зар.) [🛡️ Нельзя отменить Вето]!`,

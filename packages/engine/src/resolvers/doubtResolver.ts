@@ -383,14 +383,18 @@ export function triggerVetoWindowOrResolveEffect(
   isAfterTruthChallenge = false
 ): void {
   timerManager.clearAll();
-  const { isVetoed } = get();
+  const { isVetoed, rules } = get();
 
   if (action.cannotBeVetoed) {
     get()._resolvePendingActionEffect(action, isAfterTruthChallenge);
     return;
   }
 
-  if (isVetoed) {
+  /* Вето, сыгранное ещё до окна (в окне реакции жертвы), обычно закрывает
+     вопрос сразу. Но при правиле «вето на вето» двор должен успеть ответить и
+     на него — поэтому окно всё равно открывается, а решает уже чётность
+     цепочки. */
+  if (isVetoed && !rules.vetoOnVeto) {
     set(state => ({
       overlayInstant: null,
       history: [`🚫 Действие «${action.roleClaim || action.name}» отменено Правом вето!`, ...state.history].slice(0, 50)

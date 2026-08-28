@@ -148,6 +148,8 @@ export interface TableViewInput {
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;
   isVetoed: boolean;
+  /** Разрешено ли правилами партии класть вето поверх вето. */
+  vetoOnVeto: boolean;
   vetoDeadlineAt: number | null;
   coronationCandidateId: string | null;
   revealOutcome: RevealOutcome | null;
@@ -302,12 +304,17 @@ function menuFor(
   const card = held.card;
   if (phase === 'turn') return ownTurnMenu(card, viewer, input);
   if (phase === 'under-attack') return underAttackMenu(card, viewer, input);
-  if (phase === 'veto' && card === 'Право вето' && !input.isVetoed) {
+  /* Обычно поверх уже наложенного вето класть нечего. С правилом «вето на
+     вето» — наоборот: встречное вето снимает предыдущее, и карта остаётся
+     играбельной всю цепочку. */
+  if (phase === 'veto' && card === 'Право вето' && (!input.isVetoed || input.vetoOnVeto)) {
     return [
       {
         kind: 'veto',
-        hint: 'Отменить готовящийся эффект. Карта уйдёт в сброс',
-        label: 'Наложить вето',
+        hint: input.isVetoed
+          ? 'Снять чужое вето встречным. Карта уйдёт в сброс'
+          : 'Отменить готовящийся эффект. Карта уйдёт в сброс',
+        label: input.isVetoed ? 'Вето на вето' : 'Наложить вето',
         tone: 'danger',
         disabled: false,
         spendsToken: false,

@@ -80,6 +80,7 @@ export default function App({
     hasPlayedRoleThisTurn,
     hasPlayedPlotThisTurn,
     isVetoed,
+    rules,
     vetoDeadlineAt,
     endTurnManually,
     openConspiracyDialog
@@ -116,6 +117,7 @@ export default function App({
       hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn,
       hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
       isVetoed: s.isVetoed,
+      rules: s.rules,
       vetoDeadlineAt: s.vetoDeadlineAt,
       endTurnManually: s.endTurnManually,
       openConspiracyDialog: s.openConspiracyDialog
@@ -231,6 +233,7 @@ export default function App({
           hasPlayedRoleThisTurn,
           hasPlayedPlotThisTurn,
           isVetoed,
+          vetoOnVeto: rules.vetoOnVeto,
           vetoDeadlineAt,
           coronationCandidateId,
           revealOutcome,
@@ -251,6 +254,7 @@ export default function App({
       hasPlayedRoleThisTurn,
       hasPlayedPlotThisTurn,
       isVetoed,
+      rules.vetoOnVeto,
       vetoDeadlineAt,
       coronationCandidateId,
       revealOutcome,

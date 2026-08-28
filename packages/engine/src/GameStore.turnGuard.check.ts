@@ -46,6 +46,7 @@ function table() {
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
     isVetoed: false,
+    vetoChain: 0,
     vetoDeadlineAt: null,
     history: []
   });

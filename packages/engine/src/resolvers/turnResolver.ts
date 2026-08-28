@@ -8,6 +8,7 @@ import {
   NO_CORONATION,
   resolveCoronationAtTurnStart
 } from './coronation';
+import { vetoReset } from './vetoChain';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -76,7 +77,7 @@ export function checkEndgameAndAdvanceTurn(
       pendingAction: null,
       overlayInstant: null,
       isVaBanqueActive: false,
-      isVetoed: false,
+      ...vetoReset(),
       isPendingActionAfterTruthChallenge: false
     });
   }
@@ -159,7 +160,7 @@ export function endTurn(
       pendingAction: morningAction,
       overlayInstant: null,
       isVaBanqueActive: false,
-      isVetoed: false,
+      ...vetoReset(),
       isPendingActionAfterTruthChallenge: false,
       pendingDuelDefenderCardId: null,
       pendingDuelDefenderRoleClaim: null,
@@ -200,7 +201,7 @@ export function endTurn(
     pendingAction: null,
     overlayInstant: null,
     isVaBanqueActive: false,
-    isVetoed: false,
+    ...vetoReset(),
     isPendingActionAfterTruthChallenge: false,
     pendingDuelDefenderCardId: null,
     pendingDuelDefenderRoleClaim: null,

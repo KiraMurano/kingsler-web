@@ -5,9 +5,10 @@ import { botMemory } from '../Bot';
 import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { ACTION_HOLD_MS } from '../timing';
+import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing';
 import { loseCrowns } from './crownLoss';
 import { canBeTargetedBy } from '../targeting';
+import { vetoPlayed, vetoReset } from './vetoChain';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -92,27 +93,44 @@ export function playInstant(
       }
     }, ACTION_HOLD_MS);
   } else if (instantType === 'Право вето') {
+    const chain = vetoPlayed(get().vetoChain);
+    /* Чётная цепочка означает, что вето отменили встречным вето и эффект
+       всё-таки состоится. Первое вето — цепочка 1, отмена; второе — 2,
+       действие возвращается; третье — снова отмена, и так по кругу. */
+    const cancels = chain.isVetoed;
     set(state => ({
       players: updatedPlayers,
       discardPile: updatedDiscard,
-      isVetoed: true,
+      ...chain,
       overlayInstant: { card: 'Право вето', actorId: actor.id },
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `🚫 ${actor.name} играет инстант ⚡ «ПРАВО ВЕТО»! Эффект действия отменён!`,
+        chain.vetoChain === 1
+          ? `🚫 ${actor.name} играет инстант ⚡ «ПРАВО ВЕТО»! Эффект действия отменён!`
+          : `🚫 ${actor.name} играет ⚡ «ПРАВО ВЕТО» поверх предыдущего (${chain.vetoChain}-е в цепочке)! ${cancels ? 'Эффект снова отменён' : 'Отмена снята — действие состоится'}!`,
         ...state.history
       ].slice(0, 50)
     }));
-    triggerResourceFloat(set, actor.id, '🚫 ПРАВО ВЕТО!', false);
+    triggerResourceFloat(set, actor.id, chain.vetoChain === 1 ? '🚫 ПРАВО ВЕТО!' : `🚫 ВЕТО НА ВЕТО (${chain.vetoChain})!`, false);
 
     if (get().turnPhase === 'VETO_WINDOW') {
       timerManager.clearAll();
-      /* Полоска обязана исчезнуть в тот же кадр, что и решение: она
-         отсчитывала время на решение, которое уже принято. */
-      set({ vetoDeadlineAt: null });
-      timerManager.scheduleDelay(() => {
-        get().proceedAfterVetoWindow();
-      }, ACTION_HOLD_MS);
+      if (get().rules.vetoOnVeto) {
+        /* Окно не закрывается, а начинается заново: двор должен успеть
+           ответить на само вето. Длина цепочки ничем не ограничена — она
+           упирается только в число «Прав вето», оставшихся на руках. */
+        set({ vetoDeadlineAt: Date.now() + VETO_WINDOW_MS });
+        timerManager.scheduleDelay(() => {
+          if (get().turnPhase === 'VETO_WINDOW') get().proceedAfterVetoWindow();
+        }, VETO_WINDOW_MS);
+      } else {
+        /* Полоска обязана исчезнуть в тот же кадр, что и решение: она
+           отсчитывала время на решение, которое уже принято. */
+        set({ vetoDeadlineAt: null });
+        timerManager.scheduleDelay(() => {
+          get().proceedAfterVetoWindow();
+        }, ACTION_HOLD_MS);
+      }
     }
   } else if (instantType === 'Перенаправление' && targetPlayerId) {
     const newTarget = players.find(p => p.id === targetPlayerId);
@@ -148,7 +166,7 @@ export function playInstant(
       pendingAction: laid,
       overlayInstant: null,
       isPendingActionAfterTruthChallenge: false,
-      isVetoed: false,
+      ...vetoReset(),
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
@@ -164,7 +182,7 @@ export function playInstant(
       pendingAction: laid,
       overlayInstant: null,
       isPendingActionAfterTruthChallenge: false,
-      isVetoed: false,
+      ...vetoReset(),
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
@@ -180,7 +198,7 @@ export function playInstant(
       pendingAction: laid,
       overlayInstant: null,
       isPendingActionAfterTruthChallenge: false,
-      isVetoed: false,
+      ...vetoReset(),
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [

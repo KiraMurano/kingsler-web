@@ -201,8 +201,31 @@ export function handleDuelAttackerPhase(state: GameState, schedule: BotScheduler
  * Реакция ботов в окне «Право вето».
  */
 export function handleVetoPhase(state: GameState, schedule: BotScheduler): void {
-  const { pendingAction, players, isVetoed } = state;
-  if (!pendingAction || isVetoed) return;
+  const { pendingAction, players, isVetoed, rules } = state;
+  if (!pendingAction) return;
+
+  /* Обычно поверх уже наложенного вето ботам делать нечего. С правилом «вето
+     на вето» они отвечают встречным — но только когда встречное действительно
+     что-то меняет, то есть когда действие сейчас отменено. Иначе бот сжигал
+     бы карту, чтобы отменить то, что и так состоится. */
+  if (isVetoed && !rules.vetoOnVeto) return;
+
+  /* Встречное вето снимает чужую отмену — значит играть его осмысленно только
+     тому, чьё действие отменили. Остальным оно вернуло бы к жизни чужой ход.
+     Поэтому в цепочке кандидат ровно один: автор действия. */
+  if (isVetoed) {
+    const author = players.find(p => p.id === pendingAction.actorId);
+    if (!author?.isBot) return;
+    const vetoId = idOf(author.hand, 'Право вето');
+    if (!vetoId) return;
+    schedule('veto', () => {
+      const cur = useGameStore.getState();
+      if (cur.turnPhase === 'VETO_WINDOW' && cur.isVetoed && cur.rules.vetoOnVeto) {
+        cur.playInstant(author.id, 'Право вето', vetoId);
+      }
+    }, BOT_VETO_MS + Math.random() * BOT_VETO_JITTER_MS);
+    return;
+  }
 
   const vetoBots = players.filter(
     p => p.isBot && p.id !== pendingAction.actorId && holds(p.hand, 'Право вето')

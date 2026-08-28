@@ -204,7 +204,13 @@ export interface GameState {
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;
   isVaBanqueActive: boolean;
+  /**
+   * Отменён ли эффект текущего действия. Производное от `vetoChain`
+   * (нечётная цепочка = отменён); пишется только вместе с ним.
+   */
   isVetoed: boolean;
+  /** Сколько «Прав вето» сыграно подряд поверх текущего действия. */
+  vetoChain: number;
   isPendingActionAfterTruthChallenge?: boolean;
   /** Абсолютный timestamp закрытия окна вето. `null` вне окна. */
   vetoDeadlineAt: number | null;
