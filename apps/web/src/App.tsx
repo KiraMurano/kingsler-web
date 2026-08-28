@@ -25,7 +25,9 @@ import { deriveCardZones } from './lib/cardZones.ts';
 import { deriveTableView } from './lib/tableView.ts';
 import type { BarActionKind } from './lib/tableView.ts';
 import { reconcileSlots } from './lib/handSlotBook.ts';
+import { rememberFaces } from './lib/faceBook.ts';
 import type { SlotBook } from './lib/handSlotBook.ts';
+import type { FaceBook } from './lib/faceBook.ts';
 import type { CardInteraction } from './motion/CardLayer.tsx';
 import type { PlacedCard } from './motion/zones.ts';
 import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
@@ -157,13 +159,20 @@ export default function App({
      StrictMode) lands in the same place either way. */
   const slotBook = useRef<SlotBook>({});
 
+  /* С каким лицом каждую карту показывали в последний раз. Сброс закрыт, и
+     лицо карты в нём видно только в полёте: без этой памяти чужая карта,
+     ушедшая в сброс невскрытой, переворачивалась по дороге и выдавала себя.
+     Как и книга слотов — это несомая память, а не производное; `rememberFaces` чистая
+     и идемпотентная, поэтому обновление внутри мемо безопасно. */
+  const faceBook = useRef<FaceBook>({});
+
   /* Every card at the table, placed by state alone. Memoised on the exact
      slice placement depends on, so opening a modal does not hand `CardLayer`
      a fresh array and make it reconcile fifty nodes for nothing. */
   const placedCards = useMemo(
     () => {
       slotBook.current = reconcileSlots(slotBook.current, players);
-      return deriveCardZones(
+      const placed = deriveCardZones(
         {
           players,
           deck,
@@ -176,8 +185,13 @@ export default function App({
           turnPhase
         },
         human?.id ?? '',
-        slotBook.current
+        slotBook.current,
+        faceBook.current
       );
+      /* Записывается после раскладки, а не до: правило сброса обязано читать
+         лицо, с которым карта уходила, а не то, которое ей только что дали. */
+      faceBook.current = rememberFaces(faceBook.current, placed);
+      return placed;
     },
     [
       players,

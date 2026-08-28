@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { deriveCardZones } from './cardZones.ts';
 import type { ZoneState } from './cardZones.ts';
 import { reconcileSlots } from './handSlotBook.ts';
+import type { FaceBook } from './faceBook.ts';
 import { zoneKey, ZONE_PRECEDENCE } from '../motion/zones.ts';
 import type { PlacedCard, Zone } from '../motion/zones.ts';
 import type { Action, GameCard, Player } from '@kinglier/engine/types';
@@ -218,7 +219,10 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     reconcileSlots({}, state.players),
     afterSplice.players
   );
-  const spliced = deriveCardZones(afterSplice, 'p1', splicedBook);
+  /* Между двумя кадрами был третий: исход спора на экране, карта вскрыта.
+     Его след и несёт книга лиц — ровно так же, как её несёт `App`. */
+  const afterReveal: FaceBook = { [stakedId]: 'Наследник' };
+  const spliced = deriveCardZones(afterSplice, 'p1', splicedBook, afterReveal);
   assertUnique(spliced, 'stake/spliced');
   assert.equal(keyAt(spliced, stakedId, 'stake/spliced'), 'stake');
   assert.equal(
@@ -231,11 +235,11 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     'Наследник',
     'once it has reached the graveyard it stays readable — a card that has been shown must not turn back over on its way to the corner'
   );
-  const splicedAsP2 = deriveCardZones(afterSplice, 'p2');
+  const splicedAsP2 = deriveCardZones(afterSplice, 'p2', {}, afterReveal);
   assert.equal(
     at(splicedAsP2, stakedId, 'stake/spliced/p2').face.known,
     'Наследник',
-    'the graveyard is open, so this holds for every viewer'
+    'the reveal was public, so this holds for every viewer who saw it'
   );
 }
 
@@ -382,7 +386,17 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     0,
     'a discarded card is never also in a hand'
   );
-  assert.equal(at(placed, dead.id, 'discard').face.known, 'Рыцарь', 'the graveyard is open to everyone');
+  assert.equal(
+    at(placed, dead.id, 'discard').face.known,
+    null,
+    'nothing said this card was ever shown, so it lies face-down'
+  );
+  const afterShowing = deriveCardZones(state, 'p1', {}, { [dead.id]: 'Рыцарь' });
+  assert.equal(
+    at(afterShowing, dead.id, 'discard').face.known,
+    'Рыцарь',
+    'shown once, it keeps its face all the way to the corner'
+  );
   assert.equal(at(placed, dead.id, 'discard').ownerId, null, 'the discard belongs to nobody');
   assert.equal(at(placed, dead.id, 'discard').revealed, false, 'face-up is not the same as under scrutiny');
 }
@@ -719,6 +733,37 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     ZONE_PRECEDENCE[kindOf.get('g2')!] > ZONE_PRECEDENCE.discard,
     'the overlay claim outranks the discard claim'
   );
+}
+
+/* Чужая карта, ушедшая в сброс невскрытой, туда невскрытой и летит.
+ *
+ * Сброс закрыт (`CardPiles`: наверху лежит рубашка, листать нечего), поэтому
+ * лицо карты в нём видно ровно один миг — пока она летит в угол. Правило
+ * «в сбросе — значит открыта» писалось затем, чтобы уже вскрытая карта не
+ * переворачивалась обратно, когда исход спора уходит с экрана. Но оно
+ * открывало и те карты, которых никто не видел: чужой обмен карт руки
+ * показывал двору, что именно сосед выбросил. */
+{
+  const p1Hand = pile(['Наследник', 'Шут']);
+  const p2Hand = pile(['Казначей']);
+  const dumped = pile(['Вор'])[0];
+
+  const state = makeState({
+    players: [player({ id: 'p1', hand: p1Hand }), player({ id: 'p2', hand: p2Hand })],
+    discardPile: [dumped]
+  });
+
+  const unseen = deriveCardZones(state, 'p1').find(c => c.id === dumped.id)!;
+  assert.equal(unseen.zone.kind, 'discard');
+  assert.equal(unseen.face.known, null, 'карта, которой никто не видел, летит в сброс рубашкой');
+
+  /* А та, что уже лежала лицом вверх, лицо и сохраняет: книга помнит,
+     с каким лицом карту показывали в прошлый раз. */
+  const book: FaceBook = { [dumped.id]: 'Вор' };
+  const seen = deriveCardZones(state, 'p1', {}, book).find(
+    c => c.id === dumped.id
+  )!;
+  assert.equal(seen.face.known, 'Вор', 'однажды показанная карта не переворачивается в полёте');
 }
 
 /* A face that no rule can read is simply unknown, never invented. */

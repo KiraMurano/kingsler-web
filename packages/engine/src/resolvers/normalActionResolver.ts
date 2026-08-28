@@ -4,7 +4,7 @@ import { drawCardsFromDeck } from '../cards';
 import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { ACTION_HOLD_MS } from '../timing';
+import { ACTION_HOLD_MS, EXCHANGE_DRAW_MS } from '../timing';
 import { fallenCoronationPatch } from './coronation';
 
 type StateGetter = () => GameState;
@@ -62,39 +62,64 @@ export function executeNormalAction(
       : (actor.hand.length > 0 ? [actor.hand[0].id] : []);
 
     if (finalIds.length > 0) {
-      // Exchanged cards keep their slot: each id is plucked and the drawn
-      // instance takes its place, so the untouched card never shifts.
+      /*
+       * Обмен идёт в два такта, а не в один.
+       *
+       * Раньше карта уходила в сброс и новая появлялась в руке в одном и том
+       * же кадре состояния. Слой карт пружинил обе одновременно, и на столе
+       * это читалось одним смазанным движением вместо двух — «сбросил» и
+       * «взял». Такт 1 отдаёт карты в сброс, такт 2 через `EXCHANGE_DRAW_MS`
+       * добирает из колоды. Между тактами рука честно короче: перепись карт
+       * сходится в обеих точках, ни одна карта не висит в воздухе.
+       */
       const returnedCards = finalIds
         .map(id => byId(actor.hand, id))
         .filter((c): c is NonNullable<typeof c> => !!c);
-      const newDiscard = [...get().discardPile, ...returnedCards];
-
-      const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } = drawCardsFromDeck(finalIds.length, get().deck, newDiscard);
-
-      let newHand = [...actor.hand];
-      finalIds.forEach((id, i) => {
-        const slot = newHand.findIndex(c => c.id === id);
-        if (slot === -1) return;
-        if (drawn[i]) newHand[slot] = drawn[i];
-        else newHand = [...newHand.slice(0, slot), ...newHand.slice(slot + 1)];
-      });
-
-      actor = { ...actor, hand: newHand };
-      newPlayers[actorIdx] = actor;
-      botMemory.invalidatePlayerHand(actor.id);
 
       const count = finalIds.length;
       const countStr = count === 1 ? '1 карту' : '2 карты';
-      const drawnCardsStr = drawn.map(c => `«${c.card}»`).join(', ');
-      const drawNotice = actor.id === 'p1' ? ` (получено: ${drawnCardsStr})` : '';
-      const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
 
+      // Такт 1: карты уходят в сброс.
+      actor = { ...actor, hand: actor.hand.filter(c => !finalIds.includes(c.id)) };
+      newPlayers[actorIdx] = actor;
+      botMemory.invalidatePlayerHand(actor.id);
       set(state => ({
-        deck: newDeck,
-        discardPile: newDiscardPile,
         players: newPlayers,
-        history: [`🔄 ${actor.name} сбросил ${countStr} и бесплатно взял ${count === 1 ? 'новую' : 'новые'} из колоды${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
+        discardPile: [...state.discardPile, ...returnedCards]
       }));
+
+      // Такт 2: добор. Колода и сброс читаются заново — сброс уже пополнен, и
+      // если колода истощится, перемешивать будут вместе со сброшенным.
+      const actorName = actor.name;
+      timerManager.scheduleDelay(() => {
+        const now = get();
+        const idx = now.players.findIndex(p => p.id === action.actorId);
+        if (idx === -1) return;
+
+        const { drawn, deck: newDeck, discardPile: newDiscardPile, wasReshuffled, reshuffledCount } =
+          drawCardsFromDeck(count, now.deck, now.discardPile);
+
+        const drawnPlayers = [...now.players];
+        drawnPlayers[idx] = { ...drawnPlayers[idx], hand: [...drawnPlayers[idx].hand, ...drawn] };
+        botMemory.invalidatePlayerHand(action.actorId);
+
+        const drawnCardsStr = drawn.map(c => `«${c.card}»`).join(', ');
+        const drawNotice = action.actorId === 'p1' ? ` (получено: ${drawnCardsStr})` : '';
+        const reshuffleNotice = wasReshuffled ? ` 🂠 Колода истощилась! Сброс (${reshuffledCount} карт) перемешан и стал новой колодой.` : '';
+
+        set(state => ({
+          deck: newDeck,
+          discardPile: newDiscardPile,
+          players: drawnPlayers,
+          history: [`🔄 ${actorName} сбросил ${countStr} и бесплатно взял ${count === 1 ? 'новую' : 'новые'} из колоды${drawNotice}.${reshuffleNotice}`, ...state.history].slice(0, 50)
+        }));
+
+        // Остаток общей паузы, а не полная: ход целиком не удлиняется.
+        timerManager.scheduleDelay(() => {
+          get()._checkEndgameAndAdvanceTurn();
+        }, Math.max(0, ACTION_HOLD_MS - EXCHANGE_DRAW_MS));
+      }, EXCHANGE_DRAW_MS);
+      return;
     }
   }
 

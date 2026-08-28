@@ -19,6 +19,7 @@ import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
 import { ZONE_PRECEDENCE } from '../motion/zones.ts';
 import type { Face, PlacedCard, Zone } from '../motion/zones.ts';
 import type { SlotBook } from './handSlotBook.ts';
+import type { FaceBook } from './faceBook.ts';
 
 /** Exactly the part of the game state that placement depends on. */
 export type ZoneState = Pick<
@@ -73,11 +74,15 @@ function resolveOverlayCardId(
  *   Passing the book is what makes hand slots sticky; a seat the book does not
  *   mention falls back to the array index, which is only ever right on the
  *   very first render.
+ * @param shownBefore With what face each card was last shown, from
+ *   `rememberFaces`. It is what tells a card discarded after a reveal from one
+ *   discarded unseen — in the discard array both look alike.
  */
 export function deriveCardZones(
   state: ZoneState,
   viewerId: string,
-  slots: SlotBook = {}
+  slots: SlotBook = {},
+  shownBefore: FaceBook = {}
 ): PlacedCard[] {
   const {
     players,
@@ -137,12 +142,15 @@ export function deriveCardZones(
   }
 
   /**
-   * The graveyard is open by the rules, so an instance that has reached the
-   * discard array is readable by everyone — even while a higher-precedence
-   * rule is still drawing it somewhere else. This is what keeps a revealed
-   * card face-up: the engine puts it in the discard at the same moment it
-   * publishes the outcome, and when that outcome expires a second or two
-   * later the card must not turn itself back over on its way to the corner.
+   * A card in the discard carries the face it left with, and no other.
+   *
+   * The pile is closed — `CardPiles` shows a back and nothing browsable — so
+   * this face is on screen for exactly one moment: the flight into the corner.
+   * The rule exists to keep a card that was revealed in a challenge from
+   * turning back over when the outcome expires a second or two later, while
+   * the card is still on its way. It must not do more than that: opening every
+   * discarded card told the court what a neighbour had thrown away when they
+   * exchanged their hand.
    */
   const discarded = new Set<CardId>(discardPile.map(d => d.id));
 
@@ -160,7 +168,7 @@ export function deriveCardZones(
   ): Face {
     const shown = scrutinised.get(id);
     if (shown) return { known: shown };
-    if (discarded.has(id)) return { known: faceIndex.get(id) ?? null };
+    if (discarded.has(id)) return { known: shownBefore[id] ?? null };
     if (opts.hidden) return { known: null };
     if (opts.open !== undefined && opts.open !== null) return { known: opts.open };
     if (opts.ownerId && opts.ownerId === viewerId) return { known: faceIndex.get(id) ?? null };
@@ -280,9 +288,10 @@ export function deriveCardZones(
     });
   }
 
-  /* 7. discard — the open graveyard, face-up for everyone, owned by nobody. */
+  /* 7. discard — the graveyard, owned by nobody. A card keeps the face it was
+     shown with on the way in, and stays face-down if it was never shown. */
   for (const d of discardPile) {
-    claim(d.id, { kind: 'discard' }, { known: faceOfInstance(d) }, null);
+    claim(d.id, { kind: 'discard' }, faceFor(d.id), null);
   }
 
   /* 8. deck — included so a draw has somewhere to fly from. Face-down for
