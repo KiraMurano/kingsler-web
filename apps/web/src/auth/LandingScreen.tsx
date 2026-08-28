@@ -11,6 +11,7 @@ import {
   type Account
 } from './AuthClient';
 import { useToast } from '../lib/toast';
+import { DEFAULT_RULES } from '@kinglier/engine/rules';
 import '../styles/screen.css';
 
 type LoginStatus = 'idle' | 'sending' | 'sent' | 'verifying';
@@ -29,7 +30,7 @@ const GAME_HIGHLIGHTS = [
   {
     art: '/assets/cards/heir.webp',
     title: 'Битва за корону',
-    text: 'Накопите шесть корон Благосклонности и удержите их целый круг, отражая атаки соперников.'
+    text: `Накопите ${DEFAULT_RULES.crownsToWin} корон Благосклонности и удержите их целый круг, отражая атаки соперников.`
   }
 ] as const;
 
@@ -127,7 +128,7 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
             Каждый ход вы разыгрываете карты в закрытую и можете назвать себя кем угодно — коварным
             шантажистом, благородным рыцарем или королевским казначеем. Если вам поверят, действие
             сработает. Если поймают на лжи — придётся платить за дерзость. Плетите интриги, проверяйте
-            блеф соперников и удержите шесть корон, чтобы короновать себя королём.
+            блеф соперников и удержите {DEFAULT_RULES.crownsToWin} корон, чтобы короновать себя королём.
           </p>
 
           <div className="landing-hero-block__actions">

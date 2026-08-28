@@ -1,0 +1,233 @@
+/**
+ * Экран правил партии.
+ *
+ * Ползунков здесь три десятка, и главная задача разметки — чтобы их можно было
+ * пробегать глазами, а не читать. Поэтому строка правила устроена как строка
+ * таблицы: слева название, справа значение крупной цифрой, ползунок под ними
+ * во всю ширину. Подпись мелкая и только там, где правило неочевидно.
+ */
+
+.ruleseditor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.rulesec {
+  border: 1px solid var(--line-cold);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.rulesec__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--gold-pale);
+}
+
+.rulesec > .rulesec__title {
+  padding: 11px 14px 0;
+}
+
+.rulesec__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+}
+
+/* Заголовок-кнопка свёрнутой секции: название, счётчик карт, знак раскрытия. */
+.rulesec__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.rulesec__toggle:hover .rulesec__title {
+  color: var(--gold-bright);
+}
+
+.rulesec__chev {
+  margin-left: auto;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.rulerow {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rulerow--off {
+  opacity: 0.45;
+}
+
+.rulerow__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.rulerow__label {
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+
+.rulerow__value {
+  margin-left: auto;
+  min-width: 1.6em;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--gold-bright);
+}
+
+.rulerow__hint {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+}
+
+/* У тумблера значение не цифра, а сам переключатель — он и встаёт в правый край. */
+.rulerow--toggle .rulerow__head {
+  align-items: center;
+}
+
+.rulerow__range {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.rulerow__range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-mid);
+}
+
+.rulerow__range::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-mid);
+}
+
+.rulerow__range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+  background: var(--gold-bright);
+  box-shadow: var(--shadow-sm);
+}
+
+.rulerow__range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+  background: var(--gold-bright);
+  box-shadow: var(--shadow-sm);
+}
+
+.rulerow__range:disabled {
+  cursor: default;
+}
+
+.switch {
+  margin-left: auto;
+  width: 38px;
+  height: 21px;
+  padding: 2px;
+  border: 1px solid var(--line-mid);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: background var(--dur-fade) var(--ease-out), border-color var(--dur-fade) var(--ease-out);
+}
+
+.switch--on {
+  border-color: var(--gold);
+  background: rgba(197, 160, 78, 0.32);
+}
+
+.switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.switch__knob {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: transform var(--dur-fade) var(--ease-out), background var(--dur-fade) var(--ease-out);
+}
+
+.switch--on .switch__knob {
+  transform: translateX(17px);
+  background: var(--gold-bright);
+}
+
+.rulenote {
+  padding: 8px 10px;
+  border-left: 2px solid var(--line-mid);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.deckgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.deckgroup + .deckgroup {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-cold);
+}
+
+.deckgroup__title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Причина, по которой нельзя начать, — не гашёная кнопка, а текст: иначе
+   игрок гадает, какой из тридцати ползунков он сломал. */
+.ruleproblems {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--crimson);
+  border-radius: var(--radius);
+  background: rgba(120, 30, 30, 0.16);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--crimson-soft);
+}

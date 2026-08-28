@@ -6,16 +6,19 @@ import { onlineClient } from './online/OnlineGameClient';
 import { LandingScreen } from './auth/LandingScreen';
 import { consumeTokenFromUrl, fetchMe, logout, type Account } from './auth/AuthClient';
 import { CardBackdrop } from './components/CardBackdrop';
+import { RulesScreen } from './rules/RulesScreen';
+import type { GameRules } from '@kinglier/engine/rules';
 import { ProfileDialog } from './components/ProfileDialog';
 import { Button } from './components/ui/Button';
 import './styles/screen.css';
 
-type Mode = 'menu' | 'offline' | 'online-lobby' | 'online-game';
+type Mode = 'menu' | 'offline-rules' | 'offline' | 'online-lobby' | 'online-game';
 
 export default function Root() {
   const [account, setAccount] = useState<Account | null | 'loading'>('loading');
   const [profileOpen, setProfileOpen] = useState(false);
   const [autoJoinRoomId, setAutoJoinRoomId] = useState<string | null>(null);
+  const [offlineRules, setOfflineRules] = useState<GameRules | null>(null);
   const [mode, setMode] = useState<Mode>(
     () => (new URLSearchParams(location.search).has('room') ? 'online-lobby' : 'menu')
   );
@@ -83,7 +86,7 @@ export default function Root() {
                 size="lg"
                 block
                 sub="Быстрая партия против королевского двора ботов"
-                onClick={() => setMode('offline')}
+                onClick={() => setMode('offline-rules')}
               >
                 <Swords size={18} /> Играть с ботами
               </Button>
@@ -109,8 +112,21 @@ export default function Root() {
             />
           )}
         </div>
+      ) : mode === 'offline-rules' ? (
+        <RulesScreen
+          onBack={() => setMode('menu')}
+          onStart={rules => {
+            setOfflineRules(rules);
+            setMode('offline');
+          }}
+        />
       ) : mode === 'offline' ? (
-        <App mode="offline" account={account} onExit={exitToMenu} />
+        <App
+          mode="offline"
+          account={account}
+          onExit={exitToMenu}
+          offlineRules={offlineRules ?? undefined}
+        />
       ) : mode === 'online-lobby' ? (
         <Lobby
           onGameStarted={() => setMode('online-game')}

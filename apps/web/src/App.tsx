@@ -4,6 +4,7 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import { startBotEngine, stopBotEngine } from '@kinglier/engine/Bot';
 import { timerManager } from '@kinglier/engine/utils/timerManager';
+import type { GameRules } from '@kinglier/engine/rules';
 import { TopBar } from './components/TopBar';
 import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
@@ -42,11 +43,14 @@ import type { Account } from './auth/AuthClient';
 export default function App({
   mode,
   account,
-  onExit
+  onExit,
+  offlineRules
 }: {
   mode: 'offline' | 'online';
   account: Account;
   onExit: () => void;
+  /** Правила партии с ботами, выбранные на экране перед стартом. */
+  offlineRules?: GameRules;
 }) {
   const {
     players,
@@ -144,7 +148,10 @@ export default function App({
       setPendingTarget;
     if (mode !== 'offline') return;
     startBotEngine();
-    startGame([{ id: 'p1', name: account.nickname, avatar: account.avatar, title: account.title }]);
+    startGame(
+      [{ id: 'p1', name: account.nickname, avatar: account.avatar, title: account.title }],
+      offlineRules
+    );
     return () => {
       stopBotEngine();
       timerManager.clearAll();
