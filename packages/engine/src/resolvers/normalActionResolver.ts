@@ -6,7 +6,7 @@ import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS, EXCHANGE_DRAW_MS } from '../timing';
 import { genOf } from '../utils/russianText';
-import { loseCrowns } from './crownLoss';
+import { burnCharterOnRumor, loseCrowns } from './crownLoss';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -39,6 +39,9 @@ export function executeNormalAction(
       // сначала кладутся туда, а после вызова перечитываются обратно.
       set({ players: newPlayers });
       const result = loseCrowns(get, set, action.targetId, 1, 'распущенных слухов');
+      if (result.kind === 'blocked_by_charter') {
+        burnCharterOnRumor(get, set, action.targetId);
+      }
       newPlayers = [...get().players];
       if (result.kind === 'lost') {
         const victim = newPlayers.find(p => p.id === action.targetId);

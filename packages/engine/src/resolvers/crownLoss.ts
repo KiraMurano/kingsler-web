@@ -7,7 +7,7 @@
  * поэтому механическая часть потери живёт здесь, а флейворную строку в
  * историю по-прежнему пишет вызывающий: он один знает, чем именно бьёт.
  */
-import type { GameState } from '../types';
+import type { CardInstance, GameState } from '../types';
 import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { fallenCoronationPatch } from './coronation';
@@ -79,4 +79,44 @@ export function loseCrowns(
   get()._disruptPlayerPlotsOnLoss(victimId, reason);
 
   return { kind: 'lost', amount: lost };
+}
+
+/**
+ * «Распустить слух» против держателя «Охранной грамоты»: корону слух не
+ * забирает (её удержала грамота), но саму грамоту сжигает.
+ *
+ * Это единственная контрмера, доступная каждому за 5 🪙, и то, что не даёт
+ * грамоте стать неснимаемой крепостью: иначе её брали бы только два
+ * «Обыска покоев» на всю колоду.
+ *
+ * @returns была ли грамота сожжена.
+ */
+export function burnCharterOnRumor(
+  get: StateGetter,
+  set: StateSetter,
+  victimId: string
+): boolean {
+  const { players } = get();
+  const idx = players.findIndex(p => p.id === victimId);
+  if (idx === -1) return false;
+
+  const victim = players[idx];
+  const plot = victim.activePlot;
+  if (plot?.type !== 'Охранная грамота') return false;
+
+  const burned: CardInstance = { id: plot.cardId, card: 'Охранная грамота' };
+  const newPlayers = [...players];
+  newPlayers[idx] = { ...victim, activePlot: null };
+
+  set(state => ({
+    players: newPlayers,
+    discardPile: [...state.discardPile, burned],
+    history: [
+      `📜 Слухи подточили «Охранную грамоту» ${genOf(victim)}: корона цела, но грамота сгорела.`,
+      ...state.history
+    ].slice(0, 50)
+  }));
+  triggerResourceFloat(set, victimId, '📜 Грамота сгорела', false);
+
+  return true;
 }

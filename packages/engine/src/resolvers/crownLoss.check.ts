@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import type { CardInstance, GameState, Player } from '../types.ts';
-import { loseCrowns } from './crownLoss.ts';
+import { burnCharterOnRumor, loseCrowns } from './crownLoss.ts';
 import { disruptPlayerPlotsOnLoss } from './plotResolver.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
@@ -209,6 +209,41 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   assert.equal(stolen, 0, 'красть нечего — грамота удержала корону');
   assert.equal(api.players[0].favor, 1, 'атакующий не получил чужой короны');
   assert.equal(api.players[1].favor, 4, 'жертва не потеряла корону');
+}
+
+// --- 12. Слух сжигает грамоту, но короны не забирает ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 4,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
+    })
+  ]);
+  const result = loseCrowns(get, set, 'p1', 1, 'распущенных слухов');
+  assert.deepEqual(result, { kind: 'blocked_by_charter' });
+
+  const burned = burnCharterOnRumor(get, set, 'p1');
+  assert.equal(burned, true, 'слух сжигает грамоту');
+  assert.equal(api.players[0].favor, 4, 'корона осталась при владельце');
+  assert.equal(api.players[0].activePlot, null, 'грамота больше не лежит');
+  assert.equal(api.discardPile.length, 1, 'грамота ушла в сброс');
+  assert.equal(api.discardPile[0].id, 'c1', 'в сброс ушёл тот же экземпляр');
+  assert.equal(api.discardPile[0].card, 'Охранная грамота');
+}
+
+// --- 13. Слух не трогает Стражу покоев ---
+{
+  const { api, get, set } = makeHarness([
+    player({
+      id: 'p1',
+      favor: 4,
+      activePlot: { id: 'x', cardId: 'c1', type: 'Стража покоев' }
+    })
+  ]);
+  const burned = burnCharterOnRumor(get, set, 'p1');
+  assert.equal(burned, false, 'слух жжёт только грамоту');
+  assert.ok(api.players[0].activePlot, 'Стража осталась на месте');
 }
 
 console.log('crownLoss.check: ok');
