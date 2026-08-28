@@ -11,7 +11,7 @@
  */
 
 // 1. Конфигурация архетипов
-export { BOT_ARCHETYPES, getBotArchetype } from './botsConfig';
+export { getBotArchetype } from './botsConfig';
 
 // 2. Память ботов и учет карт
 export { botMemory, BotMemoryEngine, type KnownCardRecord } from './bot/botMemory';

@@ -9,7 +9,7 @@
  * Run: npx tsx packages/engine/src/utils/russianText.check.ts
  */
 import assert from 'node:assert/strict';
-import { accOf, declineAcc, declineGen, genOf } from './russianText.ts';
+import { accOf, declineAcc, declineGen, genOf, verbCaught, verbDoubted } from './russianText.ts';
 
 assert.equal(declineAcc('Вы'), 'вас');
 assert.equal(declineGen('Вы'), 'вас');
@@ -33,5 +33,23 @@ assert.equal(accOf({ name: 'Барон Дима', isBot: true }), 'Барона 
 assert.equal(accOf({ name: 'Мурена', isBot: false }), 'Мурена');
 assert.equal(genOf({ name: 'Графиня Елена', isBot: true }), 'Графини Елены');
 assert.equal(genOf({ name: 'Мурена', isBot: false }), 'Мурена');
+
+// Род выбирается по списку женских имён, а не по окончанию строки: полное
+// имя «Барон Дима» кончается на «а», и раньше в хронике выходило «Барон Дима
+// усомнилась». Проверяем весь двор — восемь имён, три из них женские.
+assert.equal(verbDoubted('Барон Дима'), 'усомнился');
+assert.equal(verbCaught('Барон Дима'), 'поймал');
+assert.equal(verbDoubted('Герцог Виктор'), 'усомнился');
+assert.equal(verbDoubted('Маркиз Вадим'), 'усомнился');
+assert.equal(verbDoubted('Аббат Тихон'), 'усомнился');
+assert.equal(verbDoubted('Кондотьер Ратмир'), 'усомнился');
+assert.equal(verbDoubted('Графиня Елена'), 'усомнилась');
+assert.equal(verbCaught('Графиня Елена'), 'поймала');
+assert.equal(verbDoubted('Княгиня Анна'), 'усомнилась');
+assert.equal(verbDoubted('Боярыня Ждана'), 'усомнилась');
+assert.equal(verbCaught('Боярыня Ждана'), 'поймала');
+
+// Ник живого игрока — латиница, под правило не попадает.
+assert.equal(verbDoubted('Kira Murano'), 'усомнился');
 
 console.log('russianText.check: ok');

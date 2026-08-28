@@ -20,15 +20,42 @@ assert.ok(states.length > 0, 'starting a game must broadcast at least one state'
 const afterStart = states[states.length - 1];
 assert.equal(afterStart.players.length, 4);
 assert.equal(afterStart.players.filter(p => !p.isBot).length, 2);
-assert.equal(afterStart.activePlayerId, 'p1');
-assert.equal(afterStart.players[0].avatar, '/avatars/yulia.webp');
-assert.equal(afterStart.players[0].title, 'Провокатор');
+
+// Рассадка перемешана, поэтому место ищется по id, а не по индексу.
+const anya = afterStart.players.find(p => p.id === 'p1');
+assert.ok(anya, 'p1 must be seated');
+assert.equal(anya.avatar, '/avatars/yulia.webp');
+assert.equal(anya.title, 'Провокатор');
+
+// Партия открывается жребием: ходит его победитель, и до конца броска стол
+// закрыт — воркер обязан отбивать действия, а не пропускать их под монетку.
+assert.ok(afterStart.openingToss, 'a started game must be under its opening toss');
+assert.equal(afterStart.activePlayerId, afterStart.openingToss.winnerId);
+
+const countUnderToss = states.length;
+worker.call('performAction', [{
+  type: 'normal',
+  name: 'Просить содержание',
+  actorId: afterStart.activePlayerId,
+  costGold: 0,
+  costTokens: 1,
+  description: 'ход из-под летящей монетки'
+}]);
+await new Promise(resolve => setTimeout(resolve, 300));
+assert.equal(states.length, countUnderToss, 'the worker must swallow actions while the toss is in the air');
+
+// Экран жребия снимается готовностью, а не временем: отмечаются оба живых.
+worker.call('markReady', ['p1']);
+worker.call('markReady', ['p2']);
+await new Promise(resolve => setTimeout(resolve, 300));
+const settled = states[states.length - 1];
+assert.equal(settled.openingToss, null, 'both humans ready must lift the toss screen');
 
 const countBeforeAction = states.length;
 worker.call('performAction', [{
   type: 'normal',
   name: 'Просить содержание',
-  actorId: 'p1',
+  actorId: settled.activePlayerId,
   costGold: 0,
   costTokens: 1,
   description: 'test'

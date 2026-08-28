@@ -31,8 +31,13 @@ function bot(id: string, hand: GameCard[]): Player {
 useGameStore.getState().startGame();
 
 const humanId = useGameStore.getState().players.find(p => !p.isBot)!.id;
+// Стол теперь открывается жребием и достаётся случайному месту. Здесь
+// проверяется окно между заявкой и её применением, а не жребий, — поэтому
+// монетка снимается, а ход отдаётся человеку явно.
 useGameStore.setState({
-  players: useGameStore.getState().players.map(p => (p.id === humanId ? { ...p, gold: 5 } : p))
+  players: useGameStore.getState().players.map(p => (p.id === humanId ? { ...p, gold: 5 } : p)),
+  openingToss: null,
+  activePlayerId: humanId
 });
 
 useGameStore.getState().performAction({
@@ -71,7 +76,8 @@ useGameStore.setState({
     ...useGameStore.getState().players.filter(p => !p.isBot).map(p => ({ ...p, hand: mintDeck(['Наследник', 'Шут']), favor: 0 })),
     bot('b1', ['Казначей', 'Рыцарь'])
   ],
-  activePlayerId: 'p1'
+  activePlayerId: 'p1',
+  openingToss: null
 });
 
 useGameStore.getState().performAction({

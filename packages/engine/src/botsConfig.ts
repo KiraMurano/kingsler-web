@@ -6,6 +6,21 @@ export interface BotCandidate {
   archetype: BotArchetype;
 }
 
+/**
+ * Двор ботов: восемь персонажей на восемь портретов в `/avatars`.
+ *
+ * `startGame` перемешивает этот список и сажает столько первых, сколько мест
+ * осталось после живых игроков, — поэтому состав двора меняется от партии к
+ * партии, а не только имена на чипах.
+ *
+ * Аватар бота может совпасть с аватаром живого игрока: пул портретов у нас
+ * один, и у двух живых игроков они точно так же могут совпасть.
+ *
+ * Тип характера (`type`) переиспользует пять существующих веток поведения — их
+ * читают `botEvaluator`, `botReactions` и `botTurnPlanner`. Два бота одного
+ * типа расходятся числами, а не новой веткой в ядре: осторожный Тихон бьёт
+ * только по лидеру, осторожная Елена почти не выбирает цель вовсе.
+ */
 export const ALL_BOT_CANDIDATES: BotCandidate[] = [
   {
     name: 'Барон Дима',
@@ -76,30 +91,73 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
       greed: 0.9,
       targetAggression: 0.85
     }
+  },
+  {
+    name: 'Аббат Тихон',
+    avatar: '/avatars/anton.webp',
+    archetype: {
+      type: 'cautious',
+      title: 'Серый кардинал',
+      description: 'Почти не блефует и почти не спорит. Бьет молча и только по лидеру.',
+      bluffRate: 0.10,
+      doubtAggression: 0.55,
+      blockBluffRate: 0.14,
+      greed: 0.25,
+      targetAggression: 0.95
+    }
+  },
+  {
+    name: 'Боярыня Ждана',
+    avatar: '/avatars/yulia.webp',
+    archetype: {
+      type: 'gambler',
+      title: 'Мастер интриг',
+      description: 'Блефует чаще, чем говорит правду, и хватается за любое золото.',
+      bluffRate: 0.60,
+      doubtAggression: 1.35,
+      blockBluffRate: 0.62,
+      greed: 0.85,
+      targetAggression: 0.55
+    }
+  },
+  {
+    name: 'Кондотьер Ратмир',
+    avatar: '/avatars/dima.webp',
+    archetype: {
+      type: 'provocateur',
+      title: 'Дерзкий дуэлянт',
+      description: 'Охотно принимает вызов и почти никогда не отступает от барьера.',
+      bluffRate: 0.42,
+      doubtAggression: 1.30,
+      blockBluffRate: 0.66,
+      greed: 0.40,
+      targetAggression: 0.70
+    }
   }
 ];
 
-export const BOT_ARCHETYPES: Record<string, BotArchetype> = {
-  b1: ALL_BOT_CANDIDATES[0].archetype,
-  b2: ALL_BOT_CANDIDATES[1].archetype,
-  b3: ALL_BOT_CANDIDATES[2].archetype,
-  b4: ALL_BOT_CANDIDATES[3].archetype,
-  b5: ALL_BOT_CANDIDATES[4].archetype
+/** Тот, чей архетип потерялся: ровная середина по всем шкалам. */
+const DEFAULT_ARCHETYPE: BotArchetype = {
+  type: 'pragmatic',
+  title: 'Придворный',
+  description: 'Обычный придворный.',
+  bluffRate: 0.35,
+  doubtAggression: 1.0,
+  blockBluffRate: 0.35,
+  greed: 0.5,
+  targetAggression: 0.6
 };
 
-export function getBotArchetype(botOrId: Player | string): BotArchetype {
-  if (typeof botOrId !== 'string' && botOrId.archetype) {
-    return botOrId.archetype;
-  }
-  const id = typeof botOrId === 'string' ? botOrId : botOrId.id;
-  return BOT_ARCHETYPES[id] || {
-    type: 'pragmatic',
-    title: 'Придворный',
-    description: 'Обычный придворный.',
-    bluffRate: 0.35,
-    doubtAggression: 1.0,
-    blockBluffRate: 0.35,
-    greed: 0.5,
-    targetAggression: 0.6
-  };
+/**
+ * Характер бота берётся с него самого.
+ *
+ * Раньше сюда можно было передать голый id, и все вызовы в `bot/*` так и
+ * делали: `getBotArchetype(bot.id)`. Id раздаются по позиции (`b1`, `b2`, …),
+ * а карта id → архетип была построена по порядку `ALL_BOT_CANDIDATES` — то
+ * есть за столом всегда думали первые три характера списка, под чужими
+ * именами. Перебор кандидатов работал, но виден был только в именах.
+ * Поэтому здесь теперь принимается игрок, а не строка.
+ */
+export function getBotArchetype(bot: Player): BotArchetype {
+  return bot.archetype ?? DEFAULT_ARCHETYPE;
 }

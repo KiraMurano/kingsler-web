@@ -26,7 +26,7 @@ export function evaluateBotDoubt(
     return { shouldDoubt: false, score: 0, reason: 'Нет жетонов действия' };
   }
 
-  const archetype = getBotArchetype(bot.id);
+  const archetype = getBotArchetype(bot);
 
   // 1. Точный подсчет исключенных копий карты:
   // - В сбросе

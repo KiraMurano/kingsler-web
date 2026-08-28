@@ -1037,3 +1037,266 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   СТАРТОВЫЙ ЖРЕБИЙ
+   ========================================================================== */
+
+/* Поверх диалогов: пока идёт жребий, за столом не происходит ничего,
+   что имело бы право его перекрыть. */
+.toss {
+  z-index: var(--z-toast);
+  display: grid;
+  place-items: center;
+}
+
+.toss__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+
+/* Квадрат постоянного размера. Имя встаёт поверх монетки, а не под ней —
+   иначе его высота толкала бы монетку вверх ровно в момент приземления. */
+.toss__stage {
+  position: relative;
+  width: 300px;
+  height: 220px;
+  display: grid;
+  place-items: center;
+  /* Перспектива живёт на сцене, а не на самой монете: на элементе, который
+     сам крутится, она поворачивалась бы вместе с ним и грань уходила бы в
+     плоскость экрана без всякого объёма. */
+  perspective: 900px;
+}
+
+/* Порядок наложения задан явно: имя читается поверх монетки, а не наоборот.
+   Оба узла позиционированы, и полагаться тут на порядок в разметке — значит
+   поставить читаемость главной надписи в зависимость от того, кто из них
+   окажется ниже по JSX. */
+.toss__coinbox {
+  position: absolute;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* Внешний узел только летит. Свет даётся `box-shadow`, а не `filter`:
+   `filter` — группирующее свойство и схлопнул бы трёхмерный контекст внутри,
+   после чего `backface-visibility` перестаёт прятать изнанку и вместо короны
+   показывается та же монета вверх ногами. */
+.toss__coin {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.65), 0 0 34px 6px rgba(200, 160, 74, 0.28);
+}
+
+/* Внутренний узел только крутится — и держит объём. */
+.toss__coin-spin {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.toss__face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Корона — обратная грань: развёрнута заранее, чтобы при повороте монеты
+   встать к зрителю лицом, а не зеркально. */
+.toss__face--crown {
+  transform: rotateX(180deg);
+}
+
+.toss__verdict {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.toss__eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.toss__who {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px 10px 10px;
+  border: 1px solid var(--line-mid);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-md);
+}
+
+.toss__portrait {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  flex-shrink: 0;
+}
+
+.toss__portrait .portrait__img,
+.readymark__portrait .portrait__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.toss__line {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.toss__name {
+  color: var(--gold-pale);
+  font-weight: 700;
+}
+
+/* ---- Готовность ---- */
+
+.toss__ready {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.toss__seats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.readymark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 10px;
+  border: 1px solid var(--line-cold);
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color var(--dur-fade) var(--ease-out),
+    background var(--dur-fade) var(--ease-out),
+    opacity var(--dur-fade) var(--ease-out);
+}
+
+/* Своя строка — единственная кликабельная, и это видно до наведения. */
+.readymark--mine:not(.readymark--on) {
+  cursor: pointer;
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.readymark--mine:not(.readymark--on):hover {
+  border-color: var(--gold);
+  background: var(--ink-600);
+}
+
+/* Чужая неотмеченная строка приглушена: это состояние, а не кнопка. */
+.readymark:disabled:not(.readymark--on) {
+  opacity: 0.62;
+}
+
+.readymark--on {
+  border-color: rgba(91, 154, 134, 0.5);
+  background: rgba(91, 154, 134, 0.1);
+}
+
+.readymark__box {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-mid);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  color: var(--ink-900);
+  transition:
+    background var(--dur-fade) var(--ease-out),
+    border-color var(--dur-fade) var(--ease-out);
+}
+
+.readymark--on .readymark__box {
+  background: var(--sage-soft);
+  border-color: var(--sage-soft);
+}
+
+.readymark__portrait {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--line-cold);
+  flex-shrink: 0;
+}
+
+.readymark__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.readymark__name {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.readymark__state {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.readymark--on .readymark__state {
+  color: var(--sage-soft);
+}
+
+@media (max-width: 560px) {
+  .toss__stage {
+    width: 100%;
+    height: 190px;
+  }
+
+  .toss__coin {
+    width: 96px;
+    height: 96px;
+  }
+
+  .toss__line {
+    font-size: 1rem;
+    white-space: normal;
+  }
+}

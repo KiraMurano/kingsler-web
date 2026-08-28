@@ -12,6 +12,7 @@ const port = parentPort;
 // (the underscore-prefixed methods, addSealsToPlayer) are never reachable
 // here even if a malicious message claims that method name.
 const ALLOWED_METHODS = new Set([
+  'markReady',
   'performAction', 'skipNormalActionPhase', 'endTurnManually', 'playPlotAction',
   'playInstant', 'doubtAction', 'passDoubt',
   'targetAcceptAttack', 'targetDoubtAttack', 'targetDeclareDuel',
@@ -41,6 +42,11 @@ port.on('message', (msg: WorkerMessage) => {
       break;
     case 'call': {
       if (!msg.method || !ALLOWED_METHODS.has(msg.method)) return;
+      // Пока держится экран жребия, стол закрыт для всех — кроме «Готов»,
+      // которым его и снимают. Это единственная воронка, через которую в
+      // движок попадают действия игроков, поэтому заслонка стоит одна на все
+      // методы, а не по одной в каждом.
+      if (useGameStore.getState().openingToss && msg.method !== 'markReady') return;
       const state = useGameStore.getState() as unknown as Record<string, (...args: unknown[]) => void>;
       state[msg.method](...(msg.args ?? []));
       break;
@@ -50,6 +56,9 @@ port.on('message', (msg: WorkerMessage) => {
       useGameStore.setState(state => ({
         players: state.players.map(p => (p.id === msg.playerId ? { ...p, isBot: true } : p))
       }));
+      // Ушедший не может нажать «Готов», а его место теперь ведёт бот —
+      // держать из-за него экран жребия больше некому.
+      useGameStore.getState()._settleOpeningToss();
       break;
     default:
       break;

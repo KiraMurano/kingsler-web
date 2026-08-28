@@ -60,6 +60,9 @@ function checkAndScheduleBotMove(): void {
   const state = useGameStore.getState();
   if (
     state.turnPhase === 'IDLE' &&
+    // Бот, выигравший жребий, обязан дождаться конца броска: иначе он
+    // успевает сходить, пока игрок ещё смотрит на монетку.
+    !state.openingToss &&
     !state.pendingAction &&
     !state.revealOutcome &&
     !state.duelOutcome &&
@@ -73,6 +76,7 @@ function checkAndScheduleBotMove(): void {
           const curState = useGameStore.getState();
           if (
             curState.turnPhase === 'IDLE' &&
+            !curState.openingToss &&
             !curState.pendingAction &&
             !curState.revealOutcome &&
             !curState.duelOutcome &&

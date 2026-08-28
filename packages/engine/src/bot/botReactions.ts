@@ -100,7 +100,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
 
   const blockingRole: Role = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
   const hasCard = holds(target.hand, blockingRole);
-  const archetype = getBotArchetype(target.id);
+  const archetype = getBotArchetype(target);
   const shieldId = (hasCard ? idOf(target.hand, blockingRole) : null) ?? target.hand[0]?.id;
 
   const doubtEval = evaluateBotDoubt(
@@ -164,7 +164,7 @@ export function handleDuelAttackerPhase(state: GameState, schedule: BotScheduler
   const defender = state.players.find(p => p.id === pendingAction.targetId);
   if (!attacker || !attacker.isBot || !defender) return;
 
-  const archetype = getBotArchetype(attacker.id);
+  const archetype = getBotArchetype(attacker);
   const wasTruth = holds(attacker.hand, pendingAction.roleClaim!);
 
   let willAccept = false;

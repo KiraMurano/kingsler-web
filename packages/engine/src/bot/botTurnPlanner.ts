@@ -37,7 +37,7 @@ export function makeBotMove(botId: string): void {
   const opponents = state.players.filter(p => p.id !== bot.id);
   if (opponents.length === 0) return;
 
-  const archetype = getBotArchetype(bot.id);
+  const archetype = getBotArchetype(bot);
   const leader = [...opponents].sort((a, b) => b.favor - a.favor)[0];
 
   // ==========================================================================

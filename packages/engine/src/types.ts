@@ -126,6 +126,25 @@ export interface FloatingResourceEvent {
   isGain: boolean;
 }
 
+/**
+ * Жребий на старте партии: кто ходит первым и кто уже готов начать.
+ *
+ * Живёт в состоянии, а не на клиенте, чтобы онлайн-стол видел один и тот же
+ * бросок и одни и те же галочки — состояние целиком уезжает игрокам,
+ * отдельного сетевого сообщения для этого не нужно.
+ *
+ * Экран жребия держится не по таймеру, а до готовности: партия начинается,
+ * когда каждый живой игрок отметился. `landsAt` — только про анимацию: это
+ * абсолютный timestamp приземления монетки (как `vetoDeadlineAt`), чтобы
+ * подключившийся в середине досмотрел остаток полёта, а не крутил круг заново.
+ */
+export interface OpeningTossData {
+  winnerId: string;
+  landsAt: number;
+  /** Кто нажал «Готов». Боты в счёт не идут — они готовы всегда. */
+  readyIds: string[];
+}
+
 export interface ConspiracyPromptData {
   playerId: string;
   charges: number;
@@ -147,6 +166,8 @@ export interface GameState {
   timerMaxSeconds: number;
   isTimerPaused: boolean;
   coronationCandidateId: string | null;
+  /** Не `null`, пока идёт стартовый жребий: стол под оверлеем и ходов не принимает. */
+  openingToss: OpeningTossData | null;
   /** Player whose turn it was when the circle started; win is checked at their next turn start. */
   coronationOriginId: string | null;
   
@@ -185,6 +206,8 @@ export interface GameState {
 
   // Action methods
   startGame: (seats?: { id: string; name: string; avatar?: string; title?: string }[]) => void;
+  /** «Готов» на экране жребия. Когда отметились все живые — партия начинается. */
+  markReady: (playerId: string) => void;
   performAction: (action: Omit<Action, 'id'>) => void;
   skipNormalActionPhase: () => void;
   endTurnManually: () => void;
@@ -222,4 +245,6 @@ export interface GameState {
   _checkEndgameAndAdvanceTurn: () => void;
   _disruptPlayerPlotsOnLoss: (playerId: string, reason: string) => void;
   _drawCardForPlayerWithInformantCheck: (playerIndex: number) => CardInstance;
+  /** Снимает экран жребия, если готовы все живые игроки. */
+  _settleOpeningToss: () => void;
 }

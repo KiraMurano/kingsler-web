@@ -16,6 +16,7 @@ import { ActionBar } from './components/ActionBar';
 import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
+import { OpeningToss } from './components/OpeningToss';
 import { CardDetailModal } from './components/CardDetailModal';
 import { BluffDialog } from './components/BluffDialog';
 import { CourtActionsDialog } from './components/CourtActionsDialog';
@@ -648,6 +649,11 @@ export default function App({
         showRules={rulesOpen}
         onCloseRules={() => setRulesOpen(false)}
       />
+
+      {/* Сам решает, показываться ли: пока в состоянии нет жребия — ничего не
+          рисует. Лежит порталом в body, так что место в разметке роли не
+          играет. */}
+      <OpeningToss />
 
       {mode === 'online' && connectionStatus !== 'connected' && (
         <div className="reconnect-overlay">

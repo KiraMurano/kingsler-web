@@ -4,6 +4,7 @@ import type { GameState } from '@kinglier/engine/types';
 import type { PublicGameState } from '@kinglier/engine/net/redaction';
 
 const NETWORKED_METHODS = [
+  'markReady',
   'performAction', 'skipNormalActionPhase', 'endTurnManually', 'playPlotAction',
   'playInstant', 'doubtAction', 'passDoubt',
   'targetAcceptAttack', 'targetDoubtAttack', 'targetDeclareDuel',

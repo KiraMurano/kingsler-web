@@ -12,10 +12,10 @@ import {
   TOTAL_DECK_SIZE
 } from './cards';
 import { botMemory, clearBotTimer } from './Bot';
-import { ALL_BOT_CANDIDATES, BOT_ARCHETYPES, getBotArchetype, type BotCandidate } from './botsConfig';
+import { ALL_BOT_CANDIDATES, getBotArchetype, type BotCandidate } from './botsConfig';
 import { accOf, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
-import { ACTION_HOLD_MS } from './timing';
+import { ACTION_HOLD_MS, TOSS_SPIN_MS } from './timing';
 import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
@@ -48,8 +48,9 @@ import {
 import { playInstant } from './resolvers/instantResolver';
 import { checkEndgameAndAdvanceTurn, endTurn } from './resolvers/turnResolver';
 
-export { ALL_BOT_CANDIDATES, BOT_ARCHETYPES, getBotArchetype };
+export { ALL_BOT_CANDIDATES, getBotArchetype };
 export type { BotCandidate };
+
 
 export const useGameStore = create<GameState>((set, get) => ({
   // State Properties
@@ -66,6 +67,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   coronationCandidateId: null,
   coronationOriginId: null,
+  openingToss: null,
   pendingAction: null,
   pendingDoubtDoubterId: null,
   pendingDoubtPassedIds: [],
@@ -110,13 +112,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     const botsNeeded = 4 - humanSeats.length;
     const selectedBots = shuffleArray([...ALL_BOT_CANDIDATES]).slice(0, botsNeeded);
 
-    const players: Player[] = [
-      ...humanSeats.map((seat, idx) => ({
+    /* Id ботов чеканятся здесь, до перемешивания стола: `b1` должен означать
+       бота, а не место. Место живёт в `seatNumber`, который ставится ниже. */
+    const seated: Omit<Player, 'seatNumber'>[] = [
+      ...humanSeats.map(seat => ({
         id: seat.id,
         name: seat.name,
         avatar: seat.avatar ?? '/avatars/anton.webp',
         title: seat.title,
-        seatNumber: idx + 1,
         isBot: false,
         gold: 2,
         favor: 0,
@@ -129,7 +132,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         id: `b${idx + 1}`,
         name: b.name,
         avatar: b.avatar,
-        seatNumber: humanSeats.length + idx + 1,
         isBot: true,
         archetype: b.archetype,
         gold: 2,
@@ -141,11 +143,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       }))
     ];
 
+    /* Одно перемешивание задаёт и рассадку, и порядок хода — и держит их
+       согласованными. Порядок хода — это порядок массива (`turnResolver`
+       берёт следующего по индексу), а видимая рассадка — `seatNumber`
+       относительно зрителя (`web/src/lib/seats.ts`). Круг за столом
+       по-прежнему идёт по часовой стрелке, просто неизвестно, кто где. */
+    const players: Player[] = shuffleArray(seated).map((p, idx) => ({
+      ...p,
+      seatNumber: idx + 1
+    }));
+
+    /* Жребий: первым ходит случайное место, а не хозяин комнаты. */
+    const firstPlayer = players[Math.floor(Math.random() * players.length)];
+
     set({
       players,
       deck,
       discardPile: [],
-      activePlayerId: players[0].id,
+      activePlayerId: firstPlayer.id,
+      openingToss: { winnerId: firstPlayer.id, landsAt: Date.now() + TOSS_SPIN_MS, readyIds: [] },
       turnPhase: 'IDLE',
       turnSubPhase: 'NORMAL_ACTION_PHASE',
       hasUsedNormalActionThisTurn: false,
@@ -171,8 +187,36 @@ export const useGameStore = create<GameState>((set, get) => ({
       floatingResourceEvents: [],
       winnerId: null,
       conspiracyPrompt: null,
-      history: [`👑 Новая партия началась! В колоде ${TOTAL_DECK_SIZE} карт (роли, интриги, инстанты). У каждого по 2 🪙, 2 карты и 2 ⚡ жетона действия.`]
+      history: [
+        `🪙 Жребий брошен: первым ходит ${firstPlayer.name}.`,
+        `👑 Новая партия началась! В колоде ${TOTAL_DECK_SIZE} карт (роли, интриги, инстанты). У каждого по 2 🪙, 2 карты и 2 ⚡ жетона действия.`
+      ]
     });
+  },
+
+  /**
+   * «Готов» на экране жребия.
+   *
+   * Экран снимается готовностью, а не таймером: партия начинается, когда её
+   * начали все, кто за столом живой. Боты в счёт не идут — им нечего нажимать;
+   * по той же причине место, отданное боту после дисконнекта, перестаёт
+   * держать стол (см. `_settleOpeningToss`).
+   */
+  markReady: (playerId: string) => {
+    const { openingToss, players } = get();
+    if (!openingToss || openingToss.readyIds.includes(playerId)) return;
+    const player = players.find(p => p.id === playerId);
+    if (!player || player.isBot) return;
+
+    set({ openingToss: { ...openingToss, readyIds: [...openingToss.readyIds, playerId] } });
+    get()._settleOpeningToss();
+  },
+
+  _settleOpeningToss: () => {
+    const { openingToss, players } = get();
+    if (!openingToss) return;
+    const waiting = players.filter(p => !p.isBot && !openingToss.readyIds.includes(p.id));
+    if (waiting.length === 0) set({ openingToss: null });
   },
 
   restartGame: () => {
@@ -235,7 +279,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --------------------------------------------------------------------------
 
   performAction: (actionData) => {
-    const { players, activePlayerId, turnPhase, pendingAction: alreadyPending } = get();
+    const { players, activePlayerId, turnPhase, pendingAction: alreadyPending, openingToss } = get();
+
+    /* Пока крутится жребий, стол ходов не принимает. Скрим оверлея ловит мышь
+       у себя, но онлайн-клиент может прислать действие и мимо него. */
+    if (openingToss) return;
 
     /*
      * Действие принадлежит тому, чей сейчас ход, — и никому больше.

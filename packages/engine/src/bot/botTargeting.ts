@@ -11,7 +11,7 @@ export function selectBestThiefTarget(bot: Player, opponents: Player[]): Player 
   const valid = opponents.filter(p => p.gold > 0);
   if (valid.length === 0) return null;
 
-  const archetype = getBotArchetype(bot.id);
+  const archetype = getBotArchetype(bot);
 
   valid.sort((a, b) => {
     // Базовый счет золота с учетом жадности архетипа
@@ -43,7 +43,7 @@ export function selectBestBlackmailerTarget(bot: Player, opponents: Player[]): P
   const valid = opponents.filter(p => p.favor > 0);
   if (valid.length === 0) return null;
 
-  const archetype = getBotArchetype(bot.id);
+  const archetype = getBotArchetype(bot);
 
   valid.sort((a, b) => {
     let scoreA = (a.favor * 3.0 * archetype.targetAggression) + (a.gold * 0.5);
@@ -136,7 +136,7 @@ export function shouldPlaySearchNow(
     plot.type === 'Сеть информаторов';
   if (weakPlot && target.favor < 4 && faces(bot.hand).some(isRole)) return false;
 
-  const arch = getBotArchetype(bot.id);
+  const arch = getBotArchetype(bot);
   let chance = 0.22 + arch.targetAggression * 0.28 - arch.bluffRate * 0.25;
   if (morningPlot) chance += 0.2;
   if (plot.type === 'Тайный заговор') chance += 0.12 + (plot.charges ?? 0) * 0.08;
@@ -197,7 +197,7 @@ export function shouldActivateConspiracyNow(
     if (canCrown && target.favor >= 3) return true;
     if (goldHit >= 3 && !hasAnyRole) return true;
     if (canCrown) {
-      const arch = getBotArchetype(bot.id);
+      const arch = getBotArchetype(bot);
       return rng() < 0.40 + arch.targetAggression * 0.25;
     }
     return false;
@@ -206,7 +206,7 @@ export function shouldActivateConspiracyNow(
   if (goldHit < charges) return false;
   if (hasAnyRole) return false;
   if (goldHit <= 1) return false;
-  const arch = getBotArchetype(bot.id);
+  const arch = getBotArchetype(bot);
   return rng() < 0.12 + arch.greed * 0.4;
 }
 
@@ -255,11 +255,11 @@ export function selectBestRedirectionTarget(
  */
 export function selectBestDossierTarget(bot: Player, opponents: Player[]): Player | null {
   if (opponents.length === 0) return null;
-  const archetype = getBotArchetype(bot.id);
+  const archetype = getBotArchetype(bot);
 
   const sorted = [...opponents].sort((a, b) => {
-    const archA = getBotArchetype(a.id);
-    const archB = getBotArchetype(b.id);
+    const archA = getBotArchetype(a);
+    const archB = getBotArchetype(b);
 
     // Чаще блефующие игроки (азартные, провокаторы) — отличная цель для Досье
     let scoreA = (a.favor * 2.0) + (archA.bluffRate * 4.0 * archetype.targetAggression);

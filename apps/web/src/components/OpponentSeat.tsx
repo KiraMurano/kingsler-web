@@ -4,6 +4,7 @@ import type { GameCard, Player } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import { courtly } from '../lib/text';
+import { doubtVote } from '../lib/doubtVote';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import { dur } from '../motion/tokens.ts';
 import { Bolts, Deltas, Res, Seals } from './ui/Res';
@@ -82,6 +83,18 @@ function useSeatSpeech(player: Player): string | null {
   return null;
 }
 
+/** Ответ игрока в окне сомнения — на всё время окна, а не на две секунды. */
+function useSeatDoubtVote(playerId: string) {
+  const { turnPhase, pendingAction, pendingDoubtPassedIds } = useGameStore(
+    useShallow(s => ({
+      turnPhase: s.turnPhase,
+      pendingAction: s.pendingAction,
+      pendingDoubtPassedIds: s.pendingDoubtPassedIds
+    }))
+  );
+  return doubtVote({ turnPhase, pendingAction, pendingDoubtPassedIds, playerId });
+}
+
 export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   player,
   side,
@@ -93,6 +106,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   const floatingResourceEvents = useGameStore(s => s.floatingResourceEvents);
 
   const speech = useSeatSpeech(player);
+  const vote = useSeatDoubtVote(player.id);
   const reduce = !!useReducedMotion();
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
 
@@ -125,6 +139,10 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
 
           <div className="seat__head">
             <div className="seat__toprow">
+              {/* Признак — `isBot`, а не «изначально бот»: за столом важно, кто
+                  думает машиной ПРЯМО СЕЙЧАС. Отвалившийся онлайн-игрок, чьё
+                  место перехватил ИИ, помечается так же. */}
+              {player.isBot && <span className="seat__botbadge">Бот</span>}
               <div className="seat__role">
                 {player.title ?? player.archetype?.title ?? 'Придворный'}
               </div>
@@ -135,6 +153,11 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             </div>
             <div className="seat__namerow">
               <span className="seat__name">{player.name}</span>
+              {vote && (
+                <span className={`votemark ${vote === 'passed' ? 'votemark--yes' : 'votemark--wait'}`}>
+                  {vote === 'passed' ? 'верю' : 'думает'}
+                </span>
+              )}
               {isTargetable && (
                 <span className="seat__role" style={{ color: 'var(--crimson-soft)' }}>
                   цель

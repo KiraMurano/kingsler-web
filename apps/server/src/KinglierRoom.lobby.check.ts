@@ -71,8 +71,13 @@ assert.ok(hostState, 'host must receive a state message once the game starts');
 assert.ok(guestState, 'guest must receive a state message once the game starts');
 assert.equal(hostState!.players.length, 4);
 assert.equal(hostState!.players.filter(p => !p.isBot).length, 2, 'exactly the 2 joined humans, rest are bots');
-assert.equal(hostState!.players[0].avatar, '/avatars/yulia.webp');
-assert.equal(hostState!.players[0].title, 'Оппортунист');
+
+// Место в лобби (`seats[0]`) — это очередь входа, а рассадка за столом
+// перемешана: игрок ищется по id, а не по индексу.
+const hostSeat = hostState!.players.find(p => p.id === 'p1');
+assert.ok(hostSeat, 'the host must be seated');
+assert.equal(hostSeat.avatar, '/avatars/yulia.webp');
+assert.equal(hostSeat.title, 'Оппортунист');
 
 guest.leave();
 await new Promise(resolve => setTimeout(resolve, 300));

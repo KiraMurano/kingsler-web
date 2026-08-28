@@ -52,7 +52,8 @@ useGameStore.setState({
     human('p3', ['Вор', 'Шут']),
     bot('b1', ['Казначей', 'Рыцарь'])
   ],
-  activePlayerId: 'p1'
+  activePlayerId: 'p1',
+  openingToss: null
 });
 
 useGameStore.getState().performAction({
@@ -107,7 +108,8 @@ assert.equal(
       { ...bot('b1', ['Казначей', 'Рыцарь']), actionTokens: 2 },
       { ...bot('b2', ['Наследник', 'Шут']), actionTokens: 2 }
     ],
-    activePlayerId: 'b1'
+    activePlayerId: 'b1',
+    openingToss: null
   });
 
   useGameStore.getState().performAction({
@@ -168,7 +170,8 @@ useGameStore.setState({
     human('p2', ['Казначей', 'Рыцарь']),
     human('p3', ['Право вето', 'Шут'])
   ],
-  activePlayerId: 'p1'
+  activePlayerId: 'p1',
+  openingToss: null
 });
 
 const vetoTestAction = {

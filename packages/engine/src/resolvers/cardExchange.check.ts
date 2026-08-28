@@ -43,7 +43,8 @@ useGameStore.setState({
   players: [seat('p1', ['Наследник', 'Шантажист']), seat('p2', ['Рыцарь', 'Казначей'], true)],
   deck,
   discardPile: [],
-  activePlayerId: 'p1'
+  activePlayerId: 'p1',
+  openingToss: null
 });
 
 const before = useGameStore.getState();

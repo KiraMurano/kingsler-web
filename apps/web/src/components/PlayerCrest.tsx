@@ -2,6 +2,8 @@ import React from 'react';
 import type { GameCard, Player } from '@kinglier/engine/types';
 import { DEFAULT_PROFILE_TITLE } from '@kinglier/engine/profile';
 import { useGameStore } from '@kinglier/engine/GameStore';
+import { useShallow } from 'zustand/react/shallow';
+import { doubtVote } from '../lib/doubtVote';
 import { Bolts, Deltas, Res, Seals, type DeltaEvent } from './ui/Res';
 import { UiIcon } from './ui/Icon';
 import { Portrait } from './Portrait';
@@ -39,8 +41,26 @@ interface PlayerCrestProps {
 }
 
 export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onInspectCard }) => {
-  const floatingResourceEvents = useGameStore(s => s.floatingResourceEvents);
+  const { floatingResourceEvents, turnPhase, pendingAction, pendingDoubtPassedIds } = useGameStore(
+    useShallow(s => ({
+      floatingResourceEvents: s.floatingResourceEvents,
+      turnPhase: s.turnPhase,
+      pendingAction: s.pendingAction,
+      pendingDoubtPassedIds: s.pendingDoubtPassedIds
+    }))
+  );
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
+  const vote = doubtVote({ turnPhase, pendingAction, pendingDoubtPassedIds, playerId: player.id });
+
+  /* В окне сомнения «ваш ход / ожидание» ничего не говорит: держит ход не
+     очередь, а неотвеченная проверка. */
+  const state = vote === 'passed'
+    ? 'вы поверили'
+    : vote === 'waiting'
+      ? 'ваш ответ ждут'
+      : isActive
+        ? 'ваш ход'
+        : 'ожидание';
 
   return (
     <aside className={`crest ${isActive ? 'crest--active' : ''}`}>
@@ -68,8 +88,17 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
           <div className="crest__namerow">
             <div className="crest__name">{player.name}</div>
           </div>
-          <div className={`crest__state ${isActive ? 'crest__state--mine' : ''}`}>
-            <CrossfadeText>{isActive ? 'ваш ход' : 'ожидание'}</CrossfadeText>
+          <div
+            className={[
+              'crest__state',
+              isActive && !vote ? 'crest__state--mine' : '',
+              vote === 'waiting' ? 'crest__state--asked' : '',
+              vote === 'passed' ? 'crest__state--mine' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <CrossfadeText>{state}</CrossfadeText>
           </div>
         </div>
       </div>

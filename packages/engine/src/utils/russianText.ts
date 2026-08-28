@@ -74,18 +74,31 @@ export function genOf(who: Named): string {
   return who.isBot ? declineGen(who.name) : who.name;
 }
 
+/**
+ * Женские имена за нашим столом.
+ *
+ * Род брался по окончанию всей строки, а строка — это полное имя с титулом.
+ * «Барон Дима» кончается на «а», и в хронике выходило «Барон Дима усомнилась»;
+ * приписки `name === 'Елена'` не спасали, потому что полное имя никогда не
+ * равно короткому. Имена ботов придуманы нами и конечны, поэтому род задаётся
+ * списком, а не угадывается.
+ *
+ * Ники живых игроков — латиница (см. NICKNAME_REGEX в profile.ts), под правило
+ * они не попадают и остаются в мужском роде, как и до этого.
+ */
+const FEMININE_NAMES = new Set(['Елена', 'Анна', 'Ждана']);
+
+function isFeminine(name: string): boolean {
+  const firstName = name.trim().split(' ').pop() ?? name;
+  return FEMININE_NAMES.has(firstName);
+}
+
 export function verbDoubted(name: string): string {
-  if (name === 'Елена' || name === 'Анна' || name.endsWith('а') || name.endsWith('я')) {
-    return 'усомнилась';
-  }
-  return 'усомнился';
+  return isFeminine(name) ? 'усомнилась' : 'усомнился';
 }
 
 export function verbCaught(name: string): string {
-  if (name === 'Елена' || name === 'Анна' || name.endsWith('а') || name.endsWith('я')) {
-    return 'поймала';
-  }
-  return 'поймал';
+  return isFeminine(name) ? 'поймала' : 'поймал';
 }
 
 export function shuffleArray<T>(array: T[]): T[] {
