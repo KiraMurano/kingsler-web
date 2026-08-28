@@ -15,7 +15,25 @@ import {
 export type BotScheduler = (timerKey: string, callback: () => void, delayMs: number) => void;
 
 /**
- * Реакция ботов в окне сомнения («НЕ ВЕРЮ!»).
+ * Разлёт ответов ботов в окне сомнения.
+ *
+ * Каждому боту добавляется свой шаг задержки поверх общей паузы: иначе трое
+ * отвечают в один кадр, и стол читается как одно движение вместо трёх решений.
+ */
+const DOUBT_STAGGER_MS = 260;
+
+/**
+ * Ответ ботов в окне сомнения: «Верю» или «Не верю».
+ *
+ * Каждый наблюдающий бот отвечает сам и своим таймером. Раньше отвечал только
+ * тот, кто решил усомниться, а остальные молчали: окно проматывалось само,
+ * если за столом не было второго живого наблюдателя, а если был — ботов
+ * переспрашивали заново прямо внутри `passDoubt`, уже после его клика. Два
+ * механизма на одно решение, и ни в одном боты не говорили «Верю» вслух.
+ *
+ * Бот без жетона действия проверить не может — для него «Верю» единственный
+ * законный ответ, но ответить он всё равно обязан: иначе окно ждёт того, кто
+ * никогда не ответит.
  */
 export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void {
   const { pendingAction, players, discardPile, coronationCandidateId } = state;
@@ -24,51 +42,40 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
 
-  const observingBots = players.filter(
-    p => p.isBot && p.id !== pendingAction.actorId && p.actionTokens >= 1
-  );
+  const observingBots = players.filter(p => p.isBot && p.id !== pendingAction.actorId);
 
-  let botWillDoubt = false;
+  observingBots.forEach((bot, idx) => {
+    const decision =
+      bot.actionTokens >= 1
+        ? evaluateBotDoubt(
+            bot,
+            actor,
+            pendingAction.roleClaim!,
+            false,
+            coronationCandidateId,
+            pendingAction.targetId,
+            discardPile,
+            players
+          )
+        : { shouldDoubt: false };
 
-  for (const bot of observingBots) {
-    const decision = evaluateBotDoubt(
-      bot,
-      actor,
-      pendingAction.roleClaim,
-      false,
-      coronationCandidateId,
-      pendingAction.targetId,
-      discardPile,
-      players
+    const delay =
+      BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS + idx * DOUBT_STAGGER_MS;
+
+    schedule(
+      `doubt_${bot.id}`,
+      () => {
+        const cur = useGameStore.getState();
+        /* Окно могло закрыться, пока бот думал: кто-то усомнился раньше, и
+           тогда отвечать уже не на что. Обе ветки это и так отбивают, но
+           лучше не звать их вовсе. */
+        if (cur.turnPhase !== 'DOUBT_WINDOW' || cur.pendingDoubtDoubterId) return;
+        if (decision.shouldDoubt) cur.doubtAction(bot.id);
+        else cur.passDoubt(bot.id);
+      },
+      delay
     );
-
-    if (decision.shouldDoubt) {
-      botWillDoubt = true;
-      const delay = BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS;
-      schedule('doubt', () => {
-        const curState = useGameStore.getState();
-        if (curState.turnPhase === 'DOUBT_WINDOW' && !curState.pendingDoubtDoubterId) {
-          curState.doubtAction(bot.id);
-        }
-      }, delay);
-      break;
-    }
-  }
-
-  // Auto-proceed only when every other seat is a bot (offline: the sole
-  // human just claimed something and all bots passed, so nobody is left to
-  // click "Верю"). With a second real human observer online, they must get
-  // to explicitly pass/doubt via the UI — auto-continuing here used to race
-  // ahead of their click, resolving the claim before they could react.
-  const hasOtherHumanObserver = players.some(p => !p.isBot && p.id !== pendingAction.actorId);
-  if (!botWillDoubt && !hasOtherHumanObserver) {
-    schedule('doubt', () => {
-      const curState = useGameStore.getState();
-      if (curState.turnPhase === 'DOUBT_WINDOW' && !curState.pendingDoubtDoubterId && curState.pendingAction) {
-        curState._proceedAfterDoubtPassed(curState.pendingAction);
-      }
-    }, ACTION_HOLD_MS);
-  }
+  });
 }
 
 /**

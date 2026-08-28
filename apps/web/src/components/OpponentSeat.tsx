@@ -4,11 +4,11 @@ import type { GameCard, Player } from '@kinglier/engine/types';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import { courtly } from '../lib/text';
-import { doubtVote } from '../lib/doubtVote';
+import { seatReaction } from '../lib/seatReaction';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import { dur } from '../motion/tokens.ts';
 import { Bolts, Deltas, Res, Seals } from './ui/Res';
-import { Portrait } from './Portrait';
+import { ReactionPortrait } from './ReactionPortrait';
 import { PlotSlot } from './PlotSlot';
 import { CrownsTrack } from './PlayerCrest';
 
@@ -84,15 +84,33 @@ function useSeatSpeech(player: Player): string | null {
 }
 
 /** Ответ игрока в окне сомнения — на всё время окна, а не на две секунды. */
-function useSeatDoubtVote(playerId: string) {
-  const { turnPhase, pendingAction, pendingDoubtPassedIds } = useGameStore(
-    useShallow(s => ({
-      turnPhase: s.turnPhase,
-      pendingAction: s.pendingAction,
-      pendingDoubtPassedIds: s.pendingDoubtPassedIds
-    }))
-  );
-  return doubtVote({ turnPhase, pendingAction, pendingDoubtPassedIds, playerId });
+function useSeatReaction(playerId: string) {
+  const {
+    turnPhase,
+    pendingAction,
+    pendingDoubtPassedIds,
+    pendingDoubtDoubterId,
+    pendingDoubtActionId,
+    revealOutcome
+  } = useGameStore(
+      useShallow(s => ({
+        turnPhase: s.turnPhase,
+        pendingAction: s.pendingAction,
+        pendingDoubtPassedIds: s.pendingDoubtPassedIds,
+        pendingDoubtDoubterId: s.pendingDoubtDoubterId,
+        pendingDoubtActionId: s.pendingDoubtActionId,
+        revealOutcome: s.revealOutcome
+      }))
+    );
+  return seatReaction({
+    turnPhase,
+    pendingAction,
+    pendingDoubtPassedIds,
+    pendingDoubtDoubterId,
+    pendingDoubtActionId,
+    revealOutcome,
+    playerId
+  });
 }
 
 export const OpponentSeat: React.FC<OpponentSeatProps> = ({
@@ -106,7 +124,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   const floatingResourceEvents = useGameStore(s => s.floatingResourceEvents);
 
   const speech = useSeatSpeech(player);
-  const vote = useSeatDoubtVote(player.id);
+  const reaction = useSeatReaction(player.id);
   const reduce = !!useReducedMotion();
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
 
@@ -139,10 +157,6 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
 
           <div className="seat__head">
             <div className="seat__toprow">
-              {/* Признак — `isBot`, а не «изначально бот»: за столом важно, кто
-                  думает машиной ПРЯМО СЕЙЧАС. Отвалившийся онлайн-игрок, чьё
-                  место перехватил ИИ, помечается так же. */}
-              {player.isBot && <span className="seat__botbadge">Бот</span>}
               <div className="seat__role">
                 {player.title ?? player.archetype?.title ?? 'Придворный'}
               </div>
@@ -152,12 +166,11 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
               </span>
             </div>
             <div className="seat__namerow">
+              {/* Признак — `isBot`, а не «изначально бот»: за столом важно, кто
+                  думает машиной ПРЯМО СЕЙЧАС. Отвалившийся онлайн-игрок, чьё
+                  место перехватил ИИ, помечается так же. */}
+              {player.isBot && <span className="seat__botbadge">Бот</span>}
               <span className="seat__name">{player.name}</span>
-              {vote && (
-                <span className={`votemark ${vote === 'passed' ? 'votemark--yes' : 'votemark--wait'}`}>
-                  {vote === 'passed' ? 'верю' : 'думает'}
-                </span>
-              )}
               {isTargetable && (
                 <span className="seat__role" style={{ color: 'var(--crimson-soft)' }}>
                   цель
@@ -167,7 +180,13 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           </div>
 
           <div className="seat__main">
-            <Portrait src={player.avatar} name={player.name} className="seat__portrait" />
+            <ReactionPortrait
+              src={player.avatar}
+              name={player.name}
+              className="seat__portrait"
+              reaction={reaction}
+              mirrored={side === 'right'}
+            />
 
             <div className="seat__body">
               <CrownsTrack favor={player.favor} compact events={deltas} />

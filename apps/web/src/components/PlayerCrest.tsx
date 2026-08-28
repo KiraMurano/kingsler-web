@@ -3,10 +3,10 @@ import type { GameCard, Player } from '@kinglier/engine/types';
 import { DEFAULT_PROFILE_TITLE } from '@kinglier/engine/profile';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
-import { doubtVote } from '../lib/doubtVote';
+import { seatReaction } from '../lib/seatReaction';
 import { Bolts, Deltas, Res, Seals, type DeltaEvent } from './ui/Res';
 import { UiIcon } from './ui/Icon';
-import { Portrait } from './Portrait';
+import { ReactionPortrait } from './ReactionPortrait';
 import { CrossfadeText } from './ui/CrossfadeText';
 import { AnimatedNumber } from './ui/AnimatedNumber';
 import { PlotSlot } from './PlotSlot';
@@ -41,26 +41,47 @@ interface PlayerCrestProps {
 }
 
 export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onInspectCard }) => {
-  const { floatingResourceEvents, turnPhase, pendingAction, pendingDoubtPassedIds } = useGameStore(
+  const {
+    floatingResourceEvents,
+    turnPhase,
+    pendingAction,
+    pendingDoubtPassedIds,
+    pendingDoubtDoubterId,
+    pendingDoubtActionId,
+    revealOutcome
+  } = useGameStore(
     useShallow(s => ({
       floatingResourceEvents: s.floatingResourceEvents,
       turnPhase: s.turnPhase,
       pendingAction: s.pendingAction,
-      pendingDoubtPassedIds: s.pendingDoubtPassedIds
+      pendingDoubtPassedIds: s.pendingDoubtPassedIds,
+      pendingDoubtDoubterId: s.pendingDoubtDoubterId,
+      pendingDoubtActionId: s.pendingDoubtActionId,
+      revealOutcome: s.revealOutcome
     }))
   );
   const deltas = floatingResourceEvents.filter(e => e.playerId === player.id);
-  const vote = doubtVote({ turnPhase, pendingAction, pendingDoubtPassedIds, playerId: player.id });
+  const reaction = seatReaction({
+    turnPhase,
+    pendingAction,
+    pendingDoubtPassedIds,
+    pendingDoubtDoubterId,
+    pendingDoubtActionId,
+    revealOutcome,
+    playerId: player.id
+  });
 
   /* В окне сомнения «ваш ход / ожидание» ничего не говорит: держит ход не
      очередь, а неотвеченная проверка. */
-  const state = vote === 'passed'
+  const state = reaction === 'believed'
     ? 'вы поверили'
-    : vote === 'waiting'
-      ? 'ваш ответ ждут'
-      : isActive
-        ? 'ваш ход'
-        : 'ожидание';
+    : reaction === 'doubted'
+      ? 'вы проверяете'
+      : reaction === 'thinking'
+        ? 'ваш ответ ждут'
+        : isActive
+          ? 'ваш ход'
+          : 'ожидание';
 
   return (
     <aside className={`crest ${isActive ? 'crest--active' : ''}`}>
@@ -76,7 +97,12 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
       </div>
 
       <div className="crest__head">
-        <Portrait src={player.avatar} name={player.name} className="crest__portrait" />
+        <ReactionPortrait
+          src={player.avatar}
+          name={player.name}
+          className="crest__portrait"
+          reaction={reaction}
+        />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="crest__toprow">
             <div className="crest__title">{player.title ?? DEFAULT_PROFILE_TITLE}</div>
@@ -91,9 +117,8 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
           <div
             className={[
               'crest__state',
-              isActive && !vote ? 'crest__state--mine' : '',
-              vote === 'waiting' ? 'crest__state--asked' : '',
-              vote === 'passed' ? 'crest__state--mine' : ''
+              (isActive && !reaction) || reaction === 'believed' ? 'crest__state--mine' : '',
+              reaction === 'thinking' || reaction === 'doubted' ? 'crest__state--asked' : ''
             ]
               .filter(Boolean)
               .join(' ')}

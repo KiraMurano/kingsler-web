@@ -92,7 +92,12 @@ useGameStore.getState().performAction({
 });
 assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW');
 
-useGameStore.getState().passDoubt('p1'); // no bot can doubt (0 tokens) -> proceeds to the veto window
+/* Отвечает наблюдатель, а не заявивший: опрос двора закрывается, когда
+   ответили все, кроме него. У бота ноль жетонов, проверить он не может —
+   значит, «Верю». */
+useGameStore.getState().passDoubt('p1'); // заявивший: отбивается, окно не двигается
+assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW', 'the claimant does not answer their own claim');
+useGameStore.getState().passDoubt('b1');
 assert.equal(
   useGameStore.getState().turnPhase,
   'VETO_WINDOW',

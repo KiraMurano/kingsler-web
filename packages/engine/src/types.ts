@@ -181,6 +181,15 @@ export interface GameState {
   pendingDoubtDoubterId: string | null;
   /** Ids of non-actor players who already clicked "Верю" in the current DOUBT_WINDOW — resolving requires every one of them, not just the first. */
   pendingDoubtPassedIds: string[];
+  /**
+   * Заявка, которую опрашивали. Опрос принадлежит ей, а не столу вообще.
+   *
+   * Без этого ответы доживали до следующего действия: `pendingDoubtPassedIds`
+   * гасится при ОТКРЫТИИ окна сомнения, а действие, которое окна не открывает
+   * (обычное, интрига, инстант), заставало прошлый список нетронутым — и стол
+   * показывал решения прошлого хода как свежие.
+   */
+  pendingDoubtActionId: string | null;
   hasUsedNormalActionThisTurn: boolean;
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;

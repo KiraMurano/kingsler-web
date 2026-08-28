@@ -11,7 +11,7 @@ import {
   drawCardsFromDeck,
   TOTAL_DECK_SIZE
 } from './cards';
-import { botMemory, clearBotTimer } from './Bot';
+import { botMemory, clearBotTimers } from './Bot';
 import { ALL_BOT_CANDIDATES, getBotArchetype, type BotCandidate } from './botsConfig';
 import { accOf, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
@@ -81,6 +81,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   pendingAction: null,
   pendingDoubtDoubterId: null,
   pendingDoubtPassedIds: [],
+  pendingDoubtActionId: null,
   vetoDeadlineAt: null,
 
   isVaBanqueActive: false,
@@ -190,6 +191,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       coronationOriginId: null,
       pendingAction: null,
       pendingDoubtPassedIds: [],
+      pendingDoubtActionId: null,
       vetoDeadlineAt: null,
       overlayInstant: null,
       isVaBanqueActive: false,
@@ -465,6 +467,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingAction: action,
       turnPhase: 'DOUBT_WINDOW',
       pendingDoubtPassedIds: [],
+      pendingDoubtActionId: action.id,
       timerSeconds: 0,
       timerMaxSeconds: 0
     });
@@ -519,6 +522,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       turnPhase: 'DOUBT_WINDOW',
       pendingDoubtPassedIds: [],
+      pendingDoubtActionId: pendingAction.id,
       timerSeconds: 0,
       timerMaxSeconds: 0
     });
@@ -552,12 +556,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --------------------------------------------------------------------------
 
   doubtAction: (doubterId) => {
-    clearBotTimer('doubt');
+    /* Проверка закрывает окно для всех — остальным отвечать больше не на что. */
+    clearBotTimers('doubt');
     doubtAction(get, set, doubterId);
   },
 
   passDoubt: (playerId) => {
-    clearBotTimer('doubt');
+    /* Здесь ничего не гасится намеренно: «Верю» — ответ за себя, а не за стол.
+       Снимать чужие таймеры значило бы лишать остальных права ответить. */
     passDoubt(get, set, playerId);
   },
 

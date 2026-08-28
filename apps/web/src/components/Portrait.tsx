@@ -6,9 +6,11 @@ interface PortraitProps {
   src: string;
   name: string;
   className?: string;
+  /** Накладки поверх лица — они обрезаются вместе с ним по кругу. */
+  children?: React.ReactNode;
 }
 
-export const Portrait: React.FC<PortraitProps> = ({ src, name, className = '' }) => (
+export const Portrait: React.FC<PortraitProps> = ({ src, name, className = '', children }) => (
   <div className={className}>
     <img
       className="portrait__img"
@@ -19,5 +21,6 @@ export const Portrait: React.FC<PortraitProps> = ({ src, name, className = '' })
         if (!img.src.endsWith(FALLBACK)) img.src = FALLBACK;
       }}
     />
+    {children}
   </div>
 );

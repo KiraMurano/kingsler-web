@@ -2,7 +2,7 @@ import type { Action, GameState, RevealOutcome } from '../types';
 import { isRole } from '../cards';
 import { byId, pluck } from '../cardInstance';
 import { accOf, verbCaught, verbDoubted } from '../utils/russianText';
-import { botMemory, evaluateBotDoubt } from '../Bot';
+import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing';
@@ -84,8 +84,6 @@ export function passDoubt(
     turnPhase,
     pendingAction,
     players,
-    discardPile,
-    coronationCandidateId,
     pendingDoubtPassedIds,
     pendingDoubtDoubterId
   } = get();
@@ -108,6 +106,11 @@ export function passDoubt(
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
 
+  /* Заявивший в опросе не участвует: сомневаются в НЁМ. Раньше его «Верю»
+     проходило и служило кнопкой «продолжить», из-за чего опрос двора мог
+     закрыться, не спросив никого. */
+  if (playerId === actor.id) return;
+
   const passer = players.find(p => p.id === playerId);
   if (!passer || pendingDoubtPassedIds.includes(playerId)) return;
 
@@ -120,35 +123,20 @@ export function passDoubt(
     }
   }));
 
-  // In online games with several real players, every non-actor human must
-  // pass before the court is considered settled — one "Верю" used to
-  // resolve the whole window for everyone else too.
-  const stillAwaitingHuman = players.some(
-    p => !p.isBot && p.id !== actor.id && !passedIds.includes(p.id)
-  );
-  if (stillAwaitingHuman) return;
+  /*
+   * Двор считается опрошенным, когда ответил КАЖДЫЙ, кроме заявившего, —
+   * и боты в том числе: они отвечают своими таймерами (см.
+   * `bot/botReactions.handleDoubtPhase`).
+   *
+   * Раньше ждали только живых, а ботов переспрашивали здесь же, синхронно,
+   * уже после чужого клика — и тогда бот мог усомниться «задним числом»,
+   * не сказав до этого ничего. Одно решение принималось в двух местах, и в
+   * обоих бот молчал, если верил.
+   */
+  const stillAwaiting = players.some(p => p.id !== actor.id && !passedIds.includes(p.id));
+  if (stillAwaiting) return;
 
-  // Check observing bots who have >= 1 Action Token
-  const bots = players.filter(p => p.isBot && p.id !== pendingAction.actorId && p.actionTokens >= 1);
-  const botDoubter = bots.find(b => {
-    const decision = evaluateBotDoubt(
-      b,
-      actor,
-      pendingAction.roleClaim!,
-      false,
-      coronationCandidateId,
-      pendingAction.targetId,
-      discardPile,
-      players
-    );
-    return decision.shouldDoubt;
-  });
-
-  if (botDoubter) {
-    get().doubtAction(botDoubter.id);
-  } else {
-    get()._proceedAfterDoubtPassed(pendingAction);
-  }
+  get()._proceedAfterDoubtPassed(pendingAction);
 }
 
 export function executeRevealOutcome(

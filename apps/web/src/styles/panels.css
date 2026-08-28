@@ -1266,3 +1266,110 @@
     font-size: 1rem;
   }
 }
+
+/* ==========================================================================
+   ОТВЕТ В ОКНЕ СОМНЕНИЯ — НА ЛИЦЕ
+   ========================================================================== */
+
+/* Подпись рядом с именем читается медленно и тонет в чипе, а решают тут за
+   секунды. Поэтому ответ живёт на портрете: думает — по краю ползёт дуга,
+   ответил — кольцо горит цветом ответа. Жест поверх уходит через пару секунд,
+   кольцо остаётся: жест это событие, ответ — состояние. */
+.rx {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* Кольцо снаружи портрета: тот обрезан по кругу, и всё, что внутри, обрежется
+   вместе с ним. */
+.rx__ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+
+/* Размышление: ОДНА серая дуга, медленная.
+   Две дуги читались как спиннер загрузки, а золото — как что-то уже
+   случившееся; думающий игрок не должен перетягивать взгляд с ответивших. */
+.rx__ring--thinking {
+  border-top-color: var(--text-muted);
+  animation: rx-spin 3.2s linear infinite;
+}
+
+.rx__ring--believed {
+  border-color: var(--sage-soft);
+  box-shadow: 0 0 0 1px rgba(91, 154, 134, 0.35), 0 0 18px -2px rgba(91, 154, 134, 0.75);
+}
+
+.rx__ring--doubted {
+  border-color: var(--crimson-soft);
+  box-shadow: 0 0 0 1px rgba(180, 64, 90, 0.4), 0 0 18px -2px rgba(224, 138, 156, 0.75);
+}
+
+@keyframes rx-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rx__ring--thinking {
+    animation: none;
+    border-color: var(--text-muted);
+  }
+}
+
+/* Заливка под жестом — внутри портрета, обрезается вместе с лицом.
+   Слабее, чем была: она висит всё действие, а не две секунды, и в полную силу
+   съедала бы лицо. */
+.rx__tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rx--believed .rx__tint {
+  background: rgba(91, 154, 134, 0.22);
+}
+
+.rx--doubted .rx__tint {
+  background: rgba(180, 64, 90, 0.22);
+}
+
+/* Жест выходит за край портрета — потому и живёт снаружи обрезки. */
+.rx__thumb {
+  position: absolute;
+  right: -14px;
+  bottom: -12px;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+  z-index: var(--z-float);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.75));
+}
+
+.rx__thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Рука на картинке входит в кадр снизу слева — жест направлен вправо, к столу
+   для тех, кто сидит слева и сверху. Правому его надо отзеркалить, иначе он
+   показывает от стола наружу. */
+.rx__thumb-img--mirror {
+  scale: -1 1;
+}
+
+/* Проверка — тот же жест вниз. */
+.rx__thumb-img--down {
+  scale: 1 -1;
+}
+
+.rx__thumb-img--down.rx__thumb-img--mirror {
+  scale: -1 -1;
+}

@@ -39,6 +39,19 @@ class BotTimerRegistry {
     }
   }
 
+  /**
+   * Гасит целое семейство таймеров.
+   *
+   * В окне сомнения у каждого бота свой ключ (`doubt_<id>`) — они отвечают
+   * независимо друг от друга. Значит, и снимать их приходится всем семейством:
+   * по одному ключу тут больше ничего не найдёшь.
+   */
+  public clearPrefix(prefix: string): void {
+    for (const key of [...this.timers.keys()]) {
+      if (key.startsWith(prefix)) this.clear(key);
+    }
+  }
+
   public clearAll(): void {
     for (const timeoutId of this.timers.values()) {
       clearTimeout(timeoutId);
@@ -158,7 +171,7 @@ export function startBotEngine(): void {
     // 2. ОКНО СОМНЕНИЯ (DOUBT_WINDOW): Наблюдающие боты оценивают блеф
     // ------------------------------------------------------------------------
     if (state.turnPhase === 'DOUBT_WINDOW' && state.turnPhase !== prevState?.turnPhase) {
-      botTimers.clear('doubt');
+      botTimers.clearPrefix('doubt');
       handleDoubtPhase(state, scheduler);
     }
 
@@ -204,6 +217,7 @@ export function stopBotEngine(): void {
   isEngineStarted = false;
 }
 
-export function clearBotTimer(timerKey: string): void {
-  botTimers.clear(timerKey);
+/** Снимает все таймеры семейства — см. `BotTimerRegistry.clearPrefix`. */
+export function clearBotTimers(prefix: string): void {
+  botTimers.clearPrefix(prefix);
 }

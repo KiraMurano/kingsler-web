@@ -445,30 +445,7 @@
   color: var(--gold-pale);
 }
 
-/* Ответ в окне сомнения. Пузырь с репликой «Верю.» гаснет через пару секунд,
-   а окно висит, пока не ответят все, — поэтому нужна стойкая отметка: по столу
-   должно быть видно, чей ответ держит ход. */
-.votemark {
-  flex-shrink: 0;
-  font-size: 0.58rem;
-  line-height: 1;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border-radius: 4px;
-  padding: 3px 5px;
-  border: 1px solid currentColor;
-}
-
-.votemark--yes {
-  color: var(--sage-soft);
-}
-
-.votemark--wait {
-  color: var(--text-muted);
-  opacity: 0.85;
-}
-
-/* Стоит перед титулом и не сжимается: имя и титул обрезаются многоточием,
+/* Стоит перед именем и не сжимается: имя и титул обрезаются многоточием,
    а «Бот» — это признак, который либо виден целиком, либо бесполезен. */
 .seat__botbadge {
   flex-shrink: 0;

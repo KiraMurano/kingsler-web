@@ -83,8 +83,21 @@ assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW', 'a repeated pass
 useGameStore.getState().passDoubt('p3');
 assert.equal(
   useGameStore.getState().turnPhase,
+  'DOUBT_WINDOW',
+  'бот тоже участник опроса: пока он не ответил, двор не опрошен'
+);
+
+/* Заявивший в опросе не участвует — его «Верю» ничего не двигает. */
+useGameStore.getState().passDoubt('p1');
+assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW', 'the claimant does not answer their own claim');
+
+/* В партии за бота это делает его собственный таймер (`handleDoubtPhase`);
+   здесь движок ботов не поднят, поэтому отвечаем за него руками. */
+useGameStore.getState().passDoubt('b1');
+assert.equal(
+  useGameStore.getState().turnPhase,
   'VETO_WINDOW',
-  'every non-actor human has now passed (bot has 0 tokens) — the check is settled and the veto window opens'
+  'everyone but the claimant has answered — the check is settled and the veto window opens'
 );
 
 /* --- Окно сомнения одноразовое: заявленную проверку уже не отменить. ---
