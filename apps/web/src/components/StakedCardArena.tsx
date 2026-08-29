@@ -22,6 +22,12 @@ import { dur } from '../motion/tokens.ts';
  * badge is absolutely positioned, so two of them at once would simply print
  * over each other.
  *
+ * Подвес включается классом, а не отменяется: `--pinned` вешает подпись под
+ * карту, `--solo` оставляет её стоять самой по себе. Обратный порядок —
+ * «висит по умолчанию, одиночная отменяет» — уже подводил: браузер принимал
+ * `left: auto`, но не `translate: none`, и одиночная подпись оставалась
+ * стянутой влево на половину своей ширины.
+ *
  * The anchors around it are deliberately *not* inside any `AnimatePresence`.
  * `CardLayer` measures anchors every frame; an anchor that lingered while
  * fading and drifting would drag the cards chasing it along with it.
@@ -33,7 +39,7 @@ const ClaimBadge: React.FC<{ text: string; solo?: boolean }> = ({ text, solo }) 
     <AnimatePresence mode="wait">
       <motion.span
         key={text}
-        className={solo ? 'claimbadge claimbadge--solo' : 'claimbadge'}
+        className={`claimbadge ${solo ? 'claimbadge--solo' : 'claimbadge--pinned'}`}
         initial={{ opacity: 0, y: rise }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -rise }}
