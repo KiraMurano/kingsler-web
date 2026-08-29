@@ -6,19 +6,21 @@ import { onlineClient } from './online/OnlineGameClient';
 import { LandingScreen } from './auth/LandingScreen';
 import { consumeTokenFromUrl, fetchMe, logout, type Account } from './auth/AuthClient';
 import { CardBackdrop } from './components/CardBackdrop';
-import { RulesScreen } from './rules/RulesScreen';
+import { RulesDialog } from './rules/RulesDialog';
 import type { GameRules } from '@kinglier/engine/rules';
 import { ProfileDialog } from './components/ProfileDialog';
 import { Button } from './components/ui/Button';
 import './styles/screen.css';
+import './styles/rules.css';
 
-type Mode = 'menu' | 'offline-rules' | 'offline' | 'online-lobby' | 'online-game';
+type Mode = 'menu' | 'offline' | 'online-lobby' | 'online-game';
 
 export default function Root() {
   const [account, setAccount] = useState<Account | null | 'loading'>('loading');
   const [profileOpen, setProfileOpen] = useState(false);
   const [autoJoinRoomId, setAutoJoinRoomId] = useState<string | null>(null);
   const [offlineRules, setOfflineRules] = useState<GameRules | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(
     () => (new URLSearchParams(location.search).has('room') ? 'online-lobby' : 'menu')
   );
@@ -86,7 +88,7 @@ export default function Root() {
                 size="lg"
                 block
                 sub="Быстрая партия против королевского двора ботов"
-                onClick={() => setMode('offline-rules')}
+                onClick={() => setRulesOpen(true)}
               >
                 <Swords size={18} /> Играть с ботами
               </Button>
@@ -111,15 +113,19 @@ export default function Root() {
               onLogout={handleLogout}
             />
           )}
+
+          {/* Настройки открываются поверх меню, а не уводят на свой экран:
+              это шаг перед партией, а не место, где живут тридцать ползунков. */}
+          <RulesDialog
+            open={rulesOpen}
+            onClose={() => setRulesOpen(false)}
+            onStart={rules => {
+              setOfflineRules(rules);
+              setRulesOpen(false);
+              setMode('offline');
+            }}
+          />
         </div>
-      ) : mode === 'offline-rules' ? (
-        <RulesScreen
-          onBack={() => setMode('menu')}
-          onStart={rules => {
-            setOfflineRules(rules);
-            setMode('offline');
-          }}
-        />
       ) : mode === 'offline' ? (
         <App
           mode="offline"

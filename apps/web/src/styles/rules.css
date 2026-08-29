@@ -231,3 +231,138 @@
   line-height: 1.4;
   color: var(--crimson-soft);
 }
+
+/* --- Модалка настроек: прокручивается только список правил ---------------- */
+
+/* Кнопки старта и загрузки обязаны оставаться на виду: иначе игрок,
+   докрутивший до состава колоды, теряет «Начать игру» из поля зрения. */
+.ruleswrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.ruleswrap__scroll {
+  overflow-y: auto;
+  max-height: min(52vh, 520px);
+  padding-right: 4px;
+  /* Нижняя строка на границе обрезается всегда — затухание превращает обрез в
+     обещание «дальше есть ещё» вместо сломанной вёрстки. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
+
+.ruleswrap__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-cold);
+}
+
+/* --- Сохранённые наборы --------------------------------------------------- */
+
+.presetlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.presetrow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.presetrow__pick {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-cold);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fade) var(--ease-out);
+}
+
+.presetrow__pick:hover {
+  border-color: var(--gold);
+}
+
+.presetrow__name {
+  font-size: 0.87rem;
+  color: var(--text-soft);
+}
+
+.presetrow__meta {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.presetrow__del {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--line-cold);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color var(--dur-fade) var(--ease-out), border-color var(--dur-fade) var(--ease-out);
+}
+
+.presetrow__del:hover {
+  color: var(--crimson-soft);
+  border-color: var(--crimson);
+}
+
+/* --- Сохранение набора ---------------------------------------------------- */
+
+.savepreset {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.savepreset__label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.savepreset__summary {
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.savepreset__done {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line-cold);
+  border-radius: var(--radius);
+  color: var(--sage-soft);
+  font-size: 0.88rem;
+}
+
+/* Две кнопки в подвале свода правил за столом: сохранить набор и закрыть. */
+.rules__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .rules__actions {
+    grid-template-columns: 1fr;
+  }
+}

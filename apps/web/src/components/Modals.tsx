@@ -6,6 +6,8 @@ import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/ty
 import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '@kinglier/engine/resolvers/plotResolver';
 import { courtly } from '../lib/text';
 import { pickViewer } from '../lib/viewer';
+import { Save } from 'lucide-react';
+import { SavePresetDialog } from '../rules/SavePresetDialog';
 import { Dialog } from './ui/Overlay';
 import { Button } from './ui/Button';
 import { Tag } from './ui/Tag';
@@ -165,6 +167,7 @@ interface ModalsProps {
 }
 
 export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
   const {
     players,
     viewerId,
@@ -310,8 +313,8 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
           <div>
             <h4>Колода и победа</h4>
             {rolesCount} карт ролей, {plotsCount} интриг и {instantsCount}{' '}
-            инстантов. Побеждает тот, кто первым удержит 6 <UiIcon kind="crown" size="xs" /> целый
-            круг. За выигранные споры начисляются печати: 2 <UiIcon kind="bulla" size="xs" />{' '}
+            инстантов. Побеждает тот, кто первым удержит {crownsToWin}{' '}
+            <UiIcon kind="crown" size="xs" /> целый круг. За выигранные споры начисляются печати: 2 <UiIcon kind="bulla" size="xs" />{' '}
             обращаются в 1 <UiIcon kind="crown" size="xs" />.
           </div>
 
@@ -373,9 +376,23 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
             </div>
           </div>
 
-          <Button tone="gold" block onClick={onCloseRules}>
-            Понятно
-          </Button>
+          {/* Сохранять баланс осмысленно отсюда: настройки уже опробованы за
+              столом. Загрузка живёт в настройках перед стартом — там она и
+              нужна. */}
+          <div className="rules__actions">
+            <Button tone="plain" block onClick={() => setSavePresetOpen(true)}>
+              <Save size={16} /> Сохранить настройки
+            </Button>
+            <Button tone="gold" block onClick={onCloseRules}>
+              Понятно
+            </Button>
+          </div>
+
+          <SavePresetDialog
+            open={savePresetOpen}
+            rules={rules}
+            onClose={() => setSavePresetOpen(false)}
+          />
         </div>
       </Dialog>
     );

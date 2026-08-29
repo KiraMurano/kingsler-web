@@ -39,6 +39,7 @@ import { CARD_DESCRIPTIONS, isInstant, isPlot } from '@kinglier/engine/data/card
 import type { CardMenuKind } from './lib/tableView.ts';
 import type { PendingTargetAction } from './components/targeting';
 import type { Account } from './auth/AuthClient';
+import './styles/rules.css';
 
 export default function App({
   mode,
