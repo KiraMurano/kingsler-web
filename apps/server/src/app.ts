@@ -4,6 +4,7 @@ import express from 'express';
 import { defineServer, defineRoom } from 'colyseus';
 import { KinglierRoom } from './KinglierRoom.ts';
 import { authRouter, meRouter } from './auth/routes.ts';
+import { cacheHeaders } from './staticCache.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '../../web/dist');
@@ -33,7 +34,7 @@ export function createServer() {
       app.use(express.json());
       app.use('/api/auth', authRouter);
       app.use(meRouter);
-      app.use(express.static(WEB_DIST));
+      app.use(express.static(WEB_DIST, { setHeaders: cacheHeaders }));
     }
   });
 }

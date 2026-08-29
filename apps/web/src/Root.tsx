@@ -6,6 +6,7 @@ import { onlineClient } from './online/OnlineGameClient';
 import { LandingScreen } from './auth/LandingScreen';
 import { consumeTokenFromUrl, fetchMe, logout, type Account } from './auth/AuthClient';
 import { CardBackdrop } from './components/CardBackdrop';
+import { preloadGameAssets } from './lib/preloadAssets';
 import { RulesDialog } from './rules/RulesDialog';
 import type { GameRules } from '@kinglier/engine/rules';
 import { ProfileDialog } from './components/ProfileDialog';
@@ -24,6 +25,19 @@ export default function Root() {
   const [mode, setMode] = useState<Mode>(
     () => (new URLSearchParams(location.search).has('room') ? 'online-lobby' : 'menu')
   );
+
+  /*
+   * Прогрев артов начинается вместе с приложением, а не с партией.
+   *
+   * Пока игрок читает лендинг, входит и ждёт сбора двора, восемь мегабайт
+   * картинок успевают лечь в кэш — и за столом карта появляется вместе с
+   * ходом, а не через мгновение после него. Отдельным эффектом, без зависимо-
+   * стей: прогрев не связан ни со входом, ни с комнатой, и повторять его на
+   * каждую их смену незачем.
+   */
+  useEffect(() => {
+    preloadGameAssets();
+  }, []);
 
   useEffect(() => {
     consumeTokenFromUrl();
