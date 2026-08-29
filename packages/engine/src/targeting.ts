@@ -14,7 +14,7 @@
  * повторно и нельзя выбрать самого атакующего), живут на месте вызова: они про
  * перенаправление, а не про роль.
  */
-import type { Player, Role } from './types';
+import type { InstantType, Player, Role } from './types';
 
 export function canBeTargetedBy(target: Player, roleClaim: Role): boolean {
   const plot = target.activePlot?.type;
@@ -27,5 +27,24 @@ export function canBeTargetedBy(target: Player, roleClaim: Role): boolean {
   if (roleClaim === 'Шантажист') {
     return target.favor > 0 && !isGuarded && plot !== 'Охранная грамота';
   }
+  return true;
+}
+
+/**
+ * Кого можно выбрать целью инстанта.
+ *
+ * То же правило, что и для ролей, и та же история: боты его знали
+ * (`selectBestSearchTarget` всегда отбирал только тех, у кого интрига есть), а
+ * интерфейс — нет, и движок не проверял вовсе. «Обыск покоев» уходил в никуда
+ * вместе с жетоном: резолвер честно писал в летопись «не сработал», но карта
+ * была уже сброшена.
+ *
+ * Здесь только те инстанты, у которых цель может оказаться пустой. Ограничения
+ * «Перенаправления» — нельзя выбрать самого нападающего и нельзя перевести на
+ * недопустимую роли цель — живут на месте вызова: они про перенаправление, а
+ * не про цель саму по себе.
+ */
+export function canBeTargetedByInstant(target: Player, instantType: InstantType): boolean {
+  if (instantType === 'Обыск покоев') return target.activePlot !== null;
   return true;
 }

@@ -16,6 +16,7 @@
  * просто останется на своём обычном пути — браузер возьмёт её тогда, когда она
  * понадобится, как и раньше.
  */
+import { useEffect, useRef, useState } from 'react';
 import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { PROFILE_AVATARS } from '@kinglier/engine/profile';
 
@@ -61,7 +62,8 @@ function warm(src: string): Promise<void> {
     }
     const img = new Image();
     /* И удача, и неудача заканчивают одинаково: прогрев — это ускорение, а не
-       условие работы, и падать ему не на чем. */
+       условие работы, и падать ему не на чем. Иначе одна отсутствующая
+       картинка держала бы экран загрузки навсегда. */
     const done = () => {
       warmed.add(src);
       resolve();
@@ -72,21 +74,104 @@ function warm(src: string): Promise<void> {
   });
 }
 
+/** Ход прогрева: сколько уже готово из скольких. */
+export interface PreloadProgress {
+  done: number;
+  total: number;
+  /** Доля от 0 до 1. Пустой список считается готовым, а не нулевым. */
+  ratio: number;
+  ready: boolean;
+}
+
 /**
- * Начинает прогрев и сразу возвращает управление.
+ * Начинает прогрев и сообщает о ходе.
  *
  * `extra` — то, чего нет в общих списках: например, аватар вошедшего игрока,
  * если он когда-нибудь станет своим файлом, а не выбором из готовых.
  */
-export function preloadGameAssets(extra: readonly string[] = []): void {
-  if (typeof window === 'undefined') return;
+export function preloadGameAssets(
+  extra: readonly string[] = [],
+  onProgress?: (progress: PreloadProgress) => void
+): void {
+  const list = typeof window === 'undefined' ? [] : assetList(extra);
+  const total = list.length;
+  let done = list.filter(src => warmed.has(src)).length;
 
-  const queue = assetList(extra).filter(src => !warmed.has(src));
+  const report = () =>
+    onProgress?.({
+      done,
+      total,
+      /* Делить на ноль нельзя, а «нечего грузить» — это готовность, а не
+         нулевой прогресс: экран загрузки на пустом списке не должен висеть. */
+      ratio: total === 0 ? 1 : done / total,
+      ready: done >= total
+    });
+
+  report();
+  if (done >= total) return;
+
+  const queue = list.filter(src => !warmed.has(src));
   let next = 0;
 
   const lane = async () => {
-    while (next < queue.length) await warm(queue[next++]);
+    while (next < queue.length) {
+      await warm(queue[next++]);
+      done++;
+      report();
+    }
   };
 
   for (let i = 0; i < LANES; i++) void lane();
+}
+
+/**
+ * Ход прогрева для интерфейса.
+ *
+ * Экран загрузки показывается НЕ всегда, и это два разных правила:
+ *
+ *  - `SHOW_AFTER_MS` — на прогретом кэше всё готово за десятки миллисекунд, и
+ *    экран, мелькнувший на два кадра, читается как сбой, а не как загрузка.
+ *    Поэтому сначала пауза: не успели — показываем.
+ *  - `MIN_SHOW_MS` — а уж если показали, держим достаточно, чтобы его успели
+ *    прочесть. Полоса, дошедшая до середины и исчезнувшая, выглядит хуже, чем
+ *    её отсутствие.
+ */
+const SHOW_AFTER_MS = 180;
+const MIN_SHOW_MS = 700;
+
+export function useAssetPreload(): { visible: boolean; ratio: number } {
+  const [progress, setProgress] = useState<PreloadProgress>({
+    done: 0,
+    total: 0,
+    ratio: 0,
+    ready: false
+  });
+  const [shown, setShown] = useState(false);
+  const [held, setHeld] = useState(false);
+
+  /* Готовность нужна таймеру ниже — тому, который решает, показывать ли экран
+     вообще. Он срабатывает один раз и в замыкании видел бы состояние на момент
+     монтирования, то есть всегда «не готово». */
+  const ready = useRef(false);
+
+  useEffect(() => {
+    preloadGameAssets([], next => {
+      ready.current = next.ready;
+      setProgress(next);
+    });
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      /* Успели за паузу — экран не нужен вовсе: на прогретом кэше он мелькнул
+         бы на два кадра и прочитался как сбой. */
+      if (ready.current) return;
+      setShown(true);
+      setHeld(true);
+      window.setTimeout(() => setHeld(false), MIN_SHOW_MS);
+    }, SHOW_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return { visible: shown && (!progress.ready || held), ratio: progress.ratio };
 }

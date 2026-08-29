@@ -5,7 +5,8 @@
  */
 import assert from 'node:assert/strict';
 import type { Player } from './types.ts';
-import { canBeTargetedBy } from './targeting.ts';
+import { canBeTargetedBy, canBeTargetedByInstant } from './targeting.ts';
+import { mintCard } from './cardInstance.ts';
 import { useGameStore } from './GameStore.ts';
 import { timerManager } from './utils/timerManager.ts';
 
@@ -153,6 +154,81 @@ function attack(actorId: string, victimId: string, roleClaim: 'Вор' | 'Шан
 {
   const { actorId, victimId } = seatTable({ gold: 3, favor: 3, activePlot: null });
   assert.equal(attack(actorId, victimId, 'Шантажист'), true, 'обычная цель атакуема');
+}
+
+// --- «Обыск покоев» не играется по игроку без интриги ---
+//
+// Он сбрасывает активную интригу цели, и против пустого места не делает
+// ничего: резолвер честно писал в летопись «не сработал», но карта к тому
+// моменту была уже сброшена, а жетон списан. Боты это правило знали всегда
+// (`selectBestSearchTarget` отбирает только тех, у кого интрига есть) — не
+// знали интерфейс и движок.
+{
+  assert.equal(
+    canBeTargetedByInstant(player({ id: 'p1', activePlot: null }), 'Обыск покоев'),
+    false,
+    'обыскивать нечего'
+  );
+  assert.equal(
+    canBeTargetedByInstant(player({ id: 'p1', activePlot: guard }), 'Обыск покоев'),
+    true,
+    'а вот лежащую интригу — есть'
+  );
+  /* Остальные целевые инстанты бьют по самому игроку, а не по его столу, и
+     пустой цели у них не бывает. */
+  for (const instant of ['Обвинение в измене', 'Дворцовый переполох', 'Перенаправление'] as const) {
+    assert.equal(
+      canBeTargetedByInstant(player({ id: 'p1', activePlot: null }), instant),
+      true,
+      `${instant} цель не перебирает`
+    );
+  }
+}
+
+// И движок отбивает такой ход, а не только прячет цель в интерфейсе: сюда же
+// приходят ходы по сети.
+{
+  const { actorId, victimId } = seatTable({ activePlot: null });
+  const handBefore = useGameStore.getState().players.find(p => p.id === actorId)!.hand.length;
+  const searchCard = mintCard('Обыск покоев');
+  useGameStore.setState({
+    players: useGameStore.getState().players.map(p =>
+      p.id === actorId ? { ...p, hand: [...p.hand, searchCard] } : p
+    )
+  });
+  const tokensBefore = useGameStore.getState().players.find(p => p.id === actorId)!.actionTokens;
+
+  useGameStore.getState().playInstant(actorId, 'Обыск покоев', searchCard.id, victimId);
+
+  const actor = useGameStore.getState().players.find(p => p.id === actorId)!;
+  assert.equal(actor.actionTokens, tokensBefore, 'жетон не списан');
+  assert.equal(
+    actor.hand.length,
+    handBefore + 1,
+    'карта осталась на руках: движок отверг ход, а не сжёг «Обыск покоев»'
+  );
+  timerManager.clearAll();
+}
+
+// А по игроку с интригой — играется как обычно.
+{
+  const { actorId, victimId } = seatTable({ activePlot: guard });
+  const searchCard = mintCard('Обыск покоев');
+  useGameStore.setState({
+    players: useGameStore.getState().players.map(p =>
+      p.id === actorId ? { ...p, hand: [...p.hand, searchCard] } : p
+    )
+  });
+  const tokensBefore = useGameStore.getState().players.find(p => p.id === actorId)!.actionTokens;
+
+  useGameStore.getState().playInstant(actorId, 'Обыск покоев', searchCard.id, victimId);
+
+  assert.equal(
+    useGameStore.getState().players.find(p => p.id === actorId)!.actionTokens,
+    tokensBefore - 1,
+    'обыск по живой интриге стоит жетона и проходит'
+  );
+  timerManager.clearAll();
 }
 
 timerManager.clearAll();

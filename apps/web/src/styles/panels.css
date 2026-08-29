@@ -1857,3 +1857,99 @@
     text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
   }
 }
+
+
+/* ==========================================================================
+   ЭКРАН ПРОГРЕВА — пока арты двора едут в кэш
+   ==========================================================================
+   Непрозрачный, а не полупрозрачный: за ним ещё нечего показывать, и просвет
+   выдал бы полусобранный интерфейс. Свой фон, а не общий скрим, — этот экран
+   стоит до всего остального, включая лендинг. */
+.preload {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(28, 22, 12, 0.95) 0%, rgba(6, 7, 11, 1) 70%),
+    var(--ink-900);
+}
+
+.preload__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(88vw, 380px);
+  text-align: center;
+}
+
+/* Имя игры отлито, а не набрано: тот же градиент, что у объявления начала
+   партии, — два экрана, на которых игра называет себя, должны выглядеть
+   родственно. */
+.preload__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 8vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  background: linear-gradient(
+    180deg,
+    #fdf3d8 0%,
+    var(--gold-bright) 38%,
+    var(--gold) 66%,
+    var(--gold-deep) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Тень отдельным слоем: на прозрачном тексте `text-shadow` рисуется поверх
+     заливки и съедает градиент. */
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 30px rgba(200, 160, 74, 0.4));
+}
+
+.preload__sub {
+  margin-bottom: 10px;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Дорожка и заполнение — два узла: заполнение масштабируется трансформой, а
+   трансформа на элементе с рамкой растянула бы и рамку. */
+.preload__bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.preload__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold), var(--gold-bright));
+  box-shadow: 0 0 14px -2px rgba(200, 160, 74, 0.9);
+}
+
+.preload__count {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--gold-pale);
+  /* Постоянная ширина: «7%» и «70%» разной ширины, и центрированное число
+     дёргалось бы на каждом проценте. */
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preload__title {
+    filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8));
+  }
+}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
-import { canBeTargetedBy } from '@kinglier/engine/targeting';
+import { canBeTargetedBy, canBeTargetedByInstant } from '@kinglier/engine/targeting';
 import { useShallow } from 'zustand/react/shallow';
 import { OpponentSeat } from './OpponentSeat';
 import { seatOpponents } from '../lib/seats';
@@ -52,6 +52,13 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
     if (pendingTargetAction.instantType === 'Перенаправление') {
       if (pendingAction?.actorId === player.id) return false;
       return !pendingAction?.roleClaim || canBeTargetedBy(player, pendingAction.roleClaim);
+    }
+
+    /* У инстанта своя проверка цели: «Обыск покоев» нечего играть по игроку без
+       интриги. Правило живёт в `targeting`, а не здесь, — движок и боты читают
+       то же самое, и разъехаться копиям негде. */
+    if (pendingTargetAction.instantType) {
+      return canBeTargetedByInstant(player, pendingTargetAction.instantType);
     }
 
     return !pendingTargetAction.roleClaim || canBeTargetedBy(player, pendingTargetAction.roleClaim);

@@ -7,7 +7,7 @@ import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { loseCrowns } from './crownLoss';
-import { canBeTargetedBy } from '../targeting';
+import { canBeTargetedBy, canBeTargetedByInstant } from '../targeting';
 import { vetoPlayed, vetoReset, vetoPollAnswered, vetoTopActorId } from './vetoChain';
 
 type StateGetter = () => GameState;
@@ -80,6 +80,19 @@ export function playInstant(
   if (instantType === 'Право вето' && pendingAction) {
     const { overlayInstant } = get();
     if (playerId === vetoTopActorId(pendingAction.actorId, overlayInstant)) return;
+  }
+
+  /*
+   * Целевой инстант не играется по пустой цели.
+   *
+   * «Обыск покоев» против игрока без интриги не делает ничего — резолвер ниже
+   * честно пишет в летопись «не сработал», — но карта к тому моменту уже
+   * сброшена, а жетон списан. Проверяем до списания: заставу ставим здесь, а
+   * не только в интерфейсе, потому что сюда же приходят ходы по сети.
+   */
+  if (targetPlayerId) {
+    const victim = players.find(p => p.id === targetPlayerId);
+    if (victim && !canBeTargetedByInstant(victim, instantType)) return;
   }
 
   /* Бесплатен только щит двора: «Право вето» отвечает на чужой ход и жетона
