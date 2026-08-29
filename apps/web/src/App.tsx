@@ -11,6 +11,7 @@ import { Arena } from './components/Arena';
 import { CardPiles } from './components/CardPiles';
 import { DuelClash } from './components/DuelClash';
 import { Hand } from './components/Hand';
+import { CardMenu } from './components/CardMenu';
 import { PlayerCrest } from './components/PlayerCrest';
 import { PhasePanel } from './components/PhasePanel';
 import { ActionBar } from './components/ActionBar';
@@ -142,6 +143,10 @@ export default function App({
      не знает и знать не должен, он получает готовое действие. */
   const [exchangePick, setExchangePick] = useState<CardId[] | null>(null);
   const [bluffCardId, setBluffCardId] = useState<CardId | null>(null);
+  /* Взведён ли «Ва-банк». Состояние интерфейса, а не партии: пока карта не
+     сыграна, в движке ничего не происходит. Снимается при каждом розыгрыше —
+     оставленный взведённым, он молча удвоил бы следующий ход. */
+  const [vaBanqueArmed, setVaBanqueArmed] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   useEffect(() => {
@@ -167,6 +172,12 @@ export default function App({
 
   const human = pickViewer(players, mode === 'online' ? viewerId : undefined);
   const isMyTurn = activePlayerId === human?.id && turnPhase === 'IDLE' && !pendingAction;
+
+  /* Взведённый «Ва-банк» не переживает свой ход. Оставленный включённым, он
+     молча удвоил бы следующий розыгрыш — а игрок про него уже забыл. */
+  useEffect(() => {
+    if (!isMyTurn) setVaBanqueArmed(false);
+  }, [isMyTurn]);
 
   /* Which hand slot each held card owns. The engine keeps `hand` compact, so
      the array index is not a slot: `reconcileSlots` remembers instead, and a
@@ -243,6 +254,7 @@ export default function App({
           isVetoed,
           vetoOnVeto: rules.vetoOnVeto,
           rules,
+          vaBanqueArmed,
           vetoDeadlineAt,
           coronationCandidateId,
           revealOutcome,
@@ -264,6 +276,7 @@ export default function App({
       hasPlayedPlotThisTurn,
       isVetoed,
       rules,
+      vaBanqueArmed,
       vetoDeadlineAt,
       coronationCandidateId,
       revealOutcome,
@@ -443,8 +456,10 @@ export default function App({
         name: card,
         roleClaim: card as Role,
         stakedCardId: cardId,
-        cost: info.cost
+        cost: info.cost,
+        withVaBanque: vaBanqueArmed
       });
+      setVaBanqueArmed(false);
       return;
     }
     performAction({
@@ -453,17 +468,34 @@ export default function App({
       roleClaim: card as Role,
       stakedCardId: cardId,
       actorId: human.id,
-      withVaBanque: false,
+      withVaBanque: vaBanqueArmed,
       costGold: info.cost,
       costTokens: 1,
       description: info.fullDescription
     });
+    setVaBanqueArmed(false);
   };
 
   const pickCardAction = (cardId: CardId, kind: CardMenuKind) => {
     if (!human) return;
-    const card = human.hand.find(held => held.id === cardId)?.card;
+
+    /* Переключатель, а не действие: меню остаётся открытым — игрок взводит
+       «Ва-банк» и тут же выбирает, чем именно играть. */
+    if (kind === 'vabanque') {
+      setVaBanqueArmed(v => !v);
+      return;
+    }
+
     setOpenMenuCardId(null);
+
+    /* Заряженный «Тайный заговор» лежит в слоте интриги, а не в руке: его
+       карты в `hand` нет, и искать её там бессмысленно. */
+    if (kind === 'conspiracy') {
+      openConspiracyDialog(false);
+      return;
+    }
+
+    const card = human.hand.find(held => held.id === cardId)?.card;
     if (!card) return;
 
     switch (kind) {
@@ -547,15 +579,34 @@ export default function App({
     }
   };
 
+  /* Карта, у которой есть меню, — это карта, по которой можно нажать. Кроме
+     руки такая ровно одна: заряженный «Тайный заговор» в своём слоте, и меню
+     ему выдаёт `deriveTableView` только когда удар действительно возможен. */
+  const hasMenu = (placed: PlacedCard) => !!view.menus[placed.id];
+  const ownPlotMenuCardId =
+    human.activePlot && view.menus[human.activePlot.cardId] ? human.activePlot.cardId : null;
+  const armedVaBanqueCardId = human.hand.find(c => c.card === 'Ва-банк')?.id ?? null;
+  const isOwnChargedPlot = (placed: PlacedCard) =>
+    placed.zone.kind === 'plot' && placed.zone.playerId === human.id && hasMenu(placed);
+
   const cardInteraction: CardInteraction = {
     onActivate: handleCardClick,
     onInspect: setInspectedCard,
     claimFor: claimedRoleFor,
-    isOwnHand: isOwnHandCard,
+    isOwnHand: placed => isOwnHandCard(placed) || isOwnChargedPlot(placed),
+    /* Взведённый «Ва-банк» поднимает свою карту, хотя нажимали на соседнюю:
+       иначе единственный признак того, что ход пойдёт с удвоением, — точка на
+       кнопке в меню, которое закроется сразу после выбора. */
     isSelected: placed =>
-      openMenuCardId === placed.id || !!exchangePick?.includes(placed.id),
+      openMenuCardId === placed.id ||
+      !!exchangePick?.includes(placed.id) ||
+      (vaBanqueArmed && placed.id === armedVaBanqueCardId),
     isPlayable: placed =>
-      isOwnHandCard(placed) && (isMyTurn || isTargetReaction || vetoReady(placed.face.known)),
+      isOwnChargedPlot(placed) ||
+      (isOwnHandCard(placed) && (isMyTurn || isTargetReaction || vetoReady(placed.face.known))),
+    /* Полностью заряженный Заговор подрагивает: он ждёт своего хода, и это
+       единственное, что на столе просит нажать на себя. */
+    isRestless: isOwnChargedPlot
   };
 
   return (
@@ -613,6 +664,20 @@ export default function App({
                 onPick={pickCardAction}
               />
 
+              {/* Меню лежащего заряженного Заговора. Живёт здесь, а не в
+                  `PlotSlot`: `CardMenu` рисуется порталом и берёт координаты из
+                  реестра якорей по зоне, так что тащить пропсы сквозь герб
+                  незачем. Меню есть только когда удар возможен — это решает
+                  `deriveTableView`. */}
+              {ownPlotMenuCardId && (
+                <CardMenu
+                  open={openMenuCardId === ownPlotMenuCardId}
+                  zone={{ kind: 'plot', playerId: human.id }}
+                  options={view.menus[ownPlotMenuCardId]}
+                  onPick={kind => pickCardAction(ownPlotMenuCardId, kind)}
+                />
+              )}
+
               <div className="sidecol">
                 <ActionBar view={view} onAct={runBarAction} />
                 <PhasePanel view={view} />
@@ -641,7 +706,14 @@ export default function App({
       />
 
       {bluffCardId && (
-        <BluffDialog stakedCardId={bluffCardId} onClose={() => setBluffCardId(null)} />
+        <BluffDialog
+          stakedCardId={bluffCardId}
+          armedVaBanque={vaBanqueArmed}
+          onClose={() => {
+            setBluffCardId(null);
+            setVaBanqueArmed(false);
+          }}
+        />
       )}
       {courtActionsOpen && (
         <CourtActionsDialog

@@ -52,6 +52,7 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     isVetoed: false,
     vetoOnVeto: false,
     rules: DEFAULT_RULES,
+    vaBanqueArmed: false,
     vetoDeadlineAt: null,
     coronationCandidateId: null,
     revealOutcome: null,
@@ -255,9 +256,15 @@ function action(over: Partial<Action> = {}): Action {
     }),
     'p1'
   );
-  for (const id of view.viewerHandIds) {
-    assert.deepEqual(view.menus[id].map(o => o.kind), ['bluff', 'inspect']);
-  }
+  /* Ни вето, ни Ва-банк не разыгрываются по номиналу в свой ход: первое ждёт
+     своего окна, второй — модификатор. Сблефовать ими можно обоими.
+
+     У «Права вето» при этом есть переключатель Ва-банка: блеф — это заявление
+     роли, и удвоить его законно. У самого Ва-банка переключателя нет — к себе
+     он не подключается. */
+  const [vetoId, vbId] = view.viewerHandIds;
+  assert.deepEqual(view.menus[vetoId].map(o => o.kind), ['vabanque', 'bluff', 'inspect']);
+  assert.deepEqual(view.menus[vbId].map(o => o.kind), ['bluff', 'inspect']);
 }
 
 // 9. Пустой стол. На первом кадре партии `players` ещё пуст — модель обязана
@@ -459,6 +466,94 @@ function action(over: Partial<Action> = {}): Action {
     'p1'
   );
   assert.equal(view.phase, 'veto', 'окно вето важнее и хода, и круга');
+}
+
+// ==========================================================================
+// Ва-банк как переключатель, а не карта для розыгрыша
+// ==========================================================================
+{
+  const me = player('p1', { hand: hand('Наследник', 'Ва-банк') });
+  const view = deriveTableView(input({ players: [me, player('p2'), player('p3')] }), 'p1');
+  const heirId = me.hand[0].id;
+  const vbId = me.hand[1].id;
+
+  /* Порядок зафиксирован: «Ва-банк» взводят ДО выбора, чем играть, поэтому он
+     стоит первым — перед «Разыграть» и «Блеф». */
+  assert.deepEqual(
+    view.menus[heirId].map(o => o.kind),
+    ['vabanque', 'play', 'bluff', 'inspect'],
+    'Ва-банк первым, дальше розыгрыш, блеф и осмотр'
+  );
+
+  const vbKinds = view.menus[vbId].map(o => o.kind);
+  assert.ok(!vbKinds.includes('play'), 'сам Ва-банк не разыгрывается — он модификатор');
+  assert.ok(!vbKinds.includes('vabanque'), 'и к самому себе не подключается');
+  assert.deepEqual(vbKinds, ['bluff', 'inspect'], 'у него только блеф и осмотр');
+}
+
+// Без Ва-банка в руке переключателя нет.
+{
+  const me = player('p1', { hand: hand('Наследник', 'Рыцарь') });
+  const view = deriveTableView(input({ players: [me, player('p2'), player('p3')] }), 'p1');
+  assert.ok(
+    !view.menus[me.hand[0].id].map(o => o.kind).includes('vabanque'),
+    'нечего подключать — нечего и показывать'
+  );
+}
+
+// Взведённое состояние доезжает до пункта и меняет картинку.
+{
+  const me = player('p1', { hand: hand('Наследник', 'Ва-банк') });
+  const players = [me, player('p2'), player('p3')];
+  const off = deriveTableView(input({ players }), 'p1');
+  const on = deriveTableView(input({ players, vaBanqueArmed: true }), 'p1');
+  const pick = (v: typeof off) => v.menus[me.hand[0].id].find(o => o.kind === 'vabanque');
+  assert.equal(off.menus[me.hand[0].id][0].kind, 'vabanque', 'переключатель стоит первым');
+  assert.equal(pick(off)!.tone, 'ember', 'и он оранжевый');
+  assert.equal(pick(off)!.active, false);
+  assert.equal(pick(on)!.active, true);
+  assert.ok(pick(off)!.toggle, 'это переключатель, а не действие');
+  assert.notEqual(off.id, on.id, 'взведённый Ва-банк обязан менять картинку');
+}
+
+// ==========================================================================
+// Заряженный Заговор играется нажатием на карту
+// ==========================================================================
+{
+  const full = { id: 'x', cardId: 'plot-1', type: 'Тайный заговор' as const, charges: 4 };
+  const me = player('p1', { activePlot: full });
+  const view = deriveTableView(input({ players: [me, player('p2'), player('p3')] }), 'p1');
+
+  assert.deepEqual(
+    view.menus['plot-1'].map(o => o.kind),
+    ['conspiracy', 'inspect'],
+    'у лежащего заряженного Заговора своё меню: разыграть и осмотреть'
+  );
+  assert.ok(
+    !view.bar.some(b => b.kind === 'conspiracy'),
+    'кнопки «Свершить заговор» в панели больше нет'
+  );
+}
+
+// На неполном заряде меню нет — бить нечем.
+for (const charges of [0, 1, 2, 3]) {
+  const me = player('p1', {
+    activePlot: { id: 'x', cardId: 'plot-1', type: 'Тайный заговор' as const, charges }
+  });
+  const view = deriveTableView(input({ players: [me, player('p2'), player('p3')] }), 'p1');
+  assert.equal(view.menus['plot-1'], undefined, `на ${charges} зарядах Заговор не разряжается`);
+}
+
+// В чужой ход — тоже нет.
+{
+  const me = player('p1', {
+    activePlot: { id: 'x', cardId: 'plot-1', type: 'Тайный заговор' as const, charges: 4 }
+  });
+  const view = deriveTableView(
+    input({ players: [me, player('p2'), player('p3')], activePlayerId: 'p2' }),
+    'p1'
+  );
+  assert.equal(view.menus['plot-1'], undefined, 'Заговор разряжается только в свой ход');
 }
 
 console.log('tableView.check: ok');

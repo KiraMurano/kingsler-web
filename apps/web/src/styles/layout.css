@@ -630,18 +630,6 @@
   object-fit: cover;
 }
 
-.plotcard__charge {
-  position: absolute;
-  right: 1px;
-  bottom: 1px;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: rgba(5, 7, 12, 0.9);
-  border: 1px solid var(--line-mid);
-  font-size: 0.56rem;
-  font-weight: 800;
-  color: var(--gold-pale);
-}
 
 /* Floating resource deltas.
    `fixed` и портал в `body`: координаты приходят инлайном из `Deltas`, а слой
@@ -716,36 +704,14 @@
   box-sizing: border-box;
 }
 
-/* Name, target and charge pip, laid over wherever the card has landed. */
+/* Подпись слота лежит НИЖЕ слоя карт, поэтому ничего не рисует: название
+   напечатано на арте, а заряды переехали на саму карту (`.chargetag`).
+   Осталась пустая коробка ради подсказки при наведении. */
 .feltplot__label {
   position: absolute;
   inset: 0;
   border-radius: 7px;
-  overflow: hidden;
   pointer-events: none;
-}
-
-.feltplot__name,
-.feltplot__owner {
-  position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
-  padding: 0 3px;
-  text-shadow: 0 1px 4px #000;
-}
-
-.feltplot__name {
-  bottom: 16px;
-  font-size: 0.58rem;
-  font-weight: 700;
-  color: var(--gold-pale);
-}
-
-.feltplot__owner {
-  bottom: 3px;
-  font-size: 0.52rem;
-  color: var(--text-muted);
 }
 
 /* Targeting banner */
@@ -1759,6 +1725,27 @@
   background: linear-gradient(180deg, rgba(30, 38, 54, 0.95) 0%, rgba(16, 21, 31, 0.96) 100%);
 }
 
+/* Оранжевый — только у «Ва-банка». Он единственный пункт меню, который не
+   действует, а взводит, и цвет у него не должен совпадать ни с розыгрышем
+   (спокойный), ни с блефом (красный). */
+.cardmenu__item--ember {
+  background: linear-gradient(180deg, rgba(62, 38, 14, 0.95) 0%, rgba(30, 19, 8, 0.96) 100%);
+  border-color: rgba(214, 128, 42, 0.55);
+  color: #f4c98a;
+}
+
+.cardmenu__item--ember:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(84, 50, 16, 0.95) 0%, rgba(40, 25, 10, 0.96) 100%);
+  border-color: #d6802a;
+  color: #ffe0b8;
+}
+
+.cardmenu__item--ember.is-on {
+  border-color: #f0952f;
+  box-shadow: 0 0 0 1px rgba(240, 149, 47, 0.45), 0 0 14px -3px rgba(240, 149, 47, 0.8);
+  color: #ffe9cd;
+}
+
 .cardmenu__item:hover:not(:disabled) {
   border-color: var(--gold);
 }
@@ -2128,6 +2115,23 @@
   color: rgba(199, 182, 239, 0.6);
 }
 
+/* Оранжевый. Заведён ради переключателя «Ва-банк»: он не действие, а
+   состояние следующего действия, и цветом не должен совпадать ни с
+   розыгрышем, ни с блефом. */
+.btn--ember {
+  border-color: rgba(214, 128, 42, 0.5);
+  background: rgba(214, 128, 42, 0.14);
+  color: #f4c98a;
+}
+
+.btn--ember:hover:not(:disabled) {
+  background: rgba(214, 128, 42, 0.24);
+}
+
+.btn--ember .btn__sub {
+  color: rgba(244, 201, 138, 0.6);
+}
+
 .btn--bare {
   border-color: transparent;
   background: transparent;
@@ -2243,5 +2247,32 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-above-cards);
+  pointer-events: none;
+}
+
+/* --- Заряды «Тайного заговора» ------------------------------------------- */
+
+/*
+ * Наклейка на самой карте, а не подпись под слотом: слой карт рисуется выше
+ * слота, и всё, что нарисовано под ним, за картой и пряталось.
+ *
+ * Красная с белым текстом: это единственное число на столе, которое говорит
+ * «сейчас рванёт», и читаться оно должно раньше самого арта.
+ */
+.chargetag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--crimson);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: #fff;
   pointer-events: none;
 }

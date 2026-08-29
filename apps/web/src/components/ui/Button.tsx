@@ -1,6 +1,15 @@
 import React from 'react';
 
-export type ButtonTone = 'plain' | 'gold' | 'danger' | 'calm' | 'good' | 'arcane' | 'bare';
+export type ButtonTone =
+  | 'plain'
+  | 'gold'
+  | 'danger'
+  | 'calm'
+  | 'good'
+  | 'arcane'
+  /** Оранжевый. Пока только у переключателя «Ва-банк». */
+  | 'ember'
+  | 'bare';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: ButtonTone;
@@ -16,6 +25,7 @@ const TONE_CLASS: Record<ButtonTone, string> = {
   calm: 'btn--calm',
   good: 'btn--good',
   arcane: 'btn--arcane',
+  ember: 'btn--ember',
   bare: 'btn--bare'
 };
 

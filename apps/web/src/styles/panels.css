@@ -1384,3 +1384,33 @@
 .rx__thumb-img--down.rx__thumb-img--mirror {
   scale: -1 -1;
 }
+
+/* --- Переключатель в меню карты («Ва-банк») -------------------------------- */
+
+/*
+ * Он стоит в одном ряду с «Разыграть» и «Блеф», но действием не является:
+ * он взводит то, что сделает соседняя кнопка. Поэтому у него пунктирная
+ * рамка и точка состояния — чтобы рука не нажала его вместо розыгрыша.
+ */
+.cardmenu__item--toggle {
+  border-style: dashed;
+}
+
+.cardmenu__pip {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: transparent;
+  transition: background var(--dur-fade) var(--ease-out);
+}
+
+.cardmenu__item--toggle.is-on {
+  border-style: solid;
+}
+
+.cardmenu__item--toggle.is-on .cardmenu__pip {
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}

@@ -181,11 +181,18 @@ export function deriveCardZones(
    * true no matter what order rules are added in later.
    */
   const claimed = new Map<CardId, PlacedCard>();
-  function claim(id: CardId, zone: Zone, face: Face, ownerId: string | null): void {
+  function claim(
+    id: CardId,
+    zone: Zone,
+    face: Face,
+    ownerId: string | null,
+    charges?: number
+  ): void {
     const previous = claimed.get(id);
     if (previous && ZONE_PRECEDENCE[previous.zone.kind] >= ZONE_PRECEDENCE[zone.kind]) return;
     const placed: PlacedCard = { id, zone, face, revealed: scrutinised.has(id), ownerId };
     if (verdicts.has(id)) placed.wasTruth = verdicts.get(id);
+    if (charges !== undefined) placed.charges = charges;
     claimed.set(id, placed);
   }
 
@@ -262,7 +269,8 @@ export function deriveCardZones(
       pendingAction.stakedCardId,
       { kind: 'plot', playerId: pendingAction.actorId },
       { known: laid },
-      pendingAction.actorId
+      pendingAction.actorId,
+      laid === 'Тайный заговор' ? 0 : undefined
     );
   }
   for (const p of players) {
@@ -271,7 +279,8 @@ export function deriveCardZones(
       p.activePlot.cardId,
       { kind: 'plot', playerId: p.id },
       { known: p.activePlot.type },
-      p.id
+      p.id,
+      p.activePlot.charges
     );
   }
 

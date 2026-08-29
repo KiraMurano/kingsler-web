@@ -99,14 +99,10 @@ export const PlotSlot: React.FC<PlotSlotProps> = ({ plot, ownerId, ownerName }) 
               transition: { duration: reduce ? 0.12 : LABEL_OUT_S, ease: EASE }
             }}
           >
-            <span className="feltplot__name">{info.name}</span>
-            {target && <span className="feltplot__owner">{target.name}</span>}
-            {shown.charges !== undefined && (
-              <span className="plotcard__charge">
-                {shown.charges}
-                {shown.type === 'Тайный заговор' ? '/4' : ''}
-              </span>
-            )}
+            {/* Пусто намеренно. Название карты напечатано на самом арте, а
+                заряды переехали в слой карт: подпись здесь лежит НИЖЕ карты по
+                z, и всё, что на ней нарисовано, оказывалось за картой.
+                Осталась только рамка-заглушка под наведение и подсказку. */}
           </motion.span>
         )}
       </AnimatePresence>

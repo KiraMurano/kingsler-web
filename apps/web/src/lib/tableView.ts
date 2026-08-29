@@ -14,6 +14,7 @@
  */
 import { CARD_DESCRIPTIONS, isInstant, isPlot } from '@kinglier/engine/data/cardDescriptions';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
+import { holds } from '@kinglier/engine/cardInstance';
 import type {
   Action,
   DuelOutcome,
@@ -24,6 +25,7 @@ import type {
   Role
 } from '@kinglier/engine/types';
 import { accOf, genOf } from '@kinglier/engine/utils/russianText';
+import { CONSPIRACY_FULL_CHARGE } from '@kinglier/engine/resolvers/plotResolver';
 import type { GameRules } from '@kinglier/engine/rules';
 import { doubtPayment } from '@kinglier/engine/resolvers/doubtResolver';
 
@@ -61,7 +63,7 @@ export type BarActionKind =
   | 'duel-accept'
   | 'duel-retreat';
 
-export type Tone = 'gold' | 'danger' | 'calm' | 'good' | 'arcane';
+export type Tone = 'gold' | 'danger' | 'calm' | 'good' | 'arcane' | 'ember';
 
 export interface BarButton {
   kind: BarActionKind;
@@ -84,7 +86,17 @@ export interface BarButton {
   reason?: string;
 }
 
-export type CardMenuKind = 'play' | 'bluff' | 'inspect' | 'veto' | 'duel-shield' | 'duel-bluff';
+export type CardMenuKind =
+  | 'play'
+  | 'bluff'
+  | 'inspect'
+  | 'veto'
+  | 'duel-shield'
+  | 'duel-bluff'
+  /** Разрядка заряженного «Тайного заговора» — по нажатию на саму карту. */
+  | 'conspiracy'
+  /** Переключатель: подключить «Ва-банк» к розыгрышу этой карты. */
+  | 'vabanque';
 
 export interface CardMenuOption {
   kind: CardMenuKind;
@@ -98,6 +110,15 @@ export interface CardMenuOption {
   /** Перечёркивать ли молнию — см. `BarButton.tokenBlocked`. */
   tokenBlocked: boolean;
   reason?: string;
+  /**
+   * Пункт-переключатель и его состояние.
+   *
+   * Есть только у «Ва-банка»: он ничего не делает сам, а меняет то, что
+   * сделают соседние пункты. Кнопка, которая не действует, а взводит, обязана
+   * показывать, взведена она или нет.
+   */
+  toggle?: boolean;
+  active?: boolean;
 }
 
 export interface TableView {
@@ -154,6 +175,8 @@ export interface TableViewInput {
   vetoOnVeto: boolean;
   /** Правила партии целиком — из них берётся цена платной проверки. */
   rules: GameRules;
+  /** Взведён ли «Ва-банк» — переключатель в меню карты. Состояние интерфейса. */
+  vaBanqueArmed: boolean;
   vetoDeadlineAt: number | null;
   coronationCandidateId: string | null;
   revealOutcome: RevealOutcome | null;
@@ -190,6 +213,37 @@ function inspectOption(): CardMenuOption {
   };
 }
 
+/**
+ * Меню заряженного «Тайного заговора», лежащего в слоте зрителя.
+ *
+ * Заговор разряжается только на полном заряде, поэтому меню у него появляется
+ * ровно тогда, когда удар возможен: в свой ход и на четырёх зарядах. Раньше
+ * это была кнопка в правой колонке — но карта лежит на столе, и бить по ней
+ * логично нажатием на неё саму, как по любой другой карте.
+ */
+function chargedPlotMenu(viewer: Player, input: TableViewInput): CardMenuOption[] | null {
+  const plot = viewer.activePlot;
+  if (plot?.type !== 'Тайный заговор') return null;
+  if ((plot.charges ?? 0) < CONSPIRACY_FULL_CHARGE) return null;
+  if (input.activePlayerId !== viewer.id) return null;
+  if (input.turnPhase !== 'IDLE' || input.pendingAction) return null;
+
+  const hasTokens = viewer.actionTokens >= 1;
+  return [
+    {
+      kind: 'conspiracy',
+      hint: 'Ударить по казне соперника или лишить его короны. Вето это уже не отменит',
+      label: 'Разыграть',
+      tone: 'arcane',
+      disabled: !hasTokens,
+      spendsToken: true,
+      tokenBlocked: !hasTokens,
+      reason: hasTokens ? undefined : 'Нет жетонов действия.'
+    },
+    inspectOption()
+  ];
+}
+
 /** Меню карты в свой ход. */
 function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): CardMenuOption[] {
   const options: CardMenuOption[] = [];
@@ -197,6 +251,35 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
   const plot = isPlot(card);
   const instant = isInstant(card);
   const role = !plot && !instant;
+
+  /* «Ва-банк» идёт первым и намеренно.
+   *
+   * Он не разыгрывается сам — он модификатор чужого розыгрыша, поэтому на
+   * своей карте у него только блеф и осмотр, а подключается он вот этим
+   * переключателем на ТОЙ карте, которую собираются играть. Взводят его ДО
+   * выбора «Разыграть» или «Блеф», и стоять он обязан там же — до них. Без
+   * него сыграть роль по номиналу под Ва-банком было нельзя вовсе. */
+  if (card !== 'Ва-банк' && holds(viewer.hand, 'Ва-банк')) {
+    const vbReason = !hasTokens
+      ? 'Нет жетонов действия.'
+      : input.hasPlayedRoleThisTurn
+        ? 'Роль уже была в этом ходу.'
+        : undefined;
+    options.push({
+      kind: 'vabanque',
+      hint: input.vaBanqueArmed
+        ? 'Отключить «Ва-банк»: розыгрыш пойдёт обычным'
+        : 'Подключить «Ва-банк»: при проверке эффект удвоится, но печатей не будет',
+      label: 'Ва-банк',
+      tone: 'ember',
+      disabled: !!vbReason,
+      spendsToken: false,
+      tokenBlocked: false,
+      reason: vbReason,
+      toggle: true,
+      active: input.vaBanqueArmed
+    });
+  }
 
   /* Роли и интриги играются по номиналу всегда; из инстантов — только те, что
      выкладываются открыто. Реактивные (вето, перенаправление) и Ва-банк ждут
@@ -388,20 +471,8 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
           reason: courtReason
         }
       ];
-      const charges =
-        viewer.activePlot?.type === 'Тайный заговор' ? (viewer.activePlot.charges ?? 0) : 0;
-      if (charges >= 1) {
-        bar.push({
-          kind: 'conspiracy',
-          spendsToken: true,
-          tokenBlocked: !hasTokens,
-          label: `Свершить заговор · ${charges}/4`,
-          tone: 'arcane',
-          disabled: !hasTokens,
-          hint: 'Ударить по казне соперника, а с трёх зарядов — по короне',
-          reason: noTokens
-        });
-      }
+      /* Кнопки «Свершить заговор» здесь больше нет: заряженный Заговор
+         разыгрывается нажатием на саму карту в слоте интриги. */
       bar.push({
         kind: 'end-turn',
         spendsToken: false,
@@ -671,6 +742,12 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     menus[held.id] = menuFor(held, phase, viewer, input);
   }
 
+  /* Лежащий заговор — не карта руки, но меню у него такое же: он единственная
+     карта на столе, по которой игрок действительно ходит. */
+  const plotMenu = chargedPlotMenu(viewer, input);
+  const plotCardId = plotMenu && viewer.activePlot ? viewer.activePlot.cardId : null;
+  if (plotMenu && plotCardId) menus[plotCardId] = plotMenu;
+
   /* Подпись под тем, что нарисовано. Всё, чего здесь нет, менять картинку не
      имеет права; всё, что здесь есть, обязано её менять. */
   const id = [
@@ -682,8 +759,13 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     event,
     bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
     viewerHandIds
-      .map(cid => menus[cid].map(o => `${o.kind}${o.disabled ? '!' : ''}`).join('.'))
-      .join('|')
+      .map(cid =>
+        menus[cid]
+          .map(o => `${o.kind}${o.disabled ? '!' : ''}${o.active ? '+' : ''}`)
+          .join('.')
+      )
+      .join('|'),
+    plotCardId ? `plot:${menus[plotCardId].map(o => `${o.kind}${o.disabled ? '!' : ''}`).join('.')}` : ''
   ].join('~');
 
   return {

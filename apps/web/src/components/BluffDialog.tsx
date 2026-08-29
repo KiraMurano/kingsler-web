@@ -34,10 +34,16 @@ const VA_BANQUE_EFFECT: Record<string, string> = {
 
 interface BluffDialogProps {
   stakedCardId: CardId;
+  /** Взведён ли «Ва-банк» переключателем в меню карты. */
+  armedVaBanque?: boolean;
   onClose: () => void;
 }
 
-export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose }) => {
+export const BluffDialog: React.FC<BluffDialogProps> = ({
+  stakedCardId,
+  armedVaBanque = false,
+  onClose
+}) => {
   const { players, viewerId, performAction, hasPlayedRoleThisTurn, rules } = useGameStore(
     useShallow(s => ({
       players: s.players,
@@ -51,7 +57,8 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({ stakedCardId, onClose 
 
   const hasVaBanque = !!human && holds(human.hand, 'Ва-банк');
   const canUseVaBanque = hasVaBanque && (human?.actionTokens ?? 0) >= 1 && !hasPlayedRoleThisTurn;
-  const [withVaBanque, setWithVaBanque] = useState(false);
+  /* Взвели «Ва-банк» ещё в меню карты — диалог открывается уже с ним. */
+  const [withVaBanque, setWithVaBanque] = useState(armedVaBanque);
 
   if (!human) return null;
 

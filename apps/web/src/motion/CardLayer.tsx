@@ -62,6 +62,7 @@ import { useAnchorRects } from './AnchorRegistry.tsx';
 import { dur, spring, tilt } from './tokens.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
 import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
+import { CONSPIRACY_FULL_CHARGE } from '@kinglier/engine/resolvers/plotResolver';
 
 const CARD_BACK = '/assets/cards/back-dual-face.webp';
 
@@ -134,6 +135,14 @@ export interface CardInteraction {
   claimFor?: (placed: PlacedCard) => GameCard | undefined;
   /** May this card be acted on right now? Drives hover, press and cursor. */
   isPlayable?: (placed: PlacedCard) => boolean;
+  /**
+   * Карта, которая ждёт, чтобы по ней нажали.
+   *
+   * Лежащая карта ничем не отличается от декорации, пока не шевельнётся:
+   * заряженный «Тайный заговор» без этого выглядел как уже сыгранная интрига.
+   * Лёгкое подрагивание — единственное, что говорит «по мне сейчас ходят».
+   */
+  isRestless?: (placed: PlacedCard) => boolean;
   /**
    * Is this a card in the viewer's own hand? Own cards answer to `onActivate`
    * whether or not they are playable, because the refusal — «Сейчас
@@ -619,6 +628,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const corner = isCorner(placed.zone.kind);
   const playable = !corner && (interaction.isPlayable?.(placed) ?? false);
   const own = !corner && (interaction.isOwnHand?.(placed) ?? false);
+  const restless = !corner && !reduce && (interaction.isRestless?.(placed) ?? false);
   const selected = !corner && (interaction.isSelected?.(placed) ?? false);
 
   /**
@@ -707,8 +717,23 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
           rotateY: reduce ? 0 : tiltY,
           transformStyle: 'preserve-3d'
         }}
-        animate={{ y: selected && !reduce ? -18 : 0 }}
-        transition={spring.hover}
+        /* Подрагивание — только когда карта ждёт нажатия и не поднята меню:
+           поднятая карта уже отвечает игроку, дёргать её незачем. */
+        /* Только `y`: `rotate` и `scale` на этом же узле — моушен-значения из
+           `style` (наклон карты и наведение), и анимировать их отсюда значит
+           драться с ними за одно свойство. */
+        animate={
+          selected && !reduce
+            ? { y: -18 }
+            : restless
+              ? { y: [0, -4, 0, -2.5, 0] }
+              : { y: 0 }
+        }
+        transition={
+          restless && !selected
+            ? { duration: 1.6, repeat: Infinity, repeatDelay: 1.1, ease: 'easeInOut' }
+            : spring.hover
+        }
         whileHover={lift ? { y: -14, scale: 1.03, transition: spring.hover } : undefined}
         whileTap={playable && !reduce ? { scale: 0.97, transition: spring.press } : undefined}
         onPointerMove={onPointerMove}
@@ -756,6 +781,12 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
                 <span className={`verdict ${verdict ? 'verdict--truth' : 'verdict--bluff'}`}>
                   {verdict ? 'ПРАВДА' : 'БЛЕФ'}
                 </span>
+              )}
+              {/* Заряды едут на самой карте, а не на подписи под слотом: слой
+                  карт рисуется выше слота, и любая надпись под ним пряталась
+                  за картой. */}
+              {placed.charges !== undefined && (
+                <span className="chargetag">{placed.charges}/{CONSPIRACY_FULL_CHARGE}</span>
               )}
             </div>
           </motion.div>

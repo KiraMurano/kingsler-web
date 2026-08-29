@@ -89,9 +89,19 @@ export const CardMenu: React.FC<{
             <Tooltip key={o.kind} text={o.disabled ? o.reason : o.hint} tapToOpen={o.disabled}>
               <motion.button
                 type="button"
-                className={`cardmenu__item cardmenu__item--${o.tone}${
-                  o.kind === 'inspect' ? ' cardmenu__item--icon' : ''
-                }`}
+                className={[
+                  'cardmenu__item',
+                  `cardmenu__item--${o.tone}`,
+                  o.kind === 'inspect' ? 'cardmenu__item--icon' : '',
+                  /* Переключатель обязан выглядеть переключателем: рядом с
+                     «Разыграть» он не действие, а состояние следующего
+                     действия, и спутать их нельзя. */
+                  o.toggle ? 'cardmenu__item--toggle' : '',
+                  o.toggle && o.active ? 'is-on' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-pressed={o.toggle ? o.active : undefined}
                 disabled={o.disabled}
                 initial={{ opacity: 0, y: reduce ? 0 : 6 }}
                 animate={{
@@ -112,6 +122,7 @@ export const CardMenu: React.FC<{
                   <Search size={17} aria-label={o.label} />
                 ) : (
                   <>
+                    {o.toggle && <span className="cardmenu__pip" aria-hidden />}
                     <span className="cardmenu__label">{o.label}</span>
                     {o.spendsToken && <TokenCost blocked={o.tokenBlocked} size="xs" />}
                   </>

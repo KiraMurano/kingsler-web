@@ -48,6 +48,14 @@ export interface PlacedCard {
   wasTruth?: boolean;
   /** Whose card this is, when that is meaningful (hand, plot, duel side). */
   ownerId: string | null;
+  /**
+   * Заряды «Тайного заговора», когда карта лежит в слоте интриги.
+   *
+   * Живут здесь, а не на подписи под слотом: слой карт рисуется выше слота, и
+   * любая надпись под ним оказывалась за картой. Наклейка едет вместе с картой
+   * и потому всегда поверх неё.
+   */
+  charges?: number;
 }
 
 /** The string an anchor registers itself under. Stable and collision-free. */
