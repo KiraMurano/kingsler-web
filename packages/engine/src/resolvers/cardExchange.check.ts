@@ -44,7 +44,7 @@ useGameStore.setState({
   deck,
   discardPile: [],
   activePlayerId: 'p1',
-  openingToss: null
+  opening: null
 });
 
 const before = useGameStore.getState();

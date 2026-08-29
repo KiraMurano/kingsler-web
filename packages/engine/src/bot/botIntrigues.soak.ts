@@ -10,7 +10,15 @@
  * Победы тест НЕ дожидается: окно вето висит 5 с на каждое действие, и партия
  * до 6 корон идёт больше десяти минут реального времени. Проверяется, что стол
  * живой (прогресс не встаёт) и что защита ни разу не протекла.
- * Run: npx tsx packages/engine/src/bot/botIntrigues.check.ts
+ * НЕ `*.check.ts`, и это намеренно: файл играет ПОЛНУЮ партию в реальном
+ * времени и держит выполнение до пяти с половиной минут. В обычный прогон
+ * такому места нет — из-за него набор проверок, который иначе идёт секунды,
+ * превращался в десятиминутное ожидание на каждую мелкую правку.
+ *
+ * Запускать отдельно и осознанно: после правок в движке ботов, в тайминге
+ * ходов или в открытии партии.
+ *
+ * Run: npx tsx packages/engine/src/bot/botIntrigues.soak.ts
  */
 import assert from 'node:assert/strict';
 import { useGameStore } from '../GameStore.ts';
@@ -105,7 +113,7 @@ useGameStore.getState().startGame(undefined, { crownsToWin: 3 });
    `favor: 4` первому боту нужен, чтобы сработала его эвристика на грамоту:
    она карта фаворита, с двумя коронами он её не выложит. */
 useGameStore.setState({
-  openingToss: null,
+  opening: null,
   players: useGameStore.getState().players.map((p, i) => {
     const base = { ...p, isBot: true };
     if (i === 0) return { ...base, favor: 2, hand: mintDeck(['Охранная грамота', 'Наследник']) };

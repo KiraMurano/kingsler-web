@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { useGameStore } from '../GameStore.ts';
+import { mintDeck } from '../cardInstance.ts';
 import { toGameStateData } from './gameStateData.ts';
 import { redactStateForPlayer } from './redaction.ts';
 
@@ -13,6 +14,15 @@ useGameStore.getState().startGame([
   { id: 'p1', name: 'Аня' },
   { id: 'p2', name: 'Боря' }
 ]);
+/* Руки раздаёт открытие партии, а здесь проверяется не оно: садимся сразу за
+   готовый стол, чтобы редактуре было что прятать. */
+useGameStore.setState(state => ({
+  opening: null,
+  players: state.players.map((pl, i) => ({
+    ...pl,
+    hand: mintDeck(['Наследник', 'Шут']).map(c => ({ ...c, id: `h${i}-${c.id}` }))
+  }))
+}));
 const data = toGameStateData(useGameStore.getState());
 
 const forP1 = redactStateForPlayer(data, 'p1');

@@ -8,6 +8,7 @@ import { playPlotAction, disruptPlayerPlotsOnLoss, chargeActiveConspiracies, app
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import { playInstant } from './instantResolver.ts';
 import { targetDeclareDuel } from './duelResolver.ts';
+import { timerManager } from '../utils/timerManager.ts';
 import {
   triggerVetoWindowOrResolveEffect,
   proceedAfterVetoWindow,
@@ -264,7 +265,9 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
 
   targetDeclareDuel(get, set, 'p2', cardIdOf(api, 'p2', 'Казначей'));
   assert.equal(api.players.find(p => p.id === 'p2')!.actionTokens, 1);
-  assert.equal(api.turnPhase, 'DUEL_ATTACKER_WINDOW');
+  assert.equal(api.turnPhase, 'DUEL_CLASH');
+  /* Объявление ставит отложенный розыгрыш — этой сцене он уже не нужен. */
+  timerManager.clearAll();
 }
 
 {

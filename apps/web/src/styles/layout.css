@@ -845,6 +845,21 @@
   aspect-ratio: 2 / 3;
 }
 
+/* Ва-банк на дуэли: сдвинут в сторону и мельче ставки, которую удваивает.
+   Он вложен в якорь атакующего, поэтому и едет вместе с ним — а меньший
+   размер и сдвиг делают из него подложку, а не вторую карту в паре. По z он
+   уходит под обе ставки сразу (см. `PlacedCard.underlay`), так что дуэль
+   читается целиком с первого кадра схождения. */
+.duel__side .cardanchor--overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 62%;
+  width: auto;
+  aspect-ratio: 2 / 3;
+  transform: translate(-32%, -42%);
+}
+
 /* ==========================================================================
    DECK & DISCARD — real piles, standing off the felt
    ==========================================================================
@@ -891,11 +906,18 @@
   pointer-events: none;
 }
 
+/* Подпись НЕ участвует в раскладке стопки.
+   Ширина стопки обязана равняться ширине карты и только ей. Пока подпись
+   стояла в потоке, ширину задавала она — она шире рубашки, — и стоило счётчику
+   сменить цифру, как стопка меняла ширину, а рубашка внутри уезжала вбок
+   вместе с соседней стопкой. Причём не только на переходе 9 → 10: в наборном
+   шрифте «31» и «33» тоже разной ширины. Число, двигающее карты, — это
+   подпись, командующая тем, что она подписывает. */
 .pile {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
 }
 
 .pile__slot {
@@ -935,7 +957,16 @@
   box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.55);
 }
 
+/* Подпись стоит НАД стопкой.
+   Под ней её ставить некуда: стопки прижаты к верхней половине панели правого
+   соседа, и подпись, вынесенная из потока вниз, ложилась поверх его имени.
+   Сверху же — единственный по-настоящему пустой угол стола, ради которого
+   стопки сюда и переехали. */
 .pile__count {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--font-display);
   font-size: 0.68rem;
   font-weight: 700;
@@ -946,8 +977,17 @@
   border: 1px solid var(--line);
   background: rgba(10, 13, 20, 0.92);
   color: var(--gold-pale);
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  /* Ширина с запасом под самую длинную подпись — и одна на обе капсулы.
+     Коробка вокруг одного лишь числа держала ширину честно, но однозначный
+     счёт вставал в ней по центру, и между словом и цифрой зияла дыра. Запас на
+     всю подпись убирает и дыру, и дрожь: «31» и «33» разной ширины (наборный
+     шрифт табличных цифр не знает), но обе умещаются, не двигая капсулу.
+     В `em`, а не в пикселях, чтобы запас ехал вместе с кеглем. */
+  min-width: 9.5em;
 }
+
 
 .tablecard {
   position: relative;
@@ -1042,12 +1082,15 @@
   --frame-glow: rgba(180, 64, 90, 0.55);
 }
 
+/* Печать крупная: она называет исход спора, ради которого карту и вскрывали,
+   и читаться должна с того же расстояния, что и сама карта. Прежний кегль был
+   рассчитан на капс — строчные на нём мельчали вдвое. */
 .verdict {
-  padding: 3px 9px;
-  border-radius: 4px;
-  font-size: 0.62rem;
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 0.95rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
   box-shadow: var(--shadow-sm);
 }
@@ -1449,7 +1492,9 @@
 }
 
 .crowns__seg--on {
-  background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright));
+  background-image: linear-gradient(90deg, var(--gold-deep), var(--gold-bright));
+  background-size: calc(var(--crowns, 6) * 100% + (var(--crowns, 6) - 1) * 3px) 100%;
+  background-position: calc(var(--i, 0) * 100% / max(1, var(--crowns, 6) - 1)) 0;
   box-shadow: 0 0 7px rgba(232, 200, 119, 0.4);
 }
 
@@ -1511,9 +1556,57 @@
 }
 
 .actionbar__col {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Бордовый блок-напоминание над кнопками справа (появляется через 7 секунд, не сдвигает кнопки) */
+.actionbar__prompt {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.actionbar__prompt-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(88, 24, 40, 0.96) 0%, rgba(44, 12, 22, 0.98) 100%);
+  border: 1px solid rgba(225, 75, 110, 0.65);
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #ffe6ec;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  animation: prompt-glow-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes prompt-glow-pulse {
+  0%, 100% {
+    border-color: rgba(225, 75, 110, 0.55);
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.65),
+      0 0 10px rgba(225, 29, 72, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  50% {
+    border-color: rgba(255, 120, 150, 0.9);
+    box-shadow:
+      0 6px 20px rgba(0, 0, 0, 0.75),
+      0 0 20px rgba(225, 29, 72, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
 }
 
 /* Обёртка подсказки — блочная, иначе кнопка внутри неё теряет ширину. */
@@ -1591,6 +1684,17 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+.actionbar__footnote {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-style: italic;
+  letter-spacing: 0.03em;
+  color: var(--gold-pale);
+  opacity: 0.8;
+  padding-top: 4px;
 }
 
 /* --- Полоска окна вето --- */
@@ -2261,18 +2365,25 @@
  */
 .chargetag {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  padding: 1px 5px;
+  top: 5px;
+  right: 5px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--crimson);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.75),
+    0 0 10px rgba(180, 64, 90, 0.4);
   font-family: var(--font-display);
-  font-size: 0.62rem;
+  font-size: 0.85rem;
   font-weight: 800;
-  line-height: 1.35;
-  letter-spacing: 0.02em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #fff;
   pointer-events: none;
+  z-index: 2;
 }

@@ -10,7 +10,7 @@
  * in every one of the four `DuelResultType` outcomes.
  *
  * Finally, RULES.md §7: the duel hands out ⚜️ Royal Seals, and the exact count
- * differs per outcome and per Ва-банк. `attackerAcceptDuel` used to award them
+ * differs per outcome and per Ва-банк. `resolveDuelClash` used to award them
  * BEFORE writing a `players` snapshot taken at the top of the function, so the
  * write silently threw every seal away — an honest duel left both duellists at
  * zero. The matrix below pins all eight outcomes.
@@ -18,7 +18,7 @@
  */
 import assert from 'node:assert/strict';
 import type { Action, CardInstance, GameCard, GameState, Player, Role } from '../types.ts';
-import { attackerAcceptDuel, attackerRetreatDuel, closeDuelOutcome } from './duelResolver.ts';
+import { targetDeclareDuel, resolveDuelClash, closeDuelOutcome } from './duelResolver.ts';
 import { triggerVetoWindowOrResolveEffect, resolvePendingActionEffect } from './doubtResolver.ts';
 import { resolveRoleActionEffect } from './roleResolver.ts';
 import { addSealsToPlayer } from './sealsResolver.ts';
@@ -26,6 +26,7 @@ import { botMemory } from '../bot/botMemory.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { assertCardCensus, locateCards } from './cardCensus.check.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import { ACTION_HOLD_MS } from '../timing.ts';
 
 /** Like `mintDeck`, but ids stay unique across hands — two seats holding
  *  `c0` would make the whole-state card census meaningless. */
@@ -54,7 +55,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     players: [] as Player[],
     discardPile: [] as GameState['discardPile'],
     activePlayerId: 'p1',
-    turnPhase: 'DUEL_ATTACKER_WINDOW' as GameState['turnPhase'],
+    turnPhase: 'DUEL_CLASH' as GameState['turnPhase'],
     pendingAction: null as Action | null,
     pendingDuelDefenderCardId: null as string | null,
     pendingDuelDefenderRoleClaim: 'Казначей' as GameState['pendingDuelDefenderRoleClaim'],
@@ -126,7 +127,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   });
 
   // Attacker tells the truth, defender's shield ("Рыцарь") is a bluff -> breakthrough.
-  attackerAcceptDuel(get, set, 'p1');
+  resolveDuelClash(get, set);
   assert.equal(api.duelOutcome?.resultType, 'attacker_breakthrough');
   assert.equal(
     api.players.find(p => p.id === 'p1')!.hand.some(c => c.id === attackerStakeId),
@@ -169,7 +170,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
 // --- RULES.md §6 rule 2: both revealed duel stakes go to the discard ---
 //
-// `attackerAcceptDuel` used to pull both stakes out of the hands and push them
+// `resolveDuelClash` used to pull both stakes out of the hands and push them
 // nowhere, destroying two card instances per duel: they left the discard (and
 // therefore the reshuffle and the bots' card counting) short, and gave the
 // presentation layer two ids with no zone to draw them in.
@@ -220,7 +221,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
     assertCardCensus(api, allIds, `${c.resultType}: before the duel`);
 
-    attackerAcceptDuel(get, set, 'p1');
+    resolveDuelClash(get, set);
 
     assert.equal(api.duelOutcome?.resultType, c.resultType, `${c.resultType}: expected outcome`);
 
@@ -380,7 +381,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
       ]
     });
 
-    attackerAcceptDuel(get, set, 'p1');
+    resolveDuelClash(get, set);
 
     assert.equal(api.duelOutcome?.resultType, c.resultType, `${c.label}: исход дуэли`);
     assert.equal(api.duelOutcome?.sealsWinnerId, c.sealsWinnerId, `${c.label}: sealsWinnerId`);
@@ -424,17 +425,17 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   }
 }
 
-// --- RULES.md §7: отступление нападающего не вскрывает НИ ОДНОЙ карты ---
+// --- RULES.md §7: выставленный щит разыгрывает дуэль сам ---
 //
-// Карта нападающего уходит в сброс взакрытую, карта защитника возвращается
-// (точнее — вообще не покидает) руку, и ни та ни другая не считается вскрытой:
-// память ботов о них не сбрасывается, окна исхода дуэли не возникает.
+// Согласия нападающего не спрашивают: фазы «принять бой / отступить» больше
+// нет, и отступления вместе с ней. Объявление ставит стол в `DUEL_CLASH` —
+// такт, за который карты сходятся, — и розыгрыш приходит сам, без единого
+// решения со стороны атакующего.
 {
   const attackerHand = mintDeck(['Вор', 'Наследник']);
-  const defenderHand = mintDeck(['Казначей', 'Наследник']);
+  const defenderHand = mintDeck(['Казначей', 'Шут']);
   const attackerStakeId = attackerHand[0].id;
   const defenderStakeId = defenderHand[0].id;
-  const allIds = [...attackerHand, ...defenderHand].map(x => x.id);
 
   const pending: Action = {
     id: 'a1',
@@ -450,55 +451,37 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   };
 
   const { get, set, api } = makeHarness({
+    turnPhase: 'TARGET_REACTION_WINDOW',
     pendingAction: pending,
-    pendingDuelDefenderCardId: defenderStakeId,
-    pendingDuelDefenderRoleClaim: 'Казначей',
+    pendingDuelDefenderCardId: null,
+    pendingDuelDefenderRoleClaim: null,
     players: [
       player({ id: 'p1', name: 'Атакующий', hand: attackerHand, seals: 0, favor: 3 }),
       player({ id: 'p2', name: 'Защитник', isBot: true, hand: defenderHand, seals: 0, favor: 3 })
     ]
   });
 
-  // «Вскрытие» карты в движке = `botMemory.recordRevealedCard`, которая стирает
-  // знание о ней. Заранее кладём это знание, чтобы уцелевшая запись доказывала:
-  // карта так и осталась взакрытой.
-  botMemory.clear();
-  botMemory.recordCardInSlot('p1', 0, 'Вор', 'p2');
-  botMemory.recordCardInSlot('p2', 0, 'Казначей', 'p1');
-
-  attackerRetreatDuel(get, set, 'p1');
-
-  const zones = locateCards(api);
-  assert.deepEqual(
-    zones.get(attackerStakeId),
-    ['discard'],
-    'карта нападающего сброшена (и только сброшена) при отступлении'
-  );
-  assert.deepEqual(
-    zones.get(defenderStakeId),
-    ['hand:p2'],
-    'карта-щит защитника остаётся у него в руке'
-  );
-  assertCardCensus(api, allIds, 'отступление');
-
-  assert.equal(api.duelOutcome, null, 'отступление не открывает окно исхода дуэли');
-  assert.deepEqual(
-    botMemory.getKnownCardsForBot('p2', 'p1'),
-    ['Вор'],
-    'карта нападающего НЕ была вскрыта: память двора о ней цела'
-  );
-  assert.deepEqual(
-    botMemory.getKnownCardsForBot('p1', 'p2'),
-    ['Казначей'],
-    'карта защитника НЕ была вскрыта: память двора о ней цела'
-  );
-  assert.deepEqual(
-    api.players.map(p => [p.seals, p.favor]),
-    [[0, 3], [0, 3]],
-    'за отступление печати не выдаются никому'
+  targetDeclareDuel(get, set, 'p2', defenderStakeId);
+  assert.equal(api.turnPhase, 'DUEL_CLASH', 'щит выставлен — стол в такте схождения');
+  assert.equal(
+    api.players.find(p => p.id === 'p1')!.hand.some(c => c.id === attackerStakeId),
+    true,
+    'до схождения карта нападающего ещё в руке'
   );
 
-  botMemory.clear();
+  await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS + 120));
+
+  assert.equal(
+    api.duelOutcome?.resultType,
+    'clash_blocked',
+    'дуэль разрешилась сама: обе правды, атака заблокирована'
+  );
+  assert.deepEqual(
+    api.players.map(p => p.seals),
+    [1, 1],
+    'честная дуэль дала по печати каждому — и согласия нападающего не потребовалось'
+  );
+
   timerManager.clearAll();
 }
 

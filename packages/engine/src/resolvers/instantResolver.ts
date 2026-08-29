@@ -5,10 +5,10 @@ import { botMemory } from '../Bot';
 import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing';
+import { ACTION_HOLD_MS } from '../timing';
 import { loseCrowns } from './crownLoss';
 import { canBeTargetedBy } from '../targeting';
-import { vetoPlayed, vetoReset } from './vetoChain';
+import { vetoPlayed, vetoReset, vetoPollAnswered, vetoTopActorId } from './vetoChain';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -48,7 +48,44 @@ export function playInstant(
   const actor = players.find(p => p.id === playerId);
   if (!actor) return;
 
-  const isFreeInstant = instantType === 'Право вето' || instantType === 'Перенаправление';
+  /*
+   * Законность «Перенаправления» проверяется ДО списания.
+   *
+   * Оно ложится только на живую атаку и только на цель, которую этой ролью
+   * вообще можно выбрать. Раньше проверка стояла внутри ветки эффекта и
+   * ничего не стоила — теперь карта тратит жетон, и уйти он может только за
+   * перевод, который действительно состоится.
+   */
+  if (instantType === 'Перенаправление') {
+    const newTarget = players.find(p => p.id === targetPlayerId);
+    const claim = pendingAction?.roleClaim;
+    const allowed =
+      !!pendingAction &&
+      !!newTarget &&
+      !!claim &&
+      newTarget.id !== pendingAction.actorId &&
+      canBeTargetedBy(newTarget, claim);
+    if (!allowed) return;
+  }
+
+  /*
+   * Вето не кладут поверх собственной карты.
+   *
+   * Наверху лежит либо само действие, либо последнее вето — и отменять то,
+   * что сам только что положил, бессмысленно: своё действие ты и так можешь
+   * не делать, а вето на своё вето лишь возвращает действие, которое ты этим
+   * вето и отменял. Чистая потеря карты, и именно её выбирал бот, попадая в
+   * новый круг опроса сразу после собственного вето.
+   */
+  if (instantType === 'Право вето' && pendingAction) {
+    const { overlayInstant } = get();
+    if (playerId === vetoTopActorId(pendingAction.actorId, overlayInstant)) return;
+  }
+
+  /* Бесплатен только щит двора: «Право вето» отвечает на чужой ход и жетона
+     не стоит. «Перенаправление» переводит нападение на соседа — это ход, а не
+     защита, и он оплачивается жетоном, как любой другой. */
+  const isFreeInstant = instantType === 'Право вето';
   if (!isFreeInstant && actor.actionTokens < 1) return;
 
   const { taken: card, rest: newHand } = pluck(actor.hand, cardId);
@@ -103,6 +140,18 @@ export function playInstant(
       discardPile: updatedDiscard,
       ...chain,
       overlayInstant: { card: 'Право вето', actorId: actor.id },
+      /*
+       * Круг опроса начинается заново ТЕМ ЖЕ `set`, что меняет цепочку.
+       *
+       * Это одно событие, и увидеть его наполовину нельзя. Раньше ответы
+       * гасились следующим `set`, и подписчик — движок ботов — успевал
+       * проснуться между ними: цепочка уже новая, а список ответивших ещё
+       * старый. Боты, ответившие в прошлом круге, отфильтровывались как
+       * «уже ответившие», планировать было некого, а второй `set` движок не
+       * будил (цепочка в нём не менялась). Опрос оставался ждать ответов,
+       * которых никто не даст, — стол вставал намертво ровно на вето в вето.
+       */
+      pendingVetoPassedIds: [],
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
         chain.vetoChain === 1
@@ -116,49 +165,42 @@ export function playInstant(
     if (get().turnPhase === 'VETO_WINDOW') {
       timerManager.clearAll();
       if (get().rules.vetoOnVeto) {
-        /* Окно не закрывается, а начинается заново: двор должен успеть
-           ответить на само вето. Длина цепочки ничем не ограничена — она
-           упирается только в число «Прав вето», оставшихся на руках. */
-        set({ vetoDeadlineAt: Date.now() + VETO_WINDOW_MS });
-        timerManager.scheduleDelay(() => {
-          if (get().turnPhase === 'VETO_WINDOW') get().proceedAfterVetoWindow();
-        }, VETO_WINDOW_MS);
+        /* Ответы прошлого круга уже погашены выше, вместе с цепочкой: вопрос
+           теперь другой, и «пропустил первое вето» не значит «пропускаю
+           встречное». Автор действия в новом круге появляется — отменили
+           именно его, ему и отвечать, — а сам наложивший вето выпадает.
+           Длина цепочки ограничена только числом «Прав вето» на руках.
+
+           Здесь остаётся одно: спрашивать может быть уже некого. */
+        const { players, pendingAction: pending, overlayInstant: top } = get();
+        if (pending && vetoPollAnswered(players, vetoTopActorId(pending.actorId, top), [])) {
+          get().proceedAfterVetoWindow();
+        }
       } else {
-        /* Полоска обязана исчезнуть в тот же кадр, что и решение: она
-           отсчитывала время на решение, которое уже принято. */
-        set({ vetoDeadlineAt: null });
+        /* Вето на вето запрещено — отвечать больше нечем и незачем: окно
+           закрывается сразу, задержка только чтобы карту успели прочесть. */
         timerManager.scheduleDelay(() => {
           get().proceedAfterVetoWindow();
         }, ACTION_HOLD_MS);
       }
     }
-  } else if (instantType === 'Перенаправление' && targetPlayerId) {
-    const newTarget = players.find(p => p.id === targetPlayerId);
-    const claim = pendingAction?.roleClaim;
-    const redirectAllowed =
-      !!pendingAction &&
-      !!newTarget &&
-      !!claim &&
-      newTarget.id !== pendingAction.actorId &&
-      canBeTargetedBy(newTarget, claim);
-
-    if (redirectAllowed && pendingAction && newTarget) {
-      const updatedAction = { ...pendingAction, targetId: targetPlayerId };
-      set(state => ({
-        players: updatedPlayers,
-        discardPile: updatedDiscard,
-        pendingAction: updatedAction,
-        overlayInstant: { card: 'Перенаправление', actorId: actor.id },
-        turnPhase: 'TARGET_REACTION_WINDOW',
-        timerSeconds: 0,
-        timerMaxSeconds: 0,
-        activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
-        history: [
-          `🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ»! Новая цель атаки: ${newTarget.name}!`,
-          ...state.history
-        ].slice(0, 50)
-      }));
-    }
+  } else if (instantType === 'Перенаправление' && pendingAction && targetPlayerId) {
+    const newTarget = players.find(p => p.id === targetPlayerId)!;
+    const updatedAction = { ...pendingAction, targetId: targetPlayerId };
+    set(state => ({
+      players: updatedPlayers,
+      discardPile: updatedDiscard,
+      pendingAction: updatedAction,
+      overlayInstant: { card: 'Перенаправление', actorId: actor.id },
+      turnPhase: 'TARGET_REACTION_WINDOW',
+      timerSeconds: 0,
+      timerMaxSeconds: 0,
+      activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
+      history: [
+        `🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ» (потрачен 1 ⚡)! Новая цель атаки: ${newTarget.name}!`,
+        ...state.history
+      ].slice(0, 50)
+    }));
   } else if (instantType === 'Дворцовый переполох' && targetPlayerId) {
     set(state => ({
       players: updatedPlayers,

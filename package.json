@@ -10,6 +10,8 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:server": "npm run dev --workspace=apps/server",
     "build:web": "npm run build --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web"
+    "lint": "npm run lint --workspace=apps/web",
+    "check": "node scripts/check.mjs",
+    "check:soak": "npx tsx packages/engine/src/bot/botIntrigues.soak.ts"
   }
 }

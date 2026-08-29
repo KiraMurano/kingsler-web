@@ -5,18 +5,27 @@ import { holds } from '@kinglier/engine/cardInstance';
 import { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS, CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { getCardMaxCopies, TOTAL_DECK_SIZE } from '@kinglier/engine/cards';
 import type { GameCard } from '@kinglier/engine/types';
+import type { InspectableItem, NormalAction } from '@kinglier/engine/data/cardDescriptions';
 import { Sheet } from './ui/Overlay';
 import { Tabs } from './ui/Tabs';
 import { Tag } from './ui/Tag';
 import { renderWithIcons } from './ui/Icon';
+import { ActionCard } from './ActionCard';
 import { pickViewer } from '../lib/viewer';
 
-type CodexTab = 'all' | 'roles' | 'plots' | 'instants';
+type CodexTab = 'actions' | 'roles' | 'plots' | 'instants';
 
 interface CodexProps {
   open: boolean;
   onClose: () => void;
-  onSelectCard: (card: GameCard) => void;
+  onSelectCard: (item: InspectableItem) => void;
+}
+
+interface StandardActionInfo {
+  id: string;
+  name: NormalAction;
+  cost: string;
+  shortDescription: string;
 }
 
 const ALL_CARDS: GameCard[] = [...ALL_ROLES, ...ALL_PLOTS, ...ALL_INSTANTS];
@@ -26,21 +35,56 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
     deck,
     discardPile,
     players,
-    viewerId
+    viewerId,
+    rules
   } = useGameStore(
     useShallow(s => ({
       deck: s.deck,
       discardPile: s.discardPile,
       players: s.players,
-      viewerId: s.viewerId
+      viewerId: s.viewerId,
+      rules: s.rules
     }))
   );
-  const [tab, setTab] = useState<CodexTab>('all');
+  const [tab, setTab] = useState<CodexTab>('actions');
   const [query, setQuery] = useState('');
 
   const human = pickViewer(players, viewerId);
 
-  const visible = ALL_CARDS.filter(card => {
+  const standardActions: StandardActionInfo[] = [
+    {
+      id: 'petition',
+      name: 'Просить содержание',
+      cost: '1 ⚡',
+      shortDescription: 'Возьмите 1 🪙 из королевской казны. Нельзя заблокировать.'
+    },
+    {
+      id: 'feast',
+      name: 'Устроить пир',
+      cost: `1 ⚡ · ${rules.feastCost} 🪙`,
+      shortDescription: `Купите 1 👑 за ${rules.feastCost} 🪙. Победную корону пиром купить нельзя.`
+    },
+    {
+      id: 'rumor',
+      name: 'Распустить слух',
+      cost: `1 ⚡ · ${rules.rumorCost} 🪙`,
+      shortDescription: `Потратьте ${rules.rumorCost} 🪙, чтобы сбросить 1 👑 у соперника. Срывает Королевский приём и сжигает Охранную грамоту.`
+    },
+    {
+      id: 'exchange',
+      name: 'Сменить карты',
+      cost: '1 ⚡',
+      shortDescription: 'Сбросьте одну или обе карты и немедленно доберите новые из колоды.'
+    }
+  ];
+
+  const visibleActions = standardActions.filter(act => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return act.name.toLowerCase().includes(q) || act.shortDescription.toLowerCase().includes(q);
+  });
+
+  const visibleCards = ALL_CARDS.filter(card => {
     if (tab === 'roles' && !ALL_ROLES.includes(card as never)) return false;
     if (tab === 'plots' && !ALL_PLOTS.includes(card as never)) return false;
     if (tab === 'instants' && !ALL_INSTANTS.includes(card as never)) return false;
@@ -77,7 +121,7 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
         active={tab}
         onChange={setTab}
         items={[
-          { id: 'all', label: 'Все', count: ALL_CARDS.length },
+          { id: 'actions', label: 'Обычные действия', count: standardActions.length },
           { id: 'roles', label: 'Роли', count: ALL_ROLES.length },
           { id: 'plots', label: 'Интриги', count: ALL_PLOTS.length },
           { id: 'instants', label: 'Инстанты', count: ALL_INSTANTS.length }
@@ -86,40 +130,59 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
 
       <div className="panel__body">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {visible.map(card => {
-            const info = CARD_DESCRIPTIONS[card];
-            const held = !!human && holds(human.hand, card);
-            return (
-              <div
-                key={card}
-                className={`codexrow ${held ? 'codexrow--held' : ''}`}
-                onClick={() => onSelectCard(card)}
+          {tab === 'actions' ? (
+            /* Тем же `ActionCard`, что и в модалке обычных действий: одно и
+               то же показывают одинаково, иначе два похожих блока в двух
+               файлах разойдутся на первой же правке. */
+            visibleActions.map(act => (
+              <ActionCard
+                key={act.id}
+                action={act.name}
+                badge={<Tag tone="cold">{renderWithIcons(act.cost)}</Tag>}
+                onClick={() => onSelectCard(act.name)}
               >
-                <div className={`codexrow__art cardframe cardframe--${info.category}`}>
-                  <img src={info.artImage} alt={info.name} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 8
-                    }}
-                  >
-                    <span className="codexrow__name">{info.name}</span>
-                    {held ? (
-                      <Tag tone="truth">в руке</Tag>
-                    ) : (
-                      <Tag>{getCardMaxCopies(card)} шт.</Tag>
-                    )}
+                {renderWithIcons(act.shortDescription)}
+              </ActionCard>
+            ))
+          ) : (
+            visibleCards.map(card => {
+              const info = CARD_DESCRIPTIONS[card];
+              const held = !!human && holds(human.hand, card);
+              return (
+                <div
+                  key={card}
+                  className={`codexrow ${held ? 'codexrow--held' : ''}`}
+                  onClick={() => onSelectCard(card)}
+                >
+                  <div className={`codexrow__art cardframe cardframe--${info.category}`}>
+                    <img src={info.artImage} alt={info.name} />
                   </div>
-                  <div className="codexrow__desc">{renderWithIcons(info.shortDescription)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8
+                      }}
+                    >
+                      <span className="codexrow__name">{info.name}</span>
+                      {held ? (
+                        <Tag tone="truth">в руке</Tag>
+                      ) : (
+                        <Tag>{getCardMaxCopies(card)} шт.</Tag>
+                      )}
+                    </div>
+                    <div className="codexrow__desc">{renderWithIcons(info.shortDescription)}</div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          {visible.length === 0 && <div className="log__empty">Ничего не найдено.</div>}
+              );
+            })
+          )}
+          {((tab === 'actions' && visibleActions.length === 0) ||
+            (tab !== 'actions' && visibleCards.length === 0)) && (
+            <div className="log__empty">Ничего не найдено.</div>
+          )}
         </div>
       </div>
     </Sheet>

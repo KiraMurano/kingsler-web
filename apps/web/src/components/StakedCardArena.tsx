@@ -148,7 +148,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
 
   /* 4. Duel — two cards clash. */
   const isDuelOutcome = turnPhase === 'DUEL_OUTCOME' && !!duelOutcome;
-  if (turnPhase === 'DUEL_ATTACKER_WINDOW' || isDuelOutcome) {
+  if (turnPhase === 'DUEL_CLASH' || isDuelOutcome) {
     const defenderClaim = (pendingDuelDefenderRoleClaim ||
       duelOutcome?.defenderClaim ||
       'Казначей') as GameCard;
@@ -171,6 +171,13 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
           <div className="duel__row">
             <div className="duel__side">
               <CardAnchor zone={{ kind: 'duel', side: 'attacker' }}>
+                {/* Ва-банк едет на дуэль вместе со ставкой, которую он
+                    удваивает. Без своего якоря здесь зона `overlay` оставалась
+                    незарегистрированной, и слой карт держал карту на прежнем
+                    месте: ставка улетала в середину стола, а Ва-банк оставался
+                    висеть там, где заявку делали. Якорь вложен в сторону
+                    атакующего — Ва-банк принадлежит его заявке, а не столу. */}
+                {overlayAnchor}
                 <ClaimBadge text={claimBadge(attackerClaim, target)} />
               </CardAnchor>
             </div>

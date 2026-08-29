@@ -89,7 +89,7 @@ function seatTable(victim: Partial<Player>): { actorId: string; victimId: string
   const actorId = state.players[0].id;
   const victimId = state.players[1].id;
   useGameStore.setState({
-    openingToss: null,
+    opening: null,
     activePlayerId: actorId,
     turnPhase: 'IDLE',
     turnSubPhase: 'CARD_PLAY_PHASE',

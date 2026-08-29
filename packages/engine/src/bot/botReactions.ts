@@ -4,6 +4,7 @@ import { getBotArchetype } from '../botsConfig';
 import { evaluateBotDoubt } from './botEvaluator';
 import { selectBestRedirectionTarget } from './botTargeting';
 import { holds, idOf } from '../cardInstance';
+import { vetoAnswerRequired, vetoTopActorId } from '../resolvers/vetoChain';
 import {
   ACTION_HOLD_MS,
   BOT_REACTION_MS,
@@ -36,13 +37,17 @@ const DOUBT_STAGGER_MS = 260;
  * никогда не ответит.
  */
 export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void {
-  const { pendingAction, players, discardPile, coronationCandidateId } = state;
+  const { pendingAction, players, discardPile, coronationCandidateId, pendingDoubtPassedIds } = state;
   if (!pendingAction || !pendingAction.roleClaim) return;
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
 
-  const observingBots = players.filter(p => p.isBot && p.id !== pendingAction.actorId);
+  /* Жертва нападения входит в окно с уже сказанным «Верю» — переспрашивать её
+     значит задавать один вопрос дважды, ровно то, от чего мы и ушли. */
+  const observingBots = players.filter(
+    p => p.isBot && p.id !== pendingAction.actorId && !pendingDoubtPassedIds.includes(p.id)
+  );
 
   observingBots.forEach((bot, idx) => {
     const decision =
@@ -79,7 +84,11 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
 }
 
 /**
- * Реакция бота-цели атаки (Принять / Сомневаться / Дуэль / Перенаправление).
+ * Ответ бота-жертвы — один и окончательный: Верю / Не верю / Дуэль
+ * (или «Перенаправление» за 1 ⚡, если оно есть на руках).
+ *
+ * Второго вопроса не будет: сказанное здесь «Верю» засчитывается как ответ
+ * бота в опросе двора, а выставленный щит сразу разыгрывает дуэль.
  */
 export function handleTargetReactionPhase(state: GameState, schedule: BotScheduler): void {
   const { pendingAction, discardPile, players } = state;
@@ -89,9 +98,9 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   const attacker = players.find(p => p.id === pendingAction.actorId);
   if (!target || !target.isBot || !attacker) return;
 
-  // 1. Возможность сыграть инстант ⚡ «Перенаправление» (0 ⚡)
+  // 1. Возможность сыграть инстант ⚡ «Перенаправление» (1 ⚡)
   const redirectId = idOf(target.hand, 'Перенаправление');
-  if (redirectId && Math.random() < 0.70) {
+  if (redirectId && target.actionTokens >= 1 && Math.random() < 0.70) {
     const otherOpponents = players.filter(p => p.id !== attacker.id && p.id !== target.id);
     const newTarget = selectBestRedirectionTarget(attacker, target, otherOpponents, pendingAction.roleClaim);
     if (newTarget) {
@@ -165,102 +174,99 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
 }
 
 /**
- * Реакция бота-атакующего при объявлении дуэли целью (Принять дуэль / Отступить).
- */
-export function handleDuelAttackerPhase(state: GameState, schedule: BotScheduler): void {
-  const { pendingAction } = state;
-  if (!pendingAction) return;
-
-  const attacker = state.players.find(p => p.id === pendingAction.actorId);
-  const defender = state.players.find(p => p.id === pendingAction.targetId);
-  if (!attacker || !attacker.isBot || !defender) return;
-
-  const archetype = getBotArchetype(attacker);
-  const wasTruth = holds(attacker.hand, pendingAction.roleClaim!);
-
-  let willAccept = false;
-  if (wasTruth) {
-    willAccept = true;
-  } else {
-    const baseAccept = (archetype.type === 'gambler' || archetype.type === 'provocateur') ? 0.35 : 0.10;
-    willAccept = Math.random() < baseAccept;
-  }
-
-  schedule('duel_attacker', () => {
-    const curState = useGameStore.getState();
-    if (curState.turnPhase === 'DUEL_ATTACKER_WINDOW') {
-      if (willAccept) {
-        curState.attackerAcceptDuel(attacker.id);
-      } else {
-        curState.attackerRetreatDuel(attacker.id);
-      }
-    }
-  }, BOT_REACTION_MS + Math.random() * BOT_REACTION_JITTER_MS);
-}
-
-/**
- * Реакция ботов в окне «Право вето».
+ * Ответ ботов в окне «Право вето»: наложить вето или пропустить.
+ *
+ * Окно держится ответами, а не часами, — значит ответить обязан каждый, кого
+ * спрашивают, и бот без «Права вето» в том числе: для него «Пропустить» —
+ * единственный законный ответ, но не ответить он не может, иначе стол будет
+ * ждать того, кто никогда не ответит. Это ровно устройство окна сомнения (см.
+ * `handleDoubtPhase`), и разъезжаться им нельзя.
  */
 export function handleVetoPhase(state: GameState, schedule: BotScheduler): void {
-  const { pendingAction, players, isVetoed, rules } = state;
+  const { pendingAction, players, isVetoed, rules, vetoChain, pendingVetoPassedIds } = state;
   if (!pendingAction) return;
 
-  /* Обычно поверх уже наложенного вето ботам делать нечего. С правилом «вето
-     на вето» они отвечают встречным — но только когда встречное действительно
-     что-то меняет, то есть когда действие сейчас отменено. Иначе бот сжигал
-     бы карту, чтобы отменить то, что и так состоится. */
+  /* Чья карта наверху — тот в этом круге не отвечает: ни своё действие, ни
+     своё же вето отменять незачем. Именно из-за пропуска этого правила бот,
+     положивший вето, тут же говорил «Не накладываю Вето». */
+  const topActorId = vetoTopActorId(pendingAction.actorId, state.overlayInstant);
+
+  /* Вето на вето запрещено правилами партии, а вето уже лежит: круг закрылся
+     сам, отвечать не на что. */
   if (isVetoed && !rules.vetoOnVeto) return;
 
-  /* Встречное вето снимает чужую отмену — значит играть его осмысленно только
-     тому, чьё действие отменили. Остальным оно вернуло бы к жизни чужой ход.
-     Поэтому в цепочке кандидат ровно один: автор действия. */
-  if (isVetoed) {
-    const author = players.find(p => p.id === pendingAction.actorId);
-    if (!author?.isBot) return;
-    const vetoId = idOf(author.hand, 'Право вето');
-    if (!vetoId) return;
-    schedule('veto', () => {
-      const cur = useGameStore.getState();
-      if (cur.turnPhase === 'VETO_WINDOW' && cur.isVetoed && cur.rules.vetoOnVeto) {
-        cur.playInstant(author.id, 'Право вето', vetoId);
-      }
-    }, BOT_VETO_MS + Math.random() * BOT_VETO_JITTER_MS);
-    return;
-  }
+  const actor = players.find(p => p.id === pendingAction.actorId);
 
-  const vetoBots = players.filter(
-    p => p.isBot && p.id !== pendingAction.actorId && holds(p.hand, 'Право вето')
+  /* Круг, на который отвечают. Пока бот думает, кто-то может положить вето —
+     и тогда это уже другой вопрос, а заготовленный ответ к нему не относится. */
+  const round = vetoChain;
+
+  const responders = players.filter(
+    p =>
+      p.isBot &&
+      vetoAnswerRequired(p.id, topActorId) &&
+      !pendingVetoPassedIds.includes(p.id)
   );
 
-  for (const bot of vetoBots) {
+  responders.forEach((bot, idx) => {
+    const vetoId = idOf(bot.hand, 'Право вето');
     let shouldVeto = false;
 
-    // Защита себя от прямой атаки (Вор или Шантажист)
-    if (pendingAction.targetId === bot.id) {
-      shouldVeto = true;
-    }
+    if (vetoId) {
+      if (isVetoed) {
+        /* Встречное вето снимает чужую отмену — значит осмысленно оно только
+           тому, чьё действие отменили. Остальным оно вернуло бы к жизни чужой
+           ход, поэтому в цепочке кандидат ровно один: автор действия. */
+        shouldVeto = bot.id === pendingAction.actorId;
+      } else {
+        // Защита себя от прямой атаки (Вор или Шантажист)
+        if (pendingAction.targetId === bot.id) shouldVeto = true;
 
-    // Блокировка Наследника, берущего решающую корону
-    const actor = players.find(p => p.id === pendingAction.actorId);
-    if (pendingAction.roleClaim === 'Наследник' && actor && actor.favor >= Math.max(1, rules.crownsToWin - 2)) {
-      shouldVeto = true;
-    }
-
-    // Блокировка опасных действий под Ва-банком
-    if (state.isVaBanqueActive) {
-      shouldVeto = true;
-    }
-
-    if (shouldVeto || Math.random() < 0.40) {
-      const vetoId = idOf(bot.hand, 'Право вето');
-      if (!vetoId) continue;
-      schedule('veto', () => {
-        const cur = useGameStore.getState();
-        if (cur.turnPhase === 'VETO_WINDOW' && !cur.isVetoed) {
-          cur.playInstant(bot.id, 'Право вето', vetoId);
+        // Блокировка Наследника, берущего решающую корону
+        if (
+          pendingAction.roleClaim === 'Наследник' &&
+          actor &&
+          actor.favor >= Math.max(1, rules.crownsToWin - 2)
+        ) {
+          shouldVeto = true;
         }
-      }, BOT_VETO_MS + Math.random() * BOT_VETO_JITTER_MS);
-      break;
+
+        // Блокировка опасных действий под Ва-банком
+        if (state.isVaBanqueActive) shouldVeto = true;
+
+        if (!shouldVeto) shouldVeto = Math.random() < 0.40;
+      }
     }
-  }
+
+    const delay =
+      BOT_VETO_MS + Math.random() * BOT_VETO_JITTER_MS + idx * DOUBT_STAGGER_MS;
+
+    schedule(
+      `veto_${bot.id}`,
+      () => {
+        const cur = useGameStore.getState();
+        /* Круг мог смениться, пока бот думал: поверх легло вето, и вопрос
+           теперь другой. Свой ответ бот даст заново — движок пересобирает
+           опрос на каждое сыгранное вето. */
+        if (cur.turnPhase !== 'VETO_WINDOW' || cur.vetoChain !== round) return;
+        if (cur.pendingVetoPassedIds.includes(bot.id)) return;
+        if (!shouldVeto || !vetoId) {
+          cur.passVeto(bot.id);
+          return;
+        }
+
+        cur.playInstant(bot.id, 'Право вето', vetoId);
+
+        /* Окно держится ответами — значит промолчать бот не имеет права ни при
+           каком исходе. Движок вправе отвергнуть ход молча (карты уже нет на
+           руках, ход не тот), и тогда «наложить вето» ответом не стало: без
+           этого отката бот просто исчезает из опроса, а стол ждёт его вечно.
+           Признак того, что вето легло, — сдвинувшаяся цепочка. */
+        if (useGameStore.getState().vetoChain === round) cur.passVeto(bot.id);
+        // ЗАМЕТКА: см. `bot/botVeto.check.ts` — оба зависания окна вето пришли
+        // отсюда и из перезапуска круга в `instantResolver`.
+      },
+      delay
+    );
+  });
 }

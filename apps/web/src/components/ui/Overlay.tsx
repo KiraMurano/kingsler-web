@@ -1,17 +1,30 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, ArrowLeft } from 'lucide-react';
 
 interface OverlayHeadProps {
   title?: React.ReactNode;
   description?: React.ReactNode;
   onClose: () => void;
+  onBack?: () => void;
 }
 
-const OverlayHead: React.FC<OverlayHeadProps> = ({ title, description, onClose }) => (
+const OverlayHead: React.FC<OverlayHeadProps> = ({ title, description, onClose, onBack }) => (
   <div className="overlay__head">
-    <div>
-      {title && <div className="overlay__title" role="heading" aria-level={2}>{title}</div>}
-      {description && <div className="overlay__desc">{description}</div>}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+      {onBack && (
+        <button
+          type="button"
+          className="overlay__back"
+          onClick={onBack}
+          title="Назад"
+        >
+          <ArrowLeft size={16} />
+        </button>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {title && <div className="overlay__title" role="heading" aria-level={2}>{title}</div>}
+        {description && <div className="overlay__desc">{description}</div>}
+      </div>
     </div>
     <button type="button" className="overlay__close" onClick={onClose} title="Закрыть (Esc)">
       <X size={15} />
@@ -33,6 +46,7 @@ function useEscape(open: boolean, onClose: () => void) {
 export interface SheetProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   side?: 'left' | 'right';
   width?: number;
   title?: React.ReactNode;
@@ -43,6 +57,7 @@ export interface SheetProps {
 export const Sheet: React.FC<SheetProps> = ({
   open,
   onClose,
+  onBack,
   side = 'right',
   width = 420,
   title,
@@ -59,7 +74,7 @@ export const Sheet: React.FC<SheetProps> = ({
         style={{ maxWidth: width }}
         onClick={e => e.stopPropagation()}
       >
-        <OverlayHead title={title} description={description} onClose={onClose} />
+        <OverlayHead title={title} description={description} onClose={onClose} onBack={onBack} />
         {children}
       </div>
     </div>
@@ -69,6 +84,7 @@ export const Sheet: React.FC<SheetProps> = ({
 export interface DialogProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   width?: number;
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -79,6 +95,7 @@ export interface DialogProps {
 export const Dialog: React.FC<DialogProps> = ({
   open,
   onClose,
+  onBack,
   width = 560,
   title,
   description,
@@ -97,7 +114,7 @@ export const Dialog: React.FC<DialogProps> = ({
         aria-modal="true"
         onClick={e => e.stopPropagation()}
       >
-        <OverlayHead title={title} description={description} onClose={onClose} />
+        <OverlayHead title={title} description={description} onClose={onClose} onBack={onBack} />
         <div className="overlay__body">{children}</div>
       </div>
     </div>

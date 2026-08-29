@@ -19,10 +19,10 @@ import { resolveRoleActionEffect } from './roleResolver.ts';
 import {
   triggerVetoWindowOrResolveEffect,
   proceedAfterVetoWindow,
+  passVeto,
   resolvePendingActionEffect
 } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { VETO_WINDOW_MS } from '../timing.ts';
 import { assertCardCensus } from './cardCensus.check.ts';
 import { DEFAULT_RULES } from '../rules.ts';
 
@@ -69,7 +69,8 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     pendingAction: null as Action | null,
     pendingDoubtDoubterId: null as string | null,
     pendingDoubtPassedIds: [] as string[],
-    vetoDeadlineAt: null as number | null,
+    pendingVetoPassedIds: [] as string[],
+    pendingVetoActionId: null as string | null,
     hasUsedNormalActionThisTurn: false,
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
@@ -152,8 +153,8 @@ function lateBotVetoTimerFires(
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null, 'the plot has not landed yet');
   assertCardCensus(api, allIds, 'while the veto window is open');
 
-  // The window runs out — exactly what the engine's own timer calls. (Case 4
-  // below waits out the real VETO_WINDOW_MS; here the subject is the late bot.)
+  // The court answers and the window closes. (Case 4 below drives the poll
+  // itself; here the subject is the late bot.)
   proceedAfterVetoWindow(get, set);
   assert.equal(
     api.players.find(p => p.id === 'p1')!.activePlot?.type,
@@ -267,9 +268,10 @@ function lateBotVetoTimerFires(
 }
 
 // 4. Окно вето открывается ВСЕГДА — даже когда «Права вето» нет ни у кого на
-//    руках — и закрывается само ровно через VETO_WINDOW_MS. Раньше в этом
-//    случае эффект применялся через 800 мс и окна не было вовсе; разная длина
-//    паузы читалась как подсказка о чужих картах.
+//    руках, — и держится ОТВЕТАМИ, а не часами. Таймер на пять секунд был
+//    самой дорогой паузой партии, и решение за ним почти всегда было одно и
+//    то же; теперь окно закрывает последний ответивший, а автора действия в
+//    первом круге не спрашивают вовсе.
 {
   const actorHand = mint(['Королевский приём', 'Наследник']);
   const humanHand = mint(['Шут', 'Казначей']);
@@ -293,12 +295,19 @@ function lateBotVetoTimerFires(
   assert.equal(
     api.turnPhase,
     'VETO_WINDOW',
-    'окно открывается и без «Права вето» на руках — пауза одинакова всегда'
+    'окно открывается и без «Права вето» на руках — вопрос задаётся всегда'
   );
-  assert.ok(
-    api.vetoDeadlineAt !== null && api.vetoDeadlineAt - Date.now() > VETO_WINDOW_MS - 500,
-    'дедлайн — абсолютный timestamp примерно через 7 с'
+  /* Ни у p2, ни у p3 «Права вето» нет — и это НИЧЕГО не меняет: их всё равно
+     спрашивают, и пропуск за них не проставляется. Иначе длина паузы читалась
+     бы как подсказка о чужих руках: окно, закрывшееся само, означало бы
+     «вето ни у кого нет». */
+  assert.equal(
+    api.players.filter(p => p.hand.some(c => c.card === 'Право вето')).length,
+    0,
+    'ни у кого на руках вето нет — и опрос всё равно идёт'
   );
+  assert.deepEqual(api.pendingVetoPassedIds, [], 'опрос открыт и пуст');
+  assert.equal(api.pendingVetoActionId, api.pendingAction?.id, 'опрос принадлежит своей заявке');
   assert.equal(
     api.players.find(p => p.id === 'p1')!.activePlot,
     null,
@@ -306,11 +315,66 @@ function lateBotVetoTimerFires(
   );
   assertCardCensus(api, allIds, 'пока окно вето открыто');
 
-  await new Promise(r => setTimeout(r, VETO_WINDOW_MS + 300));
+  /* Часы больше ничего не решают: сколько ни жди, без ответов окно стоит. */
+  await new Promise(r => setTimeout(r, 1200));
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'само по себе окно не закрывается');
 
-  assert.notEqual(api.turnPhase, 'VETO_WINDOW', 'окно закрывается само');
-  assert.equal(api.vetoDeadlineAt, null, 'дедлайн снят вместе с окном');
+  /* Автора не спрашивают — его «Пропустить» не засчитывается и окна не
+     закрывает. Иначе один клик закрыл бы опрос за весь двор. */
+  passVeto(get, set, 'p1');
+  assert.deepEqual(api.pendingVetoPassedIds, [], 'ответ автора в опросе не участвует');
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'окно держится');
+
+  passVeto(get, set, 'p2');
+  assert.deepEqual(api.pendingVetoPassedIds, ['p2'], 'ответ засчитан');
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'ответил не весь двор — окно держится');
+
+  /* Повторный ответ ничего не двигает: свой голос отдают один раз. */
+  passVeto(get, set, 'p2');
+  assert.deepEqual(api.pendingVetoPassedIds, ['p2'], 'второй раз тот же ответ не считается');
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'и окна не закрывает');
+
+  passVeto(get, set, 'p3');
+  assert.notEqual(
+    api.turnPhase,
+    'VETO_WINDOW',
+    'окно закрыл последний ОТВЕТИВШИЙ, а не отсутствие карт на руках'
+  );
+  assert.equal(
+    api.players.find(p => p.id === 'p1')!.activePlot?.type,
+    'Королевский приём',
+    'и действие состоялось'
+  );
   assertCardCensus(api, allIds, 'после закрытия окна вето');
+
+  timerManager.clearAll();
+}
+
+// 5. Стол на двоих: спрашивать в первом круге некого — единственный, кроме
+//    автора, отвечает, и окно закрывается его ответом. А если и того нет,
+//    опрос заканчивается, не начавшись.
+{
+  const actorHand = mint(['Королевский приём', 'Наследник']);
+  const deck = mint(['Наследник', 'Казначей']);
+  const plotCardId: CardId = actorHand[0].id;
+
+  const { get, set, api } = makeHarness({
+    activePlayerId: 'p1',
+    deck,
+    players: [player({ id: 'p1', name: 'Анна', hand: actorHand })]
+  });
+
+  playPlotAction(get, set, 'Королевский приём', plotCardId);
+  assert.notEqual(
+    api.turnPhase,
+    'VETO_WINDOW',
+    'кроме автора за столом никого — окно не имеет кого спросить и закрывается сразу'
+  );
+  assert.equal(
+    api.players.find(p => p.id === 'p1')!.activePlot?.type,
+    'Королевский приём',
+    'действие состоялось, а не повисло'
+  );
 
   timerManager.clearAll();
 }

@@ -37,7 +37,6 @@ export { makeBotMove } from './bot/botTurnPlanner';
 export {
   handleDoubtPhase,
   handleTargetReactionPhase,
-  handleDuelAttackerPhase,
   handleVetoPhase,
   type BotScheduler
 } from './bot/botReactions';

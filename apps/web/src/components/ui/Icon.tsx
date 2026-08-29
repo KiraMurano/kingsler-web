@@ -14,8 +14,8 @@ export type UiIconKind =
 export type UiIconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '500';
 
 const ICON_MAP: Record<UiIconKind, { sm: string; lg: string; alt: string }> = {
-  coin: { sm: '/assets/ui/coin-sm.webp', lg: '/assets/ui/coin-500.webp', alt: 'Монета' },
-  gold: { sm: '/assets/ui/coin-sm.webp', lg: '/assets/ui/coin-500.webp', alt: 'Золото' },
+  coin: { sm: '/assets/ui/coin-side-sm.webp', lg: '/assets/ui/coin-side-500.webp', alt: 'Монета' },
+  gold: { sm: '/assets/ui/coin-side-sm.webp', lg: '/assets/ui/coin-side-500.webp', alt: 'Золото' },
   crown: { sm: '/assets/ui/crown-sm.webp', lg: '/assets/ui/crown-500.webp', alt: 'Корона' },
   bulla: { sm: '/assets/ui/bulla-sm.webp', lg: '/assets/ui/bulla-500.webp', alt: 'Булла' },
   seal: { sm: '/assets/ui/bulla-sm.webp', lg: '/assets/ui/bulla-500.webp', alt: 'Печать' },

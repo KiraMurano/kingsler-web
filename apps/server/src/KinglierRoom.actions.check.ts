@@ -13,7 +13,14 @@ const { Client } = await import('@colyseus/sdk');
 const { createServer } = await import('./app.ts');
 const { findOrCreateUserByEmail } = await import('./db.ts');
 const { JWT } = await import('colyseus');
-const { TOSS_BOT_READY_MS, TOSS_SPIN_MS, TOSS_START_MS } = await import('@kinglier/engine/timing');
+const {
+  DEAL_STEP_MS,
+  FANFARE_MS,
+  OPENING_HOLD_MS,
+  TOSS_BOT_READY_MS,
+  TOSS_SPIN_MS,
+  TOSS_VERDICT_MS
+} = await import('@kinglier/engine/timing');
 
 const PORT = 27892;
 createServer().listen(PORT);
@@ -26,14 +33,14 @@ const client = new Client(`ws://localhost:${PORT}`);
 type State = {
   players: { id: string; gold: number; isBot: boolean }[];
   activePlayerId: string;
-  openingToss: { winnerId: string; readyIds: string[]; startsAt: number | null } | null;
+  opening: { stage: string; winnerId: string; readyIds: string[]; tossAt: number | null } | null;
 };
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Партия открывается жребием, и первый ход достаётся случайному месту, а не
- * хозяину комнаты. Проверяются здесь права на действие, а не жребий, поэтому
+ * Партия открывается сбором двора, и первый ход достаётся случайному месту, а
+ * не хозяину комнаты. Проверяются здесь права на действие, а не жребий, поэтому
  * стол пересобирается, пока монетка не выпадет живому игроку.
  *
  * Ждать чужого хода за столом нельзя: бот, атаковавший человека, открывает
@@ -54,14 +61,15 @@ async function tableWithHumanToMove() {
     host.send('start');
     await sleep(500);
     assert.ok(hostState, 'starting the game must push a state to the host');
-    assert.ok(hostState!.openingToss, 'a started game must open with a toss');
+    assert.ok(hostState!.opening, 'a started game must open with its sequence');
+    assert.equal(hostState!.opening!.stage, 'READY', 'and it starts by gathering the court');
     assert.equal(
       hostState!.activePlayerId,
-      hostState!.openingToss!.winnerId,
+      hostState!.opening!.winnerId,
       'the toss winner must be the one to move'
     );
 
-    // Под экраном жребия стол закрыт для всех, включая победителя.
+    // Всё открытие стол закрыт для всех, включая победителя жребия.
     const goldUnderToss = hostState!.players.map(p => p.gold);
     host.send('action', {
       method: 'performAction',
@@ -71,27 +79,35 @@ async function tableWithHumanToMove() {
     assert.deepEqual(
       hostState!.players.map(p => p.gold),
       goldUnderToss,
-      'no action may land while the toss screen is still up'
+      'no action may land while the opening is still running'
     );
 
     // «Готов» — про себя: чужую готовность сервер отбивает.
     host.send('action', { method: 'markReady', args: ['p2'] });
     await sleep(200);
     assert.ok(
-      !hostState!.openingToss!.readyIds.includes('p2'),
+      !hostState!.opening!.readyIds.includes('p2'),
       'a player must not be able to press ready for someone else'
     );
 
     host.send('action', { method: 'markReady', args: ['p1'] });
     await sleep(200);
-    assert.ok(hostState!.openingToss!.readyIds.includes('p1'), 'the host must be able to ready up');
-    assert.ok(hostState!.openingToss, 'the screen must hold until the guest is ready too');
+    assert.ok(hostState!.opening!.readyIds.includes('p1'), 'the host must be able to ready up');
+    assert.equal(hostState!.opening!.stage, 'READY', 'the screen must hold until the guest is ready too');
 
     // Готовы должны быть все, включая ботов: те отмечаются сами в пределах
-    // пары секунд после приземления монетки.
+    // пары секунд. Дальше открытие идёт само — пауза, жребий, раздача, фанфара.
     guest.send('action', { method: 'markReady', args: ['p2'] });
-    await sleep(TOSS_SPIN_MS + TOSS_BOT_READY_MS + TOSS_START_MS + 600);
-    assert.equal(hostState!.openingToss, null, 'the whole table ready must start the game');
+    await sleep(
+      TOSS_BOT_READY_MS +
+        OPENING_HOLD_MS * 3 +
+        TOSS_SPIN_MS +
+        TOSS_VERDICT_MS +
+        DEAL_STEP_MS * 10 +
+        FANFARE_MS +
+        1500
+    );
+    assert.equal(hostState!.opening, null, 'the whole table ready must play the opening out');
 
     const active = hostState!.players.find(p => p.id === hostState!.activePlayerId)!;
     if (!active.isBot) {

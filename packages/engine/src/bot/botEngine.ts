@@ -4,7 +4,6 @@ import { BOT_MOVE_MS, BOT_MOVE_JITTER_MS, TOSS_BOT_READY_MS } from '../timing';
 import {
   handleDoubtPhase,
   handleTargetReactionPhase,
-  handleDuelAttackerPhase,
   handleVetoPhase,
   type BotScheduler
 } from './botReactions';
@@ -64,29 +63,26 @@ const botTimers = new BotTimerRegistry();
 const scheduler: BotScheduler = (key, cb, delay) => botTimers.schedule(key, cb, delay);
 
 /**
- * Боты подтверждают готовность на экране жребия — сами и вразнобой.
+ * Боты подтверждают готовность на сборе двора — сами и вразнобой.
  *
- * Отсчёт идёт от приземления монетки, а не от начала партии: до тех пор
- * кружков готовности на экране ещё нет, и бот, отметившийся в полёте, зажёгся
- * бы до того, как игрок увидел ряд.
- *
- * Остаток полёта берётся из `landsAt`, поэтому подключившийся в середине не
- * получает лишнюю паузу.
+ * Отсчёт идёт от появления экрана, а не от какого-либо события внутри него:
+ * сбор двора — самая первая стадия, до жребия и до карт, и ждать боту здесь
+ * нечего. Разброс нужен только для того, чтобы четыре галочки не зажигались
+ * одним кадром.
  */
 function scheduleBotReadiness(state: ReturnType<typeof useGameStore.getState>): void {
-  const toss = state.openingToss;
-  if (!toss) return;
-  const untilLanded = Math.max(0, toss.landsAt - Date.now());
+  const opening = state.opening;
+  if (!opening || opening.stage !== 'READY') return;
 
   for (const bot of state.players) {
-    if (!bot.isBot || toss.readyIds.includes(bot.id)) continue;
+    if (!bot.isBot || opening.readyIds.includes(bot.id)) continue;
     botTimers.schedule(
       `toss_ready_${bot.id}`,
       () => {
         const cur = useGameStore.getState();
-        if (cur.openingToss) cur.markReady(bot.id);
+        if (cur.opening?.stage === 'READY') cur.markReady(bot.id);
       },
-      untilLanded + Math.random() * TOSS_BOT_READY_MS
+      Math.random() * TOSS_BOT_READY_MS
     );
   }
 }
@@ -103,7 +99,7 @@ function checkAndScheduleBotMove(): void {
     state.turnPhase === 'IDLE' &&
     // Бот, выигравший жребий, обязан дождаться конца броска: иначе он
     // успевает сходить, пока игрок ещё смотрит на монетку.
-    !state.openingToss &&
+    !state.opening &&
     !state.pendingAction &&
     !state.revealOutcome &&
     !state.duelOutcome &&
@@ -117,7 +113,7 @@ function checkAndScheduleBotMove(): void {
           const curState = useGameStore.getState();
           if (
             curState.turnPhase === 'IDLE' &&
-            !curState.openingToss &&
+            !curState.opening &&
             !curState.pendingAction &&
             !curState.revealOutcome &&
             !curState.duelOutcome &&
@@ -156,9 +152,11 @@ export function startBotEngine(): void {
     // ------------------------------------------------------------------------
     // 0. ЖРЕБИЙ: боты подтверждают готовность вразнобой
     // ------------------------------------------------------------------------
-    // Новый бросок узнаётся по `landsAt`: он меняется ровно раз за партию,
-    // а `readyIds` внутри одного жребия меняется на каждой галочке.
-    if (state.openingToss && state.openingToss.landsAt !== prevState?.openingToss?.landsAt) {
+    // Новое открытие узнаётся по `id`: он растёт ровно раз за партию,
+    // а `readyIds` внутри одного открытия меняется на каждой галочке — ключ по
+    // нему пересобирал бы таймеры ботов после каждой чужой галочки, и они
+    // откладывали бы свою всё дальше.
+    if (state.opening && state.opening.id !== prevState?.opening?.id) {
       scheduleBotReadiness(state);
     }
 
@@ -187,18 +185,16 @@ export function startBotEngine(): void {
     }
 
     // ------------------------------------------------------------------------
-    // 4. ОКНО АТАКУЮЩЕГО НА ДУЭЛИ (DUEL_ATTACKER_WINDOW): Принять или отступить
+    // 4. ОКНО ПРАВА ВЕТО (VETO_WINDOW): вето или «Пропустить» — от каждого
     // ------------------------------------------------------------------------
-    if (state.turnPhase === 'DUEL_ATTACKER_WINDOW' && state.turnPhase !== prevState?.turnPhase) {
-      botTimers.clear('duel_attacker');
-      handleDuelAttackerPhase(state, scheduler);
-    }
-
-    // ------------------------------------------------------------------------
-    // 5. ОКНО ПРАВА ВЕТО (VETO_WINDOW): Оценка отмены действия
-    // ------------------------------------------------------------------------
-    if (state.turnPhase === 'VETO_WINDOW' && state.turnPhase !== prevState?.turnPhase) {
-      botTimers.clear('veto');
+    // Пересобирается не только на входе в окно, но и на каждое сыгранное
+    // вето: с правилом «вето на вето» круг начинается заново, и это уже
+    // другой вопрос — прошлые ответы к нему не относятся.
+    if (
+      state.turnPhase === 'VETO_WINDOW' &&
+      (state.turnPhase !== prevState?.turnPhase || state.vetoChain !== prevState?.vetoChain)
+    ) {
+      botTimers.clearPrefix('veto');
       handleVetoPhase(state, scheduler);
     }
   });

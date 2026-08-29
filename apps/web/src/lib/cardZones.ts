@@ -112,7 +112,7 @@ export function deriveCardZones(
    * must be turned up right now.
    *
    * `verdicts` runs alongside: for each scrutinised card, whether the claim it
-   * was staked on turned out to be true. That is what the ПРАВДА / БЛЕФ stamp
+   * was staked on turned out to be true. That is what the «Правда» / «Блеф» stamp
    * on the card's front face reads.
    */
   const scrutinised = new Map<CardId, GameCard>();
@@ -186,15 +186,23 @@ export function deriveCardZones(
     zone: Zone,
     face: Face,
     ownerId: string | null,
-    charges?: number
+    extra?: { charges?: number; underlay?: boolean }
   ): void {
     const previous = claimed.get(id);
     if (previous && ZONE_PRECEDENCE[previous.zone.kind] >= ZONE_PRECEDENCE[zone.kind]) return;
     const placed: PlacedCard = { id, zone, face, revealed: scrutinised.has(id), ownerId };
     if (verdicts.has(id)) placed.wasTruth = verdicts.get(id);
-    if (charges !== undefined) placed.charges = charges;
+    if (extra?.charges !== undefined) placed.charges = extra.charges;
+    if (extra?.underlay) placed.underlay = true;
     claimed.set(id, placed);
   }
+
+  /* Идёт ли дуэль. Считается до раскладки, а не внутри правила 2: от этого
+     зависит и то, как ложится оверлей (правило 1), — на дуэли он уходит ПОД
+     карты, потому что закрывал бы собой ровно то, ради чего дуэль смотрят. */
+  const duelIsLive =
+    pendingDuelDefenderCardId !== null &&
+    (turnPhase === 'DUEL_CLASH' || turnPhase === 'DUEL_OUTCOME');
 
   /* 1. overlay — an instant laid on top of the current action. */
   if (overlayInstant) {
@@ -203,16 +211,14 @@ export function deriveCardZones(
       resolveOverlayCardId(state, overlay),
       { kind: 'overlay' },
       { known: overlay.card },
-      overlay.actorId
+      overlay.actorId,
+      { underlay: duelIsLive }
     );
   }
 
   /* 2. duel — both stakes leave their hands and clash in the middle. The
      defender's card is only named while the duel is live or its outcome is on
      screen; after that the ids stop meaning anything. */
-  const duelIsLive =
-    pendingDuelDefenderCardId !== null &&
-    (turnPhase === 'DUEL_ATTACKER_WINDOW' || turnPhase === 'DUEL_OUTCOME');
   if (duelIsLive && pendingAction) {
     const attackerId = pendingAction.actorId;
     const defenderId = pendingAction.targetId ?? duelOutcome?.defenderId ?? null;
@@ -270,7 +276,7 @@ export function deriveCardZones(
       { kind: 'plot', playerId: pendingAction.actorId },
       { known: laid },
       pendingAction.actorId,
-      laid === 'Тайный заговор' ? 0 : undefined
+      laid === 'Тайный заговор' ? { charges: 0 } : undefined
     );
   }
   for (const p of players) {
@@ -280,7 +286,7 @@ export function deriveCardZones(
       { kind: 'plot', playerId: p.id },
       { known: p.activePlot.type },
       p.id,
-      p.activePlot.charges
+      { charges: p.activePlot.charges }
     );
   }
 

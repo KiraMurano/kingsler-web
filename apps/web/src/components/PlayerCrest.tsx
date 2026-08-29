@@ -33,7 +33,11 @@ export const CrownsTrack: React.FC<{
           столько колонок, сколько корон нужно для победы. */}
       <div className="crowns__track" style={{ '--crowns': crownsToWin } as React.CSSProperties}>
         {Array.from({ length: crownsToWin }).map((_, i) => (
-          <span key={i} className={`crowns__seg ${favor > i ? 'crowns__seg--on' : ''}`} />
+          <span
+            key={i}
+            className={`crowns__seg ${favor > i ? 'crowns__seg--on' : ''}`}
+            style={{ '--i': i } as React.CSSProperties}
+          />
         ))}
       </div>
     </div>
@@ -54,6 +58,9 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
     pendingDoubtPassedIds,
     pendingDoubtDoubterId,
     pendingDoubtActionId,
+    pendingVetoPassedIds,
+    pendingVetoActionId,
+    overlayInstant,
     revealOutcome
   } = useGameStore(
     useShallow(s => ({
@@ -63,6 +70,9 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
       pendingDoubtPassedIds: s.pendingDoubtPassedIds,
       pendingDoubtDoubterId: s.pendingDoubtDoubterId,
       pendingDoubtActionId: s.pendingDoubtActionId,
+      pendingVetoPassedIds: s.pendingVetoPassedIds,
+      pendingVetoActionId: s.pendingVetoActionId,
+      overlayInstant: s.overlayInstant,
       revealOutcome: s.revealOutcome
     }))
   );
@@ -73,6 +83,9 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
     pendingDoubtPassedIds,
     pendingDoubtDoubterId,
     pendingDoubtActionId,
+    pendingVetoPassedIds,
+    pendingVetoActionId,
+    overlayInstant,
     revealOutcome,
     playerId: player.id
   });
@@ -83,11 +96,13 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
     ? 'вы поверили'
     : reaction === 'doubted'
       ? 'вы проверяете'
-      : reaction === 'thinking'
-        ? 'ваш ответ ждут'
-        : isActive
-          ? 'ваш ход'
-          : 'ожидание';
+      : reaction === 'vetoed'
+        ? 'вы наложили вето'
+        : reaction === 'passed'
+          ? 'вы пропустили'
+          : isActive
+            ? 'ваш ход'
+            : 'ожидание';
 
   return (
     <aside className={`crest ${isActive ? 'crest--active' : ''}`}>
@@ -124,7 +139,7 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
             className={[
               'crest__state',
               (isActive && !reaction) || reaction === 'believed' ? 'crest__state--mine' : '',
-              reaction === 'thinking' || reaction === 'doubted' ? 'crest__state--asked' : ''
+              reaction === 'doubted' ? 'crest__state--asked' : ''
             ]
               .filter(Boolean)
               .join(' ')}

@@ -15,9 +15,9 @@ const port = parentPort;
 const ALLOWED_METHODS = new Set([
   'markReady',
   'performAction', 'skipNormalActionPhase', 'endTurnManually', 'playPlotAction',
-  'playInstant', 'doubtAction', 'passDoubt',
+  'playInstant', 'doubtAction', 'passDoubt', 'passVeto',
   'targetAcceptAttack', 'targetDoubtAttack', 'targetDeclareDuel',
-  'attackerRetreatDuel', 'attackerAcceptDuel', 'closeDuelOutcome',
+  'closeDuelOutcome',
   'closeInformantPeek', 'closeRevealOutcome', 'openConspiracyDialog',
   'closeConspiracyDialog', 'activateConspiracy', 'endTurn'
 ]);
@@ -44,11 +44,12 @@ port.on('message', (msg: WorkerMessage) => {
       break;
     case 'call': {
       if (!msg.method || !ALLOWED_METHODS.has(msg.method)) return;
-      // Пока держится экран жребия, стол закрыт для всех — кроме «Готов»,
-      // которым его и снимают. Это единственная воронка, через которую в
-      // движок попадают действия игроков, поэтому заслонка стоит одна на все
-      // методы, а не по одной в каждом.
-      if (useGameStore.getState().openingToss && msg.method !== 'markReady') return;
+      // Пока идёт открытие партии — сбор двора, жребий, раздача, фанфара —
+      // стол закрыт для всех, кроме «Готов», которым его и запускают. Это
+      // единственная воронка, через которую в движок попадают действия
+      // игроков, поэтому заслонка стоит одна на все методы, а не по одной в
+      // каждом.
+      if (useGameStore.getState().opening && msg.method !== 'markReady') return;
       const state = useGameStore.getState() as unknown as Record<string, (...args: unknown[]) => void>;
       state[msg.method](...(msg.args ?? []));
       break;
@@ -61,7 +62,6 @@ port.on('message', (msg: WorkerMessage) => {
       // Ушедший не может нажать «Готов», а его место теперь ведёт бот —
       // значит, оно отмечается само, как и остальные ботовские.
       useGameStore.getState().markReady(msg.playerId);
-      useGameStore.getState()._settleOpeningToss();
       break;
     default:
       break;

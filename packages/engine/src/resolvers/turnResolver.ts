@@ -1,5 +1,5 @@
 import type { Action, GameState, Player } from '../types';
-import { drawCardsFromDeck } from '../cards';
+import { drawCardsFromDeck, HAND_SIZE } from '../cards';
 import { holds } from '../cardInstance';
 import { timerManager } from '../utils/timerManager';
 import { resolveMorningPlots } from './plotResolver';
@@ -94,8 +94,8 @@ export function endTurn(
   let curDeck = deck;
   let curDiscard = discardPile;
   const refilledPlayers = players.map(p => {
-    if (p.hand.length < 2) {
-      const needed = 2 - p.hand.length;
+    if (p.hand.length < HAND_SIZE) {
+      const needed = HAND_SIZE - p.hand.length;
       const { drawn, deck: newD, discardPile: newDisc } = drawCardsFromDeck(needed, curDeck, curDiscard);
       curDeck = newD;
       curDiscard = newDisc;

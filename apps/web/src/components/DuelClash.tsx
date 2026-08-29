@@ -112,7 +112,7 @@ export const DuelClash: React.FC = () => {
   const duelLive = useGameStore(
     s =>
       s.pendingDuelDefenderCardId !== null &&
-      (s.turnPhase === 'DUEL_ATTACKER_WINDOW' || s.turnPhase === 'DUEL_OUTCOME')
+      (s.turnPhase === 'DUEL_CLASH' || s.turnPhase === 'DUEL_OUTCOME')
   );
 
   useEffect(() => {

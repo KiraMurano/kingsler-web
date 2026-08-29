@@ -126,7 +126,7 @@ export const ALL_BOT_CANDIDATES: BotCandidate[] = [
     archetype: {
       type: 'provocateur',
       title: 'Дерзкий дуэлянт',
-      description: 'Охотно принимает вызов и почти никогда не отступает от барьера.',
+      description: 'Сам зовёт к барьеру и охотно выставляет щитом что попало.',
       bluffRate: 0.42,
       doubtAggression: 1.30,
       blockBluffRate: 0.66,

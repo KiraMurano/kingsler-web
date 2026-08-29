@@ -57,12 +57,16 @@ for (const bot of state.players.filter(p => p.isBot)) {
   assert.ok(bot.archetype, `${bot.name} must carry their own archetype`);
 }
 
+/* Карты `startGame` НЕ раздаёт: руки наполняет стадия `DEAL` открытия партии,
+   уже при открытом столе (см. `GameStore.opening.check.ts`). Здесь важно ровно
+   то, что колода при рассадке остаётся целой — иначе раздача брала бы карты из
+   уже початой. */
 for (const p of state.players) {
-  assert.equal(p.hand.length, 2, `${p.id} must be dealt 2 cards`);
+  assert.deepEqual(p.hand, [], `${p.id} садится за стол без карт`);
   assert.equal(p.gold, 2);
   assert.equal(p.actionTokens, 2);
 }
-assert.equal(state.deck.length, TOTAL_DECK_SIZE - 8, 'deck must be down by 4 players x 2 cards');
+assert.equal(state.deck.length, TOTAL_DECK_SIZE, 'колода к рассадке не тронута');
 
 // Рассадка действительно случайна. При равномерном перемешивании шанс, что за
 // 40 партий Аня ни разу не сменит место, — (1/4)^39; провал этой проверки

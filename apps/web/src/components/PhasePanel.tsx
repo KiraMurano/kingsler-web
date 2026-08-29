@@ -27,7 +27,6 @@ const ALERT: PhaseKind[] = [
   'doubt',
   'reveal',
   'under-attack',
-  'duel-answer',
   'veto',
   'coronation'
 ];

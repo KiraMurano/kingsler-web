@@ -1,5 +1,5 @@
 /**
- * Портрет игрока, который отвечает в окне сомнения.
+ * Портрет игрока, который отвечает в открытом окне — сомнения или вето.
  *
  * Раньше ответ показывался подписью рядом с именем. Подпись читается медленно и
  * тонет в чипе; лицо — быстрее всего. Поэтому состояние живёт прямо на
@@ -36,7 +36,16 @@ export const ReactionPortrait: React.FC<{
   mirrored?: boolean;
 }> = ({ src, name, className = '', reaction, mirrored }) => {
   const reduce = !!useReducedMotion();
-  const answered = reaction === 'believed' || reaction === 'doubted';
+  /* Ответ дан — лицо заливается цветом ответа. Верно для обоих опросов. */
+  const answered =
+    reaction === 'believed' ||
+    reaction === 'doubted' ||
+    reaction === 'passed' ||
+    reaction === 'vetoed';
+  /* А вот палец — только про веру. «Пропустить» и «вето» отвечают не на
+     «правда ли это», а на «вмешиваюсь ли я», и большой палец на этот вопрос
+     не отвечает: он сказал бы то, чего игрок не говорил. */
+  const thumbed = reaction === 'believed' || reaction === 'doubted';
 
   return (
     <span className={`rx ${reaction ? `rx--${reaction}` : ''}`}>
@@ -74,7 +83,7 @@ export const ReactionPortrait: React.FC<{
       </AnimatePresence>
 
       <AnimatePresence>
-        {answered && (
+        {thumbed && (
           <motion.span
             className="rx__thumb"
             initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.2, rotate: -22 }}

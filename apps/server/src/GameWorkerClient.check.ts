@@ -4,7 +4,14 @@
 import assert from 'node:assert/strict';
 import { GameWorkerClient } from './GameWorkerClient.ts';
 import type { GameStateData } from '@kinglier/engine/net/gameStateData';
-import { TOSS_BOT_READY_MS, TOSS_SPIN_MS, TOSS_START_MS } from '@kinglier/engine/timing';
+import {
+  DEAL_STEP_MS,
+  FANFARE_MS,
+  OPENING_HOLD_MS,
+  TOSS_BOT_READY_MS,
+  TOSS_SPIN_MS,
+  TOSS_VERDICT_MS
+} from '@kinglier/engine/timing';
 
 const worker = new GameWorkerClient();
 const states: GameStateData[] = [];
@@ -28,28 +35,38 @@ assert.ok(anya, 'p1 must be seated');
 assert.equal(anya.avatar, '/avatars/yulia.webp');
 assert.equal(anya.title, 'Провокатор');
 
-// Партия открывается жребием: ходит его победитель, и до конца броска стол
-// закрыт — воркер обязан отбивать действия, а не пропускать их под монетку.
-assert.ok(afterStart.openingToss, 'a started game must be under its opening toss');
-assert.equal(afterStart.activePlayerId, afterStart.openingToss.winnerId);
+// Партия открывается сбором двора: ходить будет победитель жребия, и всё
+// открытие стол закрыт — воркер обязан отбивать действия, а не пропускать их.
+assert.ok(afterStart.opening, 'a started game must be under its opening sequence');
+assert.equal(afterStart.opening.stage, 'READY', 'and it starts by gathering the court');
+assert.equal(afterStart.activePlayerId, afterStart.opening.winnerId);
 
-const countUnderToss = states.length;
+/* Проверяем последствия, а не число рассылок: во время сбора двора боты
+   отмечаются сами, и каждая галочка — это своя рассылка состояния. Считать
+   кадры здесь значит считать чужие ходы. */
+const goldUnderOpening = afterStart.players.map(p => p.gold);
 worker.call('performAction', [{
   type: 'normal',
   name: 'Просить содержание',
   actorId: afterStart.activePlayerId,
   costGold: 0,
   costTokens: 1,
-  description: 'ход из-под летящей монетки'
+  description: 'ход из-под открытия'
 }]);
 await new Promise(resolve => setTimeout(resolve, 300));
-assert.equal(states.length, countUnderToss, 'the worker must swallow actions while the toss is in the air');
+const underOpening = states[states.length - 1];
+assert.deepEqual(
+  underOpening.players.map(p => p.gold),
+  goldUnderOpening,
+  'the worker must swallow actions while the opening runs'
+);
+assert.equal(underOpening.pendingAction, null, 'and not even stage them');
 
-// Экран жребия снимается готовностью, а не временем — и готовы должны быть
-// все, включая ботов. Боты отмечаются сами в пределах пары секунд после
-// приземления монетки, поэтому сперва ждём их.
-await new Promise(resolve => setTimeout(resolve, TOSS_SPIN_MS + TOSS_BOT_READY_MS + 400));
-const botsReady = states[states.length - 1].openingToss!.readyIds;
+// Сбор двора держится готовностью, а не временем — и готовы должны быть все,
+// включая ботов. Боты отмечаются сами в пределах пары секунд, поэтому сперва
+// ждём их.
+await new Promise(resolve => setTimeout(resolve, TOSS_BOT_READY_MS + 600));
+const botsReady = states[states.length - 1].opening!.readyIds;
 assert.equal(
   botsReady.length,
   2,
@@ -57,11 +74,23 @@ assert.equal(
 );
 assert.ok(!botsReady.includes('p1') && !botsReady.includes('p2'), 'humans confirm themselves');
 
+// Готов весь стол — дальше открытие идёт само: пауза, жребий, раздача по одной
+// карте и фанфара. Ходов до конца этой последовательности воркер не принимает.
 worker.call('markReady', ['p1']);
 worker.call('markReady', ['p2']);
-await new Promise(resolve => setTimeout(resolve, TOSS_START_MS + 400));
+await new Promise(resolve =>
+  setTimeout(
+    resolve,
+    OPENING_HOLD_MS * 3 + TOSS_SPIN_MS + TOSS_VERDICT_MS + DEAL_STEP_MS * 10 + FANFARE_MS + 1200
+  )
+);
 const settled = states[states.length - 1];
-assert.equal(settled.openingToss, null, 'both humans ready must lift the toss screen');
+assert.equal(settled.opening, null, 'the whole table ready must play the opening out');
+assert.deepEqual(
+  settled.players.map(p => p.hand.length),
+  settled.players.map(() => 2),
+  'and the opening must have dealt every hand'
+);
 
 const countBeforeAction = states.length;
 worker.call('performAction', [{

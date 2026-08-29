@@ -19,6 +19,15 @@ export type CardInfo = CardDescription;
 export { ALL_ROLES, ALL_PLOTS, ALL_INSTANTS };
 export const CARD_INFO = CARD_DESCRIPTIONS;
 
+/**
+ * Сколько карт держит игрок. До этого числа руку добирают в конце хода, и
+ * ровно столько раздаётся на открытии партии.
+ *
+ * Было записано числом `2` в обоих местах, и «раздать» с «добрать» могли
+ * разъехаться молча.
+ */
+export const HAND_SIZE = 2;
+
 export const CARD_COPIES_MAP: Record<GameCard, number> = {
   // 6 Ролей (по 3 копии = 18)
   'Наследник': 3,

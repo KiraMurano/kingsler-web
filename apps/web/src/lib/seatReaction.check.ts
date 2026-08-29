@@ -1,5 +1,6 @@
 /**
- * Self-check: кто в окне сомнения ещё думает, кто поверил, а кто проверяет.
+ * Self-check: кто ещё думает, кто ответил и что именно ответил — в обоих
+ * опросах, сомнения и вето.
  * Run: npx tsx apps/web/src/lib/seatReaction.check.ts
  */
 import assert from 'node:assert/strict';
@@ -24,10 +25,19 @@ const at = (over: Partial<SeatReactionInput>) =>
     pendingDoubtPassedIds: [],
     pendingDoubtDoubterId: null,
     pendingDoubtActionId: action.id,
+    pendingVetoPassedIds: [],
+    /* По умолчанию опроса вето не было: он начинается только когда окно
+       действительно открылось по ЭТОЙ заявке. */
+    pendingVetoActionId: null,
+    overlayInstant: null,
     revealOutcome: null,
     playerId: 'p2',
     ...over
   });
+
+/** То же, но окно вето по текущей заявке уже открывалось. */
+const veto = (over: Partial<SeatReactionInput> = {}) =>
+  at({ turnPhase: 'VETO_WINDOW', pendingVetoActionId: action.id, ...over });
 
 // Без заявки признака нет ни у кого.
 assert.equal(at({ pendingAction: null }), null, 'без заявки сомневаться не в чем');
@@ -39,12 +49,15 @@ assert.equal(
 
 // Думать можно только пока спрашивают: вне окна молчание это не раздумье.
 assert.equal(at({ turnPhase: 'IDLE' }), null);
-assert.equal(at({ turnPhase: 'VETO_WINDOW' }), null);
+assert.equal(
+  at({ turnPhase: 'VETO_WINDOW' }),
+  null,
+  'окно вето открыто, но опрос по этой заявке не начинался — спрашивать нечего'
+);
 
 /* А вот ответ держится до конца действия. Окно закрывается в тот же миг, когда
    двор опрошен, и если гасить метки по нему, все кольца пропадают ровно тогда,
    когда становится интересно, кто что ответил. */
-assert.equal(at({ turnPhase: 'VETO_WINDOW', pendingDoubtPassedIds: ['p2'] }), 'believed');
 assert.equal(at({ turnPhase: 'IDLE', pendingDoubtPassedIds: ['p2'] }), 'believed');
 
 // Заявивший не голосует: сомневаются в нём.
@@ -102,5 +115,57 @@ assert.equal(
 );
 /* Но пока идёт своё окно, человек думает как обычно. */
 assert.equal(at({ pendingDoubtActionId: 'другая-заявка' }), 'thinking');
+
+/* --- Окно вето: те же признаки, свой набор ответов. ---
+ *
+ * Оно держится ответами, а не часами, поэтому по столу обязано быть видно,
+ * чьего ответа ждут: иначе стоящее окно неотличимо от зависшего стола. */
+assert.equal(veto(), 'thinking', 'ответа ещё нет — игрок думает');
+assert.equal(veto({ pendingVetoPassedIds: ['p2'] }), 'passed', 'пропустил');
+assert.equal(veto({ pendingVetoPassedIds: ['p3'] }), 'thinking', 'ответил сосед, не он');
+
+/* Наложивший вето узнаётся по карте, лежащей поверх действия. */
+const overlay = { card: 'Право вето', actorId: 'p2' } as const;
+assert.equal(veto({ overlayInstant: overlay }), 'vetoed');
+assert.equal(veto({ overlayInstant: overlay, playerId: 'p3' }), 'thinking', 'вето наложил не он');
+
+/* Не спрашивают того, чья карта наверху, — и это ОДНО правило на оба случая.
+   Пока наверху действие, молчит его автор. */
+assert.equal(veto({ playerId: 'p1' }), null);
+/* Как только сверху легло чужое вето — автора спрашивают: встречное вето это
+   ровно его ответ. */
+assert.equal(veto({ playerId: 'p1', overlayInstant: overlay }), 'thinking');
+assert.equal(
+  veto({ playerId: 'p1', overlayInstant: overlay, pendingVetoPassedIds: ['p1'] }),
+  'passed'
+);
+/* А сам наложивший вето из опроса выпадает: отменять своё же нечего, и
+   «Не накладываю Вето» сразу после «Право вето!» он не говорит. */
+assert.equal(
+  veto({ playerId: 'p2', overlayInstant: overlay }),
+  'vetoed',
+  'положивший вето показан вето, а не «думает»'
+);
+
+/* Ответ вето перекрывает ответ сомнения: опрос тот же, но заданный позже.
+   Иначе, пропустив вето, игрок снова загорался бы зелёным «Верю» — метка
+   откатилась бы назад во времени. */
+assert.equal(
+  veto({ pendingDoubtPassedIds: ['p2'], pendingVetoPassedIds: ['p2'] }),
+  'passed',
+  'после ответа в окне вето стол показывает именно его'
+);
+assert.equal(
+  veto({ turnPhase: 'IDLE', pendingDoubtPassedIds: ['p2'], pendingVetoPassedIds: ['p2'] }),
+  'passed',
+  'и держит его, когда окно уже закрылось, — а не откатывается к «Верю»'
+);
+
+/* Опрос вето принадлежит своей заявке ровно так же, как и опрос сомнения. */
+assert.equal(
+  at({ turnPhase: 'IDLE', pendingVetoActionId: 'другая-заявка', pendingVetoPassedIds: ['p2'] }),
+  null,
+  'ответы по прошлой заявке на новой не показываются'
+);
 
 console.log('seatReaction.check.ts passed.');

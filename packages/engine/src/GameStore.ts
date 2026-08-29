@@ -9,13 +9,21 @@ import { byId, idOf, pluck } from './cardInstance';
 import {
   createInitialDeck,
   drawCardsFromDeck,
+  HAND_SIZE,
   TOTAL_DECK_SIZE
 } from './cards';
 import { botMemory, clearBotTimers } from './Bot';
 import { ALL_BOT_CANDIDATES, getBotArchetype, type BotCandidate } from './botsConfig';
 import { accOf, shuffleArray } from './utils/russianText';
 import { timerManager } from './utils/timerManager';
-import { ACTION_HOLD_MS, TOSS_SPIN_MS, TOSS_START_MS } from './timing';
+import {
+  ACTION_HOLD_MS,
+  DEAL_STEP_MS,
+  FANFARE_MS,
+  OPENING_HOLD_MS,
+  TOSS_SPIN_MS,
+  TOSS_VERDICT_MS
+} from './timing';
 import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
@@ -33,13 +41,13 @@ import { executeNormalAction } from './resolvers/normalActionResolver';
 import { resolveRoleActionEffect } from './resolvers/roleResolver';
 import {
   targetDeclareDuel,
-  attackerRetreatDuel,
-  attackerAcceptDuel,
   closeDuelOutcome
 } from './resolvers/duelResolver';
 import {
+  courtAnswered,
   doubtAction,
   passDoubt,
+  passVeto,
   executeRevealOutcome,
   closeRevealOutcome,
   proceedAfterDoubtPassed,
@@ -62,7 +70,10 @@ export type { BotCandidate };
  * Отсчёт, потерявший таймер, не закончится никогда, и стол останется под
  * оверлеем навсегда.
  */
-let tossStartTimer: ReturnType<typeof setTimeout> | null = null;
+let openingTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Опознание открытия: растёт на каждую партию. См. `OpeningData.id`. */
+let openingSeq = 0;
 
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -81,12 +92,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   coronationCandidateId: null,
   coronationOriginId: null,
-  openingToss: null,
+  opening: null,
   pendingAction: null,
   pendingDoubtDoubterId: null,
   pendingDoubtPassedIds: [],
   pendingDoubtActionId: null,
-  vetoDeadlineAt: null,
+  pendingVetoPassedIds: [],
+  pendingVetoActionId: null,
 
   isVaBanqueActive: false,
   ...vetoReset(),
@@ -117,9 +129,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startGame: (seats, rulesInput) => {
     timerManager.clearAll();
-    if (tossStartTimer !== null) {
-      clearTimeout(tossStartTimer);
-      tossStartTimer = null;
+    if (openingTimer !== null) {
+      clearTimeout(openingTimer);
+      openingTimer = null;
     }
     botMemory.clear();
     /* Правила нормализуются здесь, а не у вызывающего: и оффлайн-экран, и
@@ -148,7 +160,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         favor: 0,
         seals: 0,
         actionTokens: rules.actionTokens,
-        hand: [deck.pop()!, deck.pop()!],
+        /* Руки пустые: карты раздаются по одной на стадии `DEAL`, уже при
+           открытом столе. Раздать их здесь значит показать игроку готовую
+           руку — раздачи как события не будет. */
+        hand: [],
         activePlot: null
       })),
       ...selectedBots.map((b, idx) => ({
@@ -161,7 +176,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         favor: 0,
         seals: 0,
         actionTokens: rules.actionTokens,
-        hand: [deck.pop()!, deck.pop()!],
+        hand: [],
         activePlot: null
       }))
     ];
@@ -185,11 +200,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       deck,
       discardPile: [],
       activePlayerId: firstPlayer.id,
-      openingToss: {
+      /* Открытие начинается со сбора двора: ни монетки, ни карт ещё нет.
+         `winnerId` уже известен, но до жребия его никто не показывает. */
+      opening: {
+        stage: 'READY',
+        id: ++openingSeq,
         winnerId: firstPlayer.id,
-        landsAt: Date.now() + TOSS_SPIN_MS,
         readyIds: [],
-        startsAt: null
+        holdUntil: null,
+        landsAt: null
       },
       turnPhase: 'IDLE',
       turnSubPhase: 'NORMAL_ACTION_PHASE',
@@ -201,7 +220,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingAction: null,
       pendingDoubtPassedIds: [],
       pendingDoubtActionId: null,
-      vetoDeadlineAt: null,
+      pendingVetoPassedIds: [],
+      pendingVetoActionId: null,
       overlayInstant: null,
       isVaBanqueActive: false,
       ...vetoReset(),
@@ -217,46 +237,132 @@ export const useGameStore = create<GameState>((set, get) => ({
       floatingResourceEvents: [],
       winnerId: null,
       conspiracyPrompt: null,
+      /* Жребий в летопись попадёт, когда монетка ляжет: писать его здесь
+         значит объявить победителя до броска. */
       history: [
-        `🪙 Жребий брошен: первым ходит ${firstPlayer.name}.`,
-        `👑 Новая партия началась! В колоде ${TOTAL_DECK_SIZE} карт (роли, интриги, инстанты). У каждого по 2 🪙, 2 карты и 2 ⚡ жетона действия.`
+        `👑 Новая партия! В колоде ${TOTAL_DECK_SIZE} карт (роли, интриги, инстанты). У каждого по 2 🪙 и 2 ⚡ жетона действия.`
       ]
     });
   },
 
   /**
-   * «Готов» на экране жребия.
+   * «Готов» на экране сбора двора.
    *
-   * Экран снимается готовностью, а не таймером: партия начинается, когда её
+   * Двор собирается готовностью, а не таймером: жребий бросается, когда партию
    * начал каждый за столом. Боты отмечаются сами и вразнобой — см.
    * `botEngine`; здесь между ними и людьми разницы нет, иначе кружки ботов
    * пришлось бы зажигать отдельным механизмом мимо состояния.
    */
   markReady: (playerId: string) => {
-    const { openingToss, players } = get();
-    if (!openingToss || openingToss.readyIds.includes(playerId)) return;
+    const { opening, players } = get();
+    if (!opening || opening.stage !== 'READY') return;
+    if (opening.readyIds.includes(playerId)) return;
     if (!players.some(p => p.id === playerId)) return;
 
-    set({ openingToss: { ...openingToss, readyIds: [...openingToss.readyIds, playerId] } });
-    get()._settleOpeningToss();
+    set({ opening: { ...opening, readyIds: [...opening.readyIds, playerId] } });
+    get()._advanceOpening();
   },
 
-  _settleOpeningToss: () => {
-    const { openingToss, players } = get();
-    if (!openingToss || openingToss.startsAt !== null) return;
+  _advanceOpening: () => {
+    const { opening, players, deck } = get();
+    if (!opening) return;
+    if (openingTimer !== null) {
+      clearTimeout(openingTimer);
+      openingTimer = null;
+    }
 
-    const waiting = players.filter(p => !openingToss.readyIds.includes(p.id));
-    if (waiting.length > 0) return;
+    /** Следующий шаг той же последовательности — через `delay`. */
+    const next = (delay: number) => {
+      openingTimer = setTimeout(() => {
+        openingTimer = null;
+        get()._advanceOpening();
+      }, delay);
+    };
 
-    /* Не в тот же кадр: игрок ещё смотрит на список готовности, а стол уже
-       подменился бы под ним. Отсчёт живёт в состоянии, поэтому онлайн-стол
-       оживает у всех разом, а не у каждого по своему таймеру. */
-    set({ openingToss: { ...openingToss, startsAt: Date.now() + TOSS_START_MS } });
-    if (tossStartTimer !== null) clearTimeout(tossStartTimer);
-    tossStartTimer = setTimeout(() => {
-      tossStartTimer = null;
-      set({ openingToss: null });
-    }, TOSS_START_MS);
+    /** Стадия доиграна: держим паузу, следующий шаг разберётся дальше. */
+    const hold = () => {
+      set({ opening: { ...opening, holdUntil: Date.now() + OPENING_HOLD_MS } });
+      next(OPENING_HOLD_MS);
+    };
+
+    switch (opening.stage) {
+      case 'READY': {
+        /* Жребий ждёт весь стол: пока хоть кто-то не отметился, монетка не
+           взлетает. Отсюда и порядок — сперва готовность, потом бросок. */
+        if (players.some(p => !opening.readyIds.includes(p.id))) return;
+
+        /* Собрались — но не в тот же кадр: игрок ещё смотрит на список,
+           проверяя, что отметились все, а монетка уже летела бы. */
+        if (opening.holdUntil === null) return hold();
+
+        const winner = players.find(p => p.id === opening.winnerId);
+        set(state => ({
+          opening: {
+            ...opening,
+            stage: 'TOSS',
+            holdUntil: null,
+            landsAt: Date.now() + TOSS_SPIN_MS
+          },
+          history: [
+            `🪙 Жребий брошен: первым ходит ${winner?.name ?? 'первый игрок'}.`,
+            ...state.history
+          ].slice(0, 50)
+        }));
+        /* Полёт плюс пауза на прочтение имени — и только потом стол. */
+        next(TOSS_SPIN_MS + TOSS_VERDICT_MS);
+        return;
+      }
+
+      case 'TOSS': {
+        /* Экран жребия снимается, стол открывается пустым — и тут же начинает
+           раздаваться. Паузу на прочтение имени уже отстоял `TOSS_VERDICT_MS`
+           выше, второй здесь не нужно. */
+        set({ opening: { ...opening, stage: 'DEAL' } });
+        next(DEAL_STEP_MS);
+        return;
+      }
+
+      case 'DEAL': {
+        const dealt = players.reduce((n, p) => n + p.hand.length, 0);
+        const total = players.length * HAND_SIZE;
+
+        if (dealt < total && deck.length > 0) {
+          /* По одной карте по кругу, начиная с того, кому выпал жребий: круг
+             тот же, что и порядок хода (см. перемешивание в `startGame`), так
+             что раздача читается как первый обход стола. */
+          const first = Math.max(0, players.findIndex(p => p.id === opening.winnerId));
+          const idx = (first + (dealt % players.length)) % players.length;
+          const card = deck[deck.length - 1];
+
+          set(state => ({
+            deck: state.deck.slice(0, -1),
+            players: state.players.map((p, i) =>
+              i === idx ? { ...p, hand: [...p.hand, card] } : p
+            )
+          }));
+          next(DEAL_STEP_MS);
+          return;
+        }
+
+        /* Роздано. Пауза — чтобы успеть посмотреть на свою руку, прежде чем
+           поверх неё встанет объявление. */
+        if (opening.holdUntil === null) return hold();
+
+        set({ opening: { ...opening, stage: 'FANFARE', holdUntil: null } });
+        next(FANFARE_MS);
+        return;
+      }
+
+      case 'FANFARE': {
+        /* Объявление отстояло своё — и уходит раньше, чем начнётся ход: между
+           «партия началась» и первым действием должен быть вдох. */
+        if (opening.holdUntil === null) return hold();
+
+        /* Стол оживает. С этого кадра `opening` пуст, и движок принимает ходы. */
+        set({ opening: null });
+        return;
+      }
+    }
   },
 
   restartGame: () => {
@@ -319,11 +425,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --------------------------------------------------------------------------
 
   performAction: (actionData) => {
-    const { players, activePlayerId, turnPhase, pendingAction: alreadyPending, openingToss } = get();
+    const { players, activePlayerId, turnPhase, pendingAction: alreadyPending, opening } = get();
 
     /* Пока крутится жребий, стол ходов не принимает. Скрим оверлея ловит мышь
        у себя, но онлайн-клиент может прислать действие и мимо него. */
-    if (openingToss) return;
+    if (opening) return;
 
     /*
      * Действие принадлежит тому, чей сейчас ход, — и никому больше.
@@ -376,7 +482,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     /* Заявление «Шантажиста» стоит золота, если правила так велят. Плата
        берётся здесь, при заявлении, — значит она уходит и при блефе, и при
-       вето, и при отступлении с дуэли. Это и есть смысл настройки: заявка
+       вето, и при проигранной дуэли. Это и есть смысл настройки: заявка
        Шантажиста должна стоить денег сама по себе, а не только успешная. */
     if (actionData.roleClaim === 'Шантажист' && actor.gold < rules.blackmailCost) {
       return;
@@ -540,22 +646,35 @@ export const useGameStore = create<GameState>((set, get) => ({
     const target = players.find(p => p.id === targetId);
     if (!actor || !target) return;
 
+    /*
+     * «Верю» жертвы — это её ответ в опросе двора, а не отдельная фаза перед
+     * ним.
+     *
+     * Раньше жертва отвечала дважды: сперва «принять / дуэль», потом заново
+     * «верю / не верю» вместе со всеми. Второй вопрос не добавлял решения —
+     * приняв нападение, она уже сказала, что спорить не будет, — но отбирал
+     * ещё один клик и делал пайплайн двухфазным. Поэтому она сразу попадает в
+     * список ответивших, и окно открывается уже для остальных.
+     */
+    const passedIds = [targetId];
     set(state => ({
-      activeSpeechReactions: {
-        ...state.activeSpeechReactions,
-        [target.id]: '«Принимаю нападение...»'
-      },
-      history: [`🏳️ ${target.name} принимает нападение ${actor.name} без боя.`, ...state.history].slice(0, 50)
-    }));
-
-    // After target accepts, court gets a chance to doubt in DOUBT_WINDOW
-    set({
       turnPhase: 'DOUBT_WINDOW',
-      pendingDoubtPassedIds: [],
+      pendingDoubtPassedIds: passedIds,
       pendingDoubtActionId: pendingAction.id,
       timerSeconds: 0,
-      timerMaxSeconds: 0
-    });
+      timerMaxSeconds: 0,
+      activeSpeechReactions: {
+        ...state.activeSpeechReactions,
+        [target.id]: '«Верю»'
+      },
+      history: [`🤝 ${target.name} верит заявке ${actor.name} и нападение не оспаривает.`, ...state.history].slice(0, 50)
+    }));
+
+    /* Спрашивать больше некого — например, за столом двое: тогда опрос двора
+       закончился, не начавшись. */
+    if (courtAnswered(players, actor.id, passedIds)) {
+      get()._proceedAfterDoubtPassed(pendingAction);
+    }
   },
 
   targetDoubtAttack: (targetId: string) => {
@@ -567,14 +686,6 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   targetDeclareDuel: (targetId, cardId) => {
     targetDeclareDuel(get, set, targetId, cardId);
-  },
-
-  attackerRetreatDuel: (attackerId) => {
-    attackerRetreatDuel(get, set, attackerId);
-  },
-
-  attackerAcceptDuel: (attackerId) => {
-    attackerAcceptDuel(get, set, attackerId);
   },
 
   closeDuelOutcome: () => {
@@ -589,6 +700,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     /* Проверка закрывает окно для всех — остальным отвечать больше не на что. */
     clearBotTimers('doubt');
     doubtAction(get, set, doubterId);
+  },
+
+  passVeto: (playerId) => {
+    /* Как и «Верю»: ответ за себя. Чужие таймеры не гасятся — остальные ещё
+       вправе положить вето. */
+    passVeto(get, set, playerId);
   },
 
   passDoubt: (playerId) => {

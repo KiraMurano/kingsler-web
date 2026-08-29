@@ -50,7 +50,7 @@ function table(botTokens: number) {
     activePlayerId: 'p1',
     turnPhase: 'IDLE',
     turnSubPhase: 'NORMAL_ACTION_PHASE',
-    openingToss: null,
+    opening: null,
     pendingAction: null,
     pendingDoubtDoubterId: null,
     pendingDoubtPassedIds: [],
@@ -62,7 +62,8 @@ function table(botTokens: number) {
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
     isVetoed: false,
-    vetoDeadlineAt: null,
+    pendingVetoPassedIds: [],
+    pendingVetoActionId: null,
     history: []
   });
 
@@ -129,7 +130,12 @@ try {
     let sawDoubt = false;
     let sawFullPoll = false;
 
-    for (let run = 0; run < 12; run++) {
+    /* Прогонов пять, а не двенадцать. Каждый ждёт, пока боты додумают, — это
+       почти четыре секунды реального времени, и двенадцать прогонов делали из
+       этого файла самую долгую проверку в наборе. Пяти хватает: обе ветки
+       случайного решения проверяются в каждом прогоне своими ассертами, а
+       число прогонов только повышает шанс увидеть обе. */
+    for (let run = 0; run < 5; run++) {
       table(2);
       await new Promise(resolve => setTimeout(resolve, ANSWERED_BY_MS));
       const { pendingDoubtDoubterId, pendingDoubtPassedIds, turnPhase, players } =
@@ -155,7 +161,7 @@ try {
       );
     }
 
-    assert.ok(sawDoubt || sawFullPoll, 'the court must do something over 12 runs');
+    assert.ok(sawDoubt || sawFullPoll, 'двор обязан хоть что-то сделать за пять прогонов');
   }
 
   console.log('botDoubt.check.ts passed.');

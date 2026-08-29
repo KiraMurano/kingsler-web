@@ -50,14 +50,18 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
     isVetoed: false,
+    opening: null,
+    vetoChain: 0,
+    pendingVetoPassedIds: [],
+    overlayInstant: null,
     vetoOnVeto: false,
     rules: DEFAULT_RULES,
     vaBanqueArmed: false,
-    vetoDeadlineAt: null,
     coronationCandidateId: null,
     revealOutcome: null,
     duelOutcome: null,
     exchangePick: null,
+    duelPick: false,
     ...over
   };
 }
@@ -130,7 +134,7 @@ function action(over: Partial<Action> = {}): Action {
   assert.notEqual(a.id, c.id, 'сменилась заявка — сменился view.id');
 }
 
-// 4. Нападение: щит против Вора — Казначей, у него «дуэль: защита».
+// 4. Нападение: ответ жертвы однофазный — верю, не верю, дуэль.
 {
   const attacked = input({
     activePlayerId: 'p2',
@@ -144,10 +148,45 @@ function action(over: Partial<Action> = {}): Action {
   });
   const view = deriveTableView(attacked, 'p1');
   assert.equal(view.phase, 'under-attack');
-  assert.deepEqual(view.bar.map(b => b.kind), ['accept-attack', 'doubt']);
+  assert.deepEqual(
+    view.bar.map(b => b.kind),
+    ['believe', 'doubt', 'duel'],
+    'один вопрос — три ответа, и второго вопроса не будет'
+  );
   const [shieldId, redirectId] = view.viewerHandIds;
   assert.deepEqual(view.menus[shieldId].map(o => o.kind), ['duel-shield', 'inspect']);
   assert.deepEqual(view.menus[redirectId].map(o => o.kind), ['play', 'duel-bluff', 'inspect']);
+  assert.equal(
+    view.menus[redirectId].find(o => o.kind === 'play')!.spendsToken,
+    true,
+    '«Перенаправление» — ход, а не щит: стоит жетона'
+  );
+
+  /* Нажали «Дуэль» — панель молчит, рука становится выбором щита. */
+  const picking = deriveTableView({ ...attacked, duelPick: true }, 'p1');
+  assert.equal(picking.phase, 'under-attack');
+  assert.deepEqual(picking.bar, [], 'во время выбора щита кнопок нет');
+  assert.deepEqual(picking.menus[shieldId], [], 'карта сама себе кнопка — меню не нужно');
+  assert.notEqual(picking.id, view.id, 'выбор щита виден в id');
+}
+
+// 4b. Сказавшего «Верю» второй раз не спрашивают: жертва входит в опрос двора
+//     с уже засчитанным ответом, и кнопок «верю / не верю» ей больше не дают.
+{
+  const после = input({
+    activePlayerId: 'p2',
+    turnPhase: 'DOUBT_WINDOW',
+    pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' }),
+    pendingDoubtPassedIds: ['p1']
+  });
+  const view = deriveTableView(после, 'p1');
+  assert.equal(view.phase, 'waiting', 'свой ответ дают один раз');
+  assert.deepEqual(view.bar, []);
+
+  /* А вот двор, который ещё не отвечал, спрашивают как обычно. */
+  const третий = deriveTableView(после, 'p3');
+  assert.equal(третий.phase, 'doubt');
+  assert.deepEqual(третий.bar.map(b => b.kind), ['doubt', 'believe']);
 }
 
 // 5. Нападение чужой ролью: карта, не являющаяся щитом, идёт только в блеф-дуэль.
@@ -168,25 +207,58 @@ function action(over: Partial<Action> = {}): Action {
   );
 }
 
-// 6. Окно вето: кнопок нет, вето играется картой, дедлайн доезжает до модели.
+// 6. Окно вето — опрос, а не таймер: у каждого спрашиваемого есть
+//    «Пропустить», а само вето по-прежнему играется картой.
 {
-  const deadline = 1_000_000;
-  const view = deriveTableView(
-    input({
-      turnPhase: 'VETO_WINDOW',
-      activePlayerId: 'p2',
-      pendingAction: action(),
-      vetoDeadlineAt: deadline,
-      players: [player('p1', { hand: hand('Право вето', 'Шут') }), player('p2'), player('p3')]
-    }),
-    'p1'
-  );
+  const открыто = input({
+    turnPhase: 'VETO_WINDOW',
+    activePlayerId: 'p2',
+    pendingAction: action(),
+    players: [player('p1', { hand: hand('Право вето', 'Шут') }), player('p2'), player('p3')]
+  });
+  const view = deriveTableView(открыто, 'p1');
   assert.equal(view.phase, 'veto');
-  assert.deepEqual(view.bar, [], 'в окне вето кнопок нет — только карта');
-  assert.equal(view.deadlineAt, deadline);
+  assert.deepEqual(view.bar.map(b => b.kind), ['veto-pass'], 'отказ — кнопкой, вето — картой');
   const [vetoId, jesterId] = view.viewerHandIds;
   assert.deepEqual(view.menus[vetoId].map(o => o.kind), ['veto', 'inspect']);
   assert.deepEqual(view.menus[jesterId].map(o => o.kind), ['inspect']);
+
+  /* ГЛАВНОЕ: отсутствие «Права вето» на руках НЕ пропускает ход за игрока.
+     Его спрашивают ровно так же, и жать «Пропустить» он обязан сам — иначе
+     закрывшееся само окно означало бы «вето ни у кого нет». */
+  const безКарты = deriveTableView(
+    { ...открыто, players: [player('p1', { hand: hand('Шут', 'Рыцарь') }), player('p2'), player('p3')] },
+    'p1'
+  );
+  assert.equal(безКарты.phase, 'veto', 'без вето на руках игрока всё равно спрашивают');
+  assert.deepEqual(безКарты.bar.map(b => b.kind), ['veto-pass'], 'и кнопка отказа у него есть');
+
+  /* Ответивший выпадает из опроса — второй раз своё «Пропустить» не жмут. */
+  const ответил = deriveTableView({ ...открыто, pendingVetoPassedIds: ['p1'] }, 'p1');
+  assert.equal(ответил.phase, 'waiting', 'свой ответ дают один раз');
+  assert.deepEqual(ответил.bar, []);
+
+  /* Автора собственного действия не спрашивают, пока поверх не легло вето. */
+  const автор = deriveTableView(открыто, 'p2');
+  assert.notEqual(автор.phase, 'veto', 'свой ход у автора не переспрашивают');
+
+  /* А как только его действие отменили — спрашивают: встречное вето его. */
+  const вето = { card: 'Право вето', actorId: 'p3' } as const;
+  const отменён = deriveTableView(
+    { ...открыто, isVetoed: true, vetoChain: 1, overlayInstant: вето },
+    'p2'
+  );
+  assert.equal(отменён.phase, 'veto', 'отменили его действие — ему и отвечать');
+  assert.deepEqual(отменён.bar.map(b => b.kind), ['veto-pass']);
+
+  /* А вот сам наложивший вето из опроса выпадает: вето поверх собственного
+     вето ничего не отменяет, и предлагать его — предлагать сжечь карту. */
+  const наложивший = deriveTableView(
+    { ...открыто, isVetoed: true, vetoChain: 1, overlayInstant: вето },
+    'p3'
+  );
+  assert.notEqual(наложивший.phase, 'veto', 'своё же вето не переспрашивают');
+  assert.deepEqual(наложивший.bar, []);
 }
 
 // 7. Глухая кнопка остаётся видимой и объясняет себя — но тултипом, а не
@@ -206,7 +278,7 @@ function action(over: Partial<Action> = {}): Action {
   const spent = deriveTableView(input({ hasUsedNormalActionThisTurn: true }), 'p1');
   const spentCourt = spent.bar.find(b => b.kind === 'court-actions')!;
   assert.equal(spentCourt.disabled, true);
-  assert.match(spentCourt.reason!, /^Действие двора уже было/);
+  assert.match(spentCourt.reason!, /^Обычное действие уже было/);
   assert.equal(spentCourt.tokenBlocked, false, 'жетоны на месте — запрет не рисуем');
 }
 
@@ -220,11 +292,6 @@ function action(over: Partial<Action> = {}): Action {
       activePlayerId: 'p2',
       turnPhase: 'TARGET_REACTION_WINDOW',
       pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' })
-    }),
-    input({
-      activePlayerId: 'p1',
-      turnPhase: 'DUEL_ATTACKER_WINDOW',
-      pendingAction: action({ actorId: 'p1', targetId: 'p2' })
     })
   ];
   for (const состояние of фазы) {
@@ -241,7 +308,13 @@ function action(over: Partial<Action> = {}): Action {
     input(),
     input({ activePlayerId: 'p2' }),
     input({ activePlayerId: 'p2', turnPhase: 'DOUBT_WINDOW', pendingAction: action() }),
-    input({ turnPhase: 'VETO_WINDOW', pendingAction: action(), vetoDeadlineAt: 1 })
+    input({ turnPhase: 'VETO_WINDOW', activePlayerId: 'p2', pendingAction: action() }),
+    input({
+      activePlayerId: 'p2',
+      turnPhase: 'TARGET_REACTION_WINDOW',
+      pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' }),
+      duelPick: true
+    })
   ]) {
     const view = deriveTableView(состояние, 'p1');
     assert.ok(view.guidance.length > 0, `пустая подсказка в фазе ${view.phase}`);
@@ -554,6 +627,30 @@ for (const charges of [0, 1, 2, 3]) {
     'p1'
   );
   assert.equal(view.menus['plot-1'], undefined, 'Заговор разряжается только в свой ход');
+}
+
+/* --- Пока идёт открытие партии, у стола нет фазы. ---
+ *
+ * `activePlayerId` — это победитель жребия, и он известен с самого `startGame`,
+ * а `turnPhase` всё открытие стоит в `IDLE`. Вместе это давало победителю
+ * готовую панель своего хода ещё до броска монетки: он смотрел жребий, уже
+ * зная его исход. */
+{
+  const открытие = {
+    stage: 'TOSS' as const,
+    id: 1,
+    winnerId: 'p1',
+    readyIds: ['p1', 'p2', 'p3'],
+    holdUntil: null,
+    landsAt: Date.now() + 1000
+  };
+  const view = deriveTableView(input({ activePlayerId: 'p1', opening: открытие }), 'p1');
+  assert.equal(view.phase, 'waiting', 'победителю жребия не показывают его ход заранее');
+  assert.deepEqual(view.bar, [], 'и кнопок хода тоже');
+
+  /* А как только открытие кончилось — ход начинается как обычно. */
+  const после = deriveTableView(input({ activePlayerId: 'p1' }), 'p1');
+  assert.equal(после.phase, 'turn');
 }
 
 console.log('tableView.check: ok');

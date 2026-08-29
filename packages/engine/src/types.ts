@@ -71,8 +71,8 @@ export interface Action {
 
 export type TurnPhase = 
   | 'IDLE'                   // Active player choosing action (Role / Normal / Plot)
-  | 'TARGET_REACTION_WINDOW' // Targeted victim choosing: Accept / Doubt / Duel
-  | 'DUEL_ATTACKER_WINDOW'   // Attacker choosing: Retreat / Accept Duel
+  | 'TARGET_REACTION_WINDOW' // Жертва отвечает один раз: Верю / Не верю / Дуэль
+  | 'DUEL_CLASH'             // Ставки сходятся: дуэль разыгрывается сама, ответа ни от кого не ждут
   | 'DOUBT_WINDOW'          // Non-targeted role or court check after accept
   | 'VETO_WINDOW'           // Court instant window before effect application
   | 'REVEAL_OUTCOME'        // Showing card reveal / challenge result modal
@@ -129,27 +129,60 @@ export interface FloatingResourceEvent {
 }
 
 /**
- * Жребий на старте партии: кто ходит первым и кто уже готов начать.
+ * Стадия открытия партии. Порядок здесь — это порядок на экране.
  *
- * Живёт в состоянии, а не на клиенте, чтобы онлайн-стол видел один и тот же
- * бросок и одни и те же галочки — состояние целиком уезжает игрокам,
- * отдельного сетевого сообщения для этого не нужно.
+ *  - `READY`    двор собирается: каждый живой игрок отмечается «Готов».
+ *  - `TOSS`     жребий: монетка летит и называет того, кто ходит первым.
+ *  - `DEAL`     стол уже виден, карты раздаются по одной по кругу.
+ *  - `FANFARE`  «Битва за престол начинается» — точка перед первым ходом.
  *
- * Экран жребия держится не по таймеру, а до готовности: партия начинается,
- * когда каждый живой игрок отметился. `landsAt` — только про анимацию: это
- * абсолютный timestamp приземления монетки (как `vetoDeadlineAt`), чтобы
- * подключившийся в середине досмотрел остаток полёта, а не крутил круг заново.
+ * Раньше стадий не было вовсе: стол открывался сразу, с уже розданными
+ * картами, а жребий вместе с готовностью висел поверх него. Готовность при
+ * этом спрашивали ПОСЛЕ броска — то есть игрок подтверждал участие в партии,
+ * жребий которой уже состоялся.
  */
-export interface OpeningTossData {
+export type OpeningStage = 'READY' | 'TOSS' | 'DEAL' | 'FANFARE';
+
+/**
+ * Открытие партии: от сбора двора до первого хода.
+ *
+ * Живёт в состоянии, а не на клиенте, чтобы онлайн-стол видел одну и ту же
+ * последовательность — один бросок, одни галочки, одну раздачу. Состояние
+ * целиком уезжает игрокам, отдельного сетевого сообщения для этого не нужно.
+ *
+ * Пока поле не `null`, стол ходов не принимает.
+ */
+export interface OpeningData {
+  stage: OpeningStage;
+  /**
+   * Опознание этого открытия. Растёт на каждую новую партию — по нему и
+   * только по нему узнаётся новое открытие: `readyIds` меняется на каждой
+   * галочке, а стадия проходит одни и те же значения в каждой партии.
+   *
+   * Счётчик, а не время старта: две партии, начатые в одну миллисекунду,
+   * получили бы одинаковую метку, и движок ботов не заметил бы вторую. В
+   * тестах это ровно тот случай, а не гипотетический.
+   */
+  id: number;
+  /** Кто ходит первым. Показывается только со стадии `TOSS`. */
   winnerId: string;
-  landsAt: number;
-  /** Кто нажал «Готов». Боты в счёт не идут — они готовы всегда. */
+  /** Кто нажал «Готов». Боты отмечаются сами — см. `botEngine`. */
   readyIds: string[];
   /**
-   * Когда стол оживёт. Не `null` только после последней галочки: готовы все,
-   * идёт отсчёт до первого хода.
+   * Стадия доиграна, идёт пауза перед следующей — до этого момента.
+   *
+   * Одно поле на все переходы, потому что понятие одно: каждая стадия что-то
+   * сообщает, и сообщению нужно время дойти. `null` означает, что стадия ещё
+   * идёт: двор не собран, карты не розданы, объявление на экране.
    */
-  startsAt: number | null;
+  holdUntil: number | null;
+  /**
+   * Абсолютный timestamp приземления монетки; `null` до броска.
+   *
+   * Абсолютный, а не длительность, чтобы подключившийся в середине досмотрел
+   * остаток полёта, а не крутил круг заново.
+   */
+  landsAt: number | null;
 }
 
 export interface ConspiracyPromptData {
@@ -181,8 +214,8 @@ export interface GameState {
   timerMaxSeconds: number;
   isTimerPaused: boolean;
   coronationCandidateId: string | null;
-  /** Не `null`, пока идёт стартовый жребий: стол под оверлеем и ходов не принимает. */
-  openingToss: OpeningTossData | null;
+  /** Не `null`, пока идёт открытие партии: стол ходов не принимает. */
+  opening: OpeningData | null;
   /** Player whose turn it was when the circle started; win is checked at their next turn start. */
   coronationOriginId: string | null;
   
@@ -200,6 +233,16 @@ export interface GameState {
    * показывал решения прошлого хода как свежие.
    */
   pendingDoubtActionId: string | null;
+  /**
+   * Кто уже нажал «Пропустить» в текущем круге окна вето.
+   *
+   * Окно держится ответами, а не часами: оно закрывается, когда ответил
+   * каждый, кого спрашивали (см. `vetoPollAnswered`). Сыгранное вето начинает
+   * круг заново и гасит список — вопрос после него другой.
+   */
+  pendingVetoPassedIds: string[];
+  /** Действие, по которому идёт опрос вето. Как `pendingDoubtActionId`. */
+  pendingVetoActionId: string | null;
   hasUsedNormalActionThisTurn: boolean;
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;
@@ -212,8 +255,6 @@ export interface GameState {
   /** Сколько «Прав вето» сыграно подряд поверх текущего действия. */
   vetoChain: number;
   isPendingActionAfterTruthChallenge?: boolean;
-  /** Абсолютный timestamp закрытия окна вето. `null` вне окна. */
-  vetoDeadlineAt: number | null;
   
   // Outcome Modals
   revealOutcome: RevealOutcome | null;
@@ -239,7 +280,7 @@ export interface GameState {
     seats?: { id: string; name: string; avatar?: string; title?: string }[],
     rules?: Partial<GameRules>
   ) => void;
-  /** «Готов» на экране жребия. Когда отметились все живые — партия начинается. */
+  /** «Готов» на экране сбора двора. Когда отметились все — начинается жребий. */
   markReady: (playerId: string) => void;
   performAction: (action: Omit<Action, 'id'>) => void;
   skipNormalActionPhase: () => void;
@@ -248,14 +289,16 @@ export interface GameState {
   playInstant: (playerId: string, instantType: InstantType, cardId: CardId, targetPlayerId?: string) => void;
   doubtAction: (doubterId: string) => void;
   passDoubt: (playerId: string) => void;
+  /** «Пропустить» в окне вето. Окно закрывается, когда ответили все. */
+  passVeto: (playerId: string) => void;
   proceedAfterVetoWindow: () => void;
   
   // Duel methods for targeted attacks
+  /** «Верю» жертвы: её ответ в опросе двора, а не отдельная фаза перед ним. */
   targetAcceptAttack: (targetId: string) => void;
   targetDoubtAttack: (targetId: string) => void;
+  /** «Дуэль»: карта-щит выставлена — дуэль разыгрывается, согласия атакующего не спрашивают. */
   targetDeclareDuel: (targetId: string, cardId: CardId) => void;
-  attackerRetreatDuel: (attackerId: string) => void;
-  attackerAcceptDuel: (attackerId: string) => void;
   closeDuelOutcome: () => void;
 
   closeInformantPeek: () => void;
@@ -278,6 +321,12 @@ export interface GameState {
   _checkEndgameAndAdvanceTurn: () => void;
   _disruptPlayerPlotsOnLoss: (playerId: string, reason: string) => void;
   _drawCardForPlayerWithInformantCheck: (playerIndex: number) => CardInstance;
-  /** Снимает экран жребия, если готовы все живые игроки. */
-  _settleOpeningToss: () => void;
+  /**
+   * Один шаг открытия партии: сбор двора → жребий → раздача → фанфара → игра.
+   *
+   * Шаг всегда один и тот же вызов: следующий планируется самим шагом, поэтому
+   * последовательность живёт в одном месте, а не размазана по таймерам
+   * вызывающих.
+   */
+  _advanceOpening: () => void;
 }

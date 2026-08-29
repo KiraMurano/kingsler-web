@@ -47,7 +47,8 @@ function table() {
     hasPlayedPlotThisTurn: false,
     isVetoed: false,
     vetoChain: 0,
-    vetoDeadlineAt: null,
+    pendingVetoPassedIds: [],
+    pendingVetoActionId: null,
     history: []
   });
 }

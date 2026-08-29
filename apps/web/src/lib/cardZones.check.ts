@@ -423,7 +423,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
       stakedCardId: attackStakeId
     }),
     pendingDuelDefenderCardId: defendStakeId,
-    turnPhase: 'DUEL_ATTACKER_WINDOW'
+    turnPhase: 'DUEL_CLASH'
   });
   const placed = deriveCardZones(state, 'p1');
   assertUnique(placed, 'duel');
@@ -696,7 +696,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     pendingAction: roleAction({ actorId: 'p1', targetId: 'p2', stakedCardId: p1Hand[0].id }),
     pendingDuelDefenderCardId: p2Hand[0].id,
     overlayInstant: { card: 'Право вето', actorId: 'p3' },
-    turnPhase: 'DUEL_ATTACKER_WINDOW'
+    turnPhase: 'DUEL_CLASH'
   });
   const placed = deriveCardZones(state, 'p1');
   assertUnique(placed, 'crowded');

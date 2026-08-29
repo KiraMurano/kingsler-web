@@ -5,11 +5,12 @@ import { accOf, verbCaught, verbDoubted } from '../utils/russianText';
 import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing';
+import { ACTION_HOLD_MS } from '../timing';
 import { discardProtectiveIntrigueOnBluff } from './crownLoss';
 import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
 import { resolveInstantEffect } from './instantResolver';
 import { beginCoronationIfNeeded } from './coronation';
+import { vetoAnswerRequired, vetoPollAnswered, vetoTopActorId } from './vetoChain';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -47,13 +48,33 @@ export function doubtPayment(
   return null;
 }
 
+/**
+ * Опрошен ли двор целиком: ответили все, кроме самого заявившего.
+ *
+ * Живёт здесь, а не в `passDoubt`, потому что в опрос можно войти уже с
+ * готовым ответом: «Верю» жертвы нападения засчитывается в тот же момент,
+ * когда окно открывается (см. `targetAcceptAttack`).
+ */
+export function courtAnswered(
+  players: Player[],
+  actorId: string,
+  passedIds: string[]
+): boolean {
+  return !players.some(p => p.id !== actorId && !passedIds.includes(p.id));
+}
+
 export function doubtAction(
   get: StateGetter,
   set: StateSetter,
   doubterId: string
 ): void {
-  const { pendingAction, turnPhase, players, pendingDoubtDoubterId } = get();
+  const { pendingAction, turnPhase, players, pendingDoubtDoubterId, pendingDoubtPassedIds } = get();
   if ((turnPhase !== 'DOUBT_WINDOW' && turnPhase !== 'TARGET_REACTION_WINDOW') || !pendingAction || !pendingAction.roleClaim) return;
+
+  /* Сказавший «Верю» ответ уже дал: переиграть его на «Не верю» нельзя.
+     Иначе жертва, поверившая нападению, добирала бы себе вторую попытку в том
+     же окне — ровно та лишняя фаза, которой здесь больше нет. */
+  if (pendingDoubtPassedIds.includes(doubterId)) return;
 
   /* Проверяет тот, кто успел первым. Второй «Не верю» поверх заявленного
      снял бы отложенное вскрытие (`clearAll` ниже) и списал бы ещё один жетон
@@ -167,7 +188,7 @@ export function passDoubt(
     pendingDoubtPassedIds: passedIds,
     activeSpeechReactions: {
       ...state.activeSpeechReactions,
-      [passer.id]: '«Верю.»'
+      [passer.id]: '«Верю»'
     }
   }));
 
@@ -181,8 +202,7 @@ export function passDoubt(
    * не сказав до этого ничего. Одно решение принималось в двух местах, и в
    * обоих бот молчал, если верил.
    */
-  const stillAwaiting = players.some(p => p.id !== actor.id && !passedIds.includes(p.id));
-  if (stillAwaiting) return;
+  if (!courtAnswered(players, actor.id, passedIds)) return;
 
   get()._proceedAfterDoubtPassed(pendingAction);
 }
@@ -452,21 +472,70 @@ export function triggerVetoWindowOrResolveEffect(
     return;
   }
 
-  // The window opens on every vetoable action, whoever holds «Право вето» and
-  // whether anyone holds it at all. The length of the pause used to depend on
-  // that — instant when nobody had one, 2.2 s for a bot, open-ended for a
-  // human — and a pause of a telling length is a tell: the court could read
-  // the other players' hands off the clock. One fixed window says nothing.
+  /*
+   * Окно открывается на каждое ветируемое действие, независимо от того,
+   * держит ли кто-то «Право вето» и держит ли вообще: длина паузы, зависящая
+   * от рук, читалась бы как подсказка о них.
+   *
+   * Держится оно ответами, а не часами. Раньше здесь висел таймер на пять
+   * секунд — самая дорогая пауза партии, при том что за ней почти всегда
+   * стояло одно и то же «никто не вмешался», а игрок, решивший вмешаться, мог
+   * банально не успеть. Теперь это опрос, как и окно сомнения: каждый либо
+   * кладёт вето, либо жмёт «Пропустить», и ход идёт дальше, когда ответили
+   * все. Отвалившийся онлайн-игрок опрос не держит — его место перехватывает
+   * бот и отвечает сам.
+   */
   set({
     turnPhase: 'VETO_WINDOW',
-    vetoDeadlineAt: Date.now() + VETO_WINDOW_MS,
+    pendingVetoPassedIds: [],
+    pendingVetoActionId: action.id,
     timerSeconds: 0,
     timerMaxSeconds: 0,
     isPendingActionAfterTruthChallenge: isAfterTruthChallenge
   });
-  timerManager.scheduleDelay(() => {
-    if (get().turnPhase === 'VETO_WINDOW') proceedAfterVetoWindow(get, set);
-  }, VETO_WINDOW_MS);
+
+  /* Спрашивать может быть некого: за столом двое, и единственный отвечающий —
+     тот, чья карта сейчас наверху, а его не спрашивают. */
+  const { players, overlayInstant } = get();
+  if (vetoPollAnswered(players, vetoTopActorId(action.actorId, overlayInstant), [])) {
+    proceedAfterVetoWindow(get, set);
+  }
+}
+
+/**
+ * «Пропустить» в окне вето — ответ за себя, а не за стол.
+ *
+ * Зеркало `passDoubt`: чужие ответы не отменяются и не подразумеваются, и
+ * окно закрывается ровно тогда, когда ответил каждый, кого спрашивали.
+ */
+export function passVeto(
+  get: StateGetter,
+  set: StateSetter,
+  playerId: string
+): void {
+  const { turnPhase, pendingAction, players, pendingVetoPassedIds, overlayInstant } = get();
+  if (turnPhase !== 'VETO_WINDOW' || !pendingAction) return;
+
+  const passer = players.find(p => p.id === playerId);
+  if (!passer || pendingVetoPassedIds.includes(playerId)) return;
+
+  /* Того, чья карта наверху, не спрашивают — и засчитывать его «Пропустить»
+     нельзя: иначе один клик закрыл бы окно за весь двор. */
+  const topActorId = vetoTopActorId(pendingAction.actorId, overlayInstant);
+  if (!vetoAnswerRequired(playerId, topActorId)) return;
+
+  const passedIds = [...pendingVetoPassedIds, playerId];
+  set(state => ({
+    pendingVetoPassedIds: passedIds,
+    activeSpeechReactions: {
+      ...state.activeSpeechReactions,
+      [playerId]: '«Не накладываю Вето»'
+    }
+  }));
+
+  if (!vetoPollAnswered(players, topActorId, passedIds)) return;
+
+  proceedAfterVetoWindow(get, set);
 }
 
 export function resolvePendingActionEffect(
@@ -501,7 +570,6 @@ export function proceedAfterVetoWindow(
   timerManager.clearAll();
   const { turnPhase, pendingAction, isVetoed, isPendingActionAfterTruthChallenge } = get();
   if (!pendingAction) {
-    set({ vetoDeadlineAt: null });
     get()._checkEndgameAndAdvanceTurn();
     return;
   }
@@ -515,7 +583,7 @@ export function proceedAfterVetoWindow(
   // re-entered here, pushing an already-landed plot card into the discard
   // while its instance also sat in the plot slot.
   if (turnPhase !== 'VETO_WINDOW') return;
-  set({ turnPhase: 'IDLE', vetoDeadlineAt: null });
+  set({ turnPhase: 'IDLE' });
 
   if (isVetoed) {
     set(state => ({

@@ -62,7 +62,6 @@ import { useAnchorRects } from './AnchorRegistry.tsx';
 import { dur, spring, tilt } from './tokens.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
 import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
-import { CONSPIRACY_FULL_CHARGE } from '@kinglier/engine/resolvers/plotResolver';
 
 const CARD_BACK = '/assets/cards/back-dual-face.webp';
 
@@ -225,6 +224,10 @@ const REVEALED_Z = ZONE_PRECEDENCE.overlay + 10;
  */
 function stackOrder(placed: PlacedCard): number {
   if (placed.revealed && !isCorner(placed.zone.kind)) return REVEALED_Z;
+  /* Оверлей, ушедший под сопровождаемые карты. Значение выбрано ниже `duel`,
+     но выше `stake`: на дуэли Ва-банк обязан оказаться под обеими ставками
+     сразу, не дожидаясь вскрытия, которое поднимет их на `REVEALED_Z`. */
+  if (placed.underlay) return ZONE_PRECEDENCE.duel - 5;
   return ZONE_PRECEDENCE[placed.zone.kind];
 }
 
@@ -779,14 +782,14 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
             >
               {showVerdict && (
                 <span className={`verdict ${verdict ? 'verdict--truth' : 'verdict--bluff'}`}>
-                  {verdict ? 'ПРАВДА' : 'БЛЕФ'}
+                  {verdict ? 'Правда' : 'Блеф'}
                 </span>
               )}
               {/* Заряды едут на самой карте, а не на подписи под слотом: слой
                   карт рисуется выше слота, и любая надпись под ним пряталась
                   за картой. */}
               {placed.charges !== undefined && (
-                <span className="chargetag">{placed.charges}/{CONSPIRACY_FULL_CHARGE}</span>
+                <span className="chargetag">{placed.charges}</span>
               )}
             </div>
           </motion.div>

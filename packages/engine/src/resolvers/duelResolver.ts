@@ -45,7 +45,7 @@ export function targetDeclareDuel(
     players: state.players.map(p =>
       p.id === target.id ? { ...p, actionTokens: p.actionTokens - tokenCost } : p
     ),
-    turnPhase: 'DUEL_ATTACKER_WINDOW',
+    turnPhase: 'DUEL_CLASH',
     pendingDuelDefenderCardId: staked.id,
     pendingDuelDefenderRoleClaim: blockingRole,
     timerSeconds: 0,
@@ -59,58 +59,28 @@ export function targetDeclareDuel(
 
   // Charge active conspiracies on duel declaration
   chargeActiveConspiracies(get, set, `вызов на дуэль от ${target.name}`);
-}
 
-export function attackerRetreatDuel(
-  get: StateGetter,
-  set: StateSetter,
-  attackerId: string
-): void {
-  timerManager.clearAll();
-  const { pendingAction, turnPhase, players } = get();
-  if (turnPhase !== 'DUEL_ATTACKER_WINDOW' || !pendingAction || pendingAction.actorId !== attackerId) return;
-
-  const actor = players.find(p => p.id === attackerId);
-  const defender = players.find(p => p.id === pendingAction.targetId);
-  if (!actor || !defender) return;
-
-  const discarded = byId(actor.hand, pendingAction.stakedCardId) ?? actor.hand[0];
-  const { rest: actorHand } = discarded
-    ? pluck(actor.hand, discarded.id)
-    : { rest: [...actor.hand] };
-
-  const newPlayers = players.map(p => p.id === actor.id ? { ...p, hand: actorHand } : p);
-  const newDiscard = discarded ? [...get().discardPile, discarded] : [...get().discardPile];
-
-  set(state => ({
-    players: newPlayers,
-    discardPile: newDiscard,
-    turnPhase: 'IDLE',
-    turnSubPhase: 'CARD_PLAY_PHASE',
-    pendingAction: null,
-    overlayInstant: null,
-    activeSpeechReactions: {
-      ...state.activeSpeechReactions,
-      [actor.id]: '«Я отступаю... в этот раз.»'
-    },
-    history: [`🏳️ ${actor.name} отступает перед щитом ${defender.name} (карта атаки сброшена).`, ...state.history].slice(0, 50)
-  }));
-
+  /* Согласия атакующего не спрашивают: выставленный щит — это уже дуэль.
+     Пауза здесь не решение, а такт: за неё карты успевают сойтись в середине
+     стола, и удар читается как удар, а не как мгновенная смена картинки. */
   timerManager.scheduleDelay(() => {
-    get()._checkEndgameAndAdvanceTurn();
+    resolveDuelClash(get, set);
   }, ACTION_HOLD_MS);
 }
 
-export function attackerAcceptDuel(
-  get: StateGetter,
-  set: StateSetter,
-  attackerId: string
-): void {
+/**
+ * Розыгрыш дуэли: обе ставки вскрываются разом.
+ *
+ * Отдельного решения атакующего здесь нет и быть не может — оно было
+ * двухфазностью на ровном месте. Щит выставлен, значит спор состоялся, и
+ * функция вызывается сама тактом позже объявления.
+ */
+export function resolveDuelClash(get: StateGetter, set: StateSetter): void {
   timerManager.clearAll();
   const { pendingAction, pendingDuelDefenderCardId, pendingDuelDefenderRoleClaim, turnPhase, players } = get();
-  if (turnPhase !== 'DUEL_ATTACKER_WINDOW' || !pendingAction || pendingAction.actorId !== attackerId || !pendingDuelDefenderRoleClaim) return;
+  if (turnPhase !== 'DUEL_CLASH' || !pendingAction || !pendingDuelDefenderRoleClaim) return;
 
-  const actor = players.find(p => p.id === attackerId);
+  const actor = players.find(p => p.id === pendingAction.actorId);
   const defender = players.find(p => p.id === pendingAction.targetId);
   if (!actor || !defender) return;
 
@@ -206,7 +176,7 @@ export function attackerAcceptDuel(
     turnPhase: 'DUEL_OUTCOME',
     activeSpeechReactions: {
       ...state.activeSpeechReactions,
-      [actor.id]: actorWasTruth ? '«Принимаю дуэль! Чистая сталь!»' : '«Принимаю! Посмотрим, кто дрогнет!»',
+      [actor.id]: actorWasTruth ? '«Чистая сталь!»' : '«Посмотрим, кто дрогнет!»',
       [defender.id]: defenderWasTruth ? '«Мой щит непоколебим!»' : '«Я рискнул и ответил вызовом!»'
     },
     history: [message, ...state.history].slice(0, 50)

@@ -286,6 +286,27 @@
   transform: scale(1.06);
 }
 
+.overlay__back {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--line-mid);
+  background: rgba(200, 160, 74, 0.08);
+  color: var(--gold-pale);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.overlay__back:hover {
+  color: #fff;
+  border-color: var(--gold);
+  background: rgba(200, 160, 74, 0.2);
+  transform: translateX(-2px);
+}
+
 /* Modal Hero Title component */
 .modal-hero-title {
   display: flex;
@@ -332,6 +353,120 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+
+/* ==========================================================================
+   ОБЫЧНОЕ ДЕЙСТВИЕ — широкая карточка со своим артом
+   ==========================================================================
+   Полоса, а не карта: обычное действие картой не является, и путать его с
+   рукой нельзя. Арты нарисованы в 3:1, но карточка ниже — 4.5:1: в списке из
+   четырёх подряд трёхкратная полоса читалась как четыре плаката. Арт при этом
+   обрезается по высоте (`cover`, по центру), а в файле лежит целиком — вернуть
+   пропорцию можно этой одной строкой, не трогая картинок.
+
+   `aspect-ratio`, а не фиксированная высота: пропорция держится сама на любой
+   ширине, а если описание всё же длиннее — коробка вырастет, и текст не
+   обрежется. Это ровно тот случай у «Распустить слух»: у него описание вдвое
+   длиннее остальных. */
+.actionlist {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.actioncard {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4.5 / 1;
+  padding: 0;
+  border: 1px solid var(--line-cold);
+  border-radius: 11px;
+  overflow: hidden;
+  background-color: var(--ink-800);
+  background-size: cover;
+  background-position: center;
+  /* Фон обрезается по внутреннему краю канта.
+     По умолчанию он заливает и полосу самого канта, а полог над ним её не
+     накрывает: `inset: 0` у абсолютного потомка считается от внутреннего края,
+     кант остаётся снаружи. Из-за этого по всему периметру шла яркая ниточка
+     необработанного арта — светлая у доступных карточек и мутная у погашенных,
+     и читалась она как артефакт рамки. */
+  background-clip: padding-box;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, transform 0.12s ease;
+}
+
+.actioncard:hover:not([aria-disabled='true']) {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+/* Полог под текстом. Отдельным узлом, а не тенью на буквах: тень обводит
+   каждую букву и на длинном описании превращается в грязь. Слева плотный,
+   справа сходит на нет — арт нарисован так, что смысловая его часть справа. */
+.actioncard__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(8, 10, 16, 0.94) 0%,
+    rgba(8, 10, 16, 0.86) 42%,
+    rgba(8, 10, 16, 0.5) 72%,
+    rgba(8, 10, 16, 0.22) 100%
+  );
+}
+
+.actioncard__text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 100%;
+  padding: 11px 14px;
+}
+
+.actioncard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.actioncard__name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--gold-pale);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.actioncard__desc {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-soft);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+/* Недоступное действие гаснет вместе с артом: обесцвеченная полоса читается
+   как «сейчас нельзя» быстрее любой подписи. Клики при этом не глушим —
+   ссылки на карты внутри описания должны открываться и в этом состоянии
+   (см. `off` в `ActionCard`). */
+.actioncard[aria-disabled='true'] {
+  cursor: default;
+}
+
+.actioncard[aria-disabled='true'] .actioncard__veil {
+  background: linear-gradient(90deg, rgba(8, 10, 16, 0.95) 0%, rgba(8, 10, 16, 0.8) 100%);
+}
+
+.actioncard--off {
+  filter: grayscale(0.85);
+  opacity: 0.55;
 }
 
 .optgrid {
@@ -663,6 +798,15 @@
   background: rgba(200, 160, 74, 0.06);
 }
 
+.codexrow--static {
+  cursor: default;
+}
+
+.codexrow--static:hover {
+  border-color: var(--line-cold);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .codexrow--held {
   border-color: rgba(91, 154, 134, 0.4);
   background: rgba(91, 154, 134, 0.06);
@@ -697,12 +841,19 @@
   color: var(--text-muted);
 }
 
-/* Card detail */
 .detail {
   display: grid;
   grid-template-columns: 176px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
+}
+
+.detail--no-art {
+  display: block;
+}
+
+.detail--no-art .detail__col {
+  width: 100%;
 }
 
 .detail__art {
@@ -1020,6 +1171,16 @@
   --frame-glow: rgba(180, 64, 90, 0.45);
 }
 
+.cardframe--action {
+  --frame: var(--steel);
+  --frame-bright: var(--steel-soft);
+  --frame-glow: rgba(95, 131, 174, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 24, 36, 0.95);
+}
+
 .cardframe {
   border: 2px solid var(--frame);
   box-shadow:
@@ -1044,14 +1205,29 @@
 
 /* Поверх диалогов: пока идёт жребий, за столом не происходит ничего,
    что имело бы право его перекрыть. */
+/* Жребий бросается над ОТКРЫТЫМ столом, поэтому это не скрим, а слой поверх
+   него: карт на столе ещё нет, прятать нечего, а монета посреди стола — это и
+   есть жребий за этим столом, а не заставка перед ним.
+
+   Центр — по сукну, а не по окну: круг стола центрирован на 44% высоты (см.
+   `.table` в layout.css), и монета обязана падать туда же, иначе она летит
+   мимо стола. Ничего не ловит: `pointer-events: none`. */
 .toss {
+  position: fixed;
+  inset: 0;
   z-index: var(--z-toast);
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  pointer-events: none;
 }
 
+/* Ставится по замеренному центру сукна, а не по центру окна: круг стола
+   центрирован на 44% высоты сцены, и повторять эту арифметику здесь значило бы
+   держать вторую копию чужой геометрии. Координаты приходят из
+   `useTableCenter`; здесь только сдвиг на половину себя. */
 .toss__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1064,7 +1240,9 @@
    плоскость экрана без всякого объёма. */
 .toss__stage {
   position: relative;
-  width: 100%;
+  /* Ширина явная: колонка теперь позиционируется абсолютно и сжимается по
+     содержимому, а `width: 100%` от сжатого родителя — это ноль. */
+  width: 320px;
   height: 300px;
   display: grid;
   place-items: center;
@@ -1075,15 +1253,28 @@
    Разделены не ради порядка: `filter` или любое другое группирующее свойство
    на вращающемся узле схлопнуло бы трёхмерный контекст, и
    `backface-visibility` перестал бы прятать изнанку. */
+.toss__coin-spin {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+/* Толщина монеты. Половина уходит вперёд, половина назад — так грани стоят
+   симметрично оси вращения, и монета крутится вокруг себя, а не вокруг своей
+   лицевой стороны. Число дублирует `COIN_THICKNESS` в `OpeningSequence.tsx`:
+   там оно расставляет срезы ребра, здесь — сами грани. */
 .toss__coin {
   position: relative;
   width: 224px;
   height: 224px;
-}
+  --coin-half: 7.5px;
+  /* Пропускает перспективу площадки внутрь, к граням и ребру. Без этого узел
+     схлопывал бы объём в свою плоскость, и толщина читалась бы стопкой
+     наклеек, а не телом: перспектива в CSS достаётся только прямым потомкам,
+     а прямой потомок площадки — этот узел, а не тот, что крутится.
 
-.toss__coin-spin {
-  position: absolute;
-  inset: 0;
+     Отсюда же и запрет на `filter` здесь: любое группирующее свойство снова
+     схлопнет объём (см. комментарий у `.toss__coin-spin`). */
   transform-style: preserve-3d;
 }
 
@@ -1095,10 +1286,22 @@
   object-fit: contain;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  transform: translateZ(var(--coin-half));
 }
 
+/* После разворота собственная ось Z смотрит в другую сторону, поэтому тот же
+   сдвиг уводит грань назад — это и нужно. */
 .toss__face--back {
-  transform: rotateX(180deg);
+  transform: rotateX(180deg) translateZ(var(--coin-half));
+}
+
+/* Срез ребра. Круг ровно по монете: арт заполняет свой квадрат от края до
+   края, так что вписанный круг совпадает с самой монетой и в её прозрачные
+   углы не вылезает. */
+.toss__edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
 }
 
 /* ---- Кто ходит первым ---- */
@@ -1112,7 +1315,13 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  max-width: 100%;
+  /* Ширина по имени, а не по площадке.
+     Раньше блок был ограничен шириной `.toss__stage` (её задаёт монета —
+     224px), а имя внутри стояло в `nowrap` с многоточием: длинный ник обрезался
+     ровно там, где его впервые называют. Место есть — это оверлей во весь
+     экран, — и брать его надо по содержимому. */
+  width: max-content;
+  max-width: min(92vw, 560px);
   padding: 10px 26px 10px 10px;
   border: 1px solid var(--line-mid);
   border-radius: 999px;
@@ -1129,8 +1338,7 @@
   flex-shrink: 0;
 }
 
-.toss__portrait .portrait__img,
-.facemark__img .portrait__img {
+.toss__portrait .portrait__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1151,73 +1359,188 @@
   line-height: 1.2;
   color: var(--gold-pale);
   font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Ник длиннее блока переносится, а не обрезается: имя первого ходящего —
+     то единственное, ради чего этот экран показывают. */
+  overflow-wrap: anywhere;
 }
 
-/* ---- Готовность ---- */
+/* ---- Сбор двора ---- */
 
-.toss__ready {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  justify-content: center;
+.gather {
+  z-index: var(--z-toast);
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
-.toss__marks {
+.gather__col {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  width: min(92vw, 420px);
+}
+
+.gather__head {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
+  text-align: center;
 }
 
-/* Обесцвеченный портрет — это «ещё не отметился». Цвет возвращается вместе с
-   зелёной рамкой, и по ряду сразу видно, кого ждут. */
-.facemark {
+.gather__title {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-pale);
+  text-shadow: 0 2px 18px rgba(200, 160, 74, 0.35);
+}
+
+.gather__sub {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+/* Стол столбцом: у каждого своя строка, лицо и имя рядом. В ряду четыре
+   кружка помещались только мелкими и без подписей, и «кого ждём» приходилось
+   доставать подсказкой из каждого.
+
+   Промежуток между строками задаёт ТОЛЬКО их набивка. Пока к ней добавлялся
+   ещё и `gap` списка, расстояние складывалось из двух чисел, и стоило одному
+   из них измениться, как строки разъезжались, а своя строка — сильнее прочих,
+   потому что к ней прибавлялся третий промежуток, колонки. */
+.gather__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Ни плашки, ни канта: строка — это лицо и имя, и всё. Карточка вокруг них
+   превращала список в четыре кнопки, из которых нажимается ноль. Единственная
+   карточка на экране — своя строка, и она действительно кнопка. */
+/* Одна геометрия на строку списка и на кнопку внутри неё: та же набивка, тот
+   же промежуток, тот же кант. Своя строка отличается заливкой и словом справа
+   — то есть тем, что не двигает содержимое. */
+.gather__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* Слева ровно столько же, сколько сверху и снизу: капсула кнопки скруглена
+     по своей высоте, и вокруг круглого лица зазор обязан быть одинаковым со
+     всех сторон — иначе аватар сидит в капсуле криво. Справа больше: там
+     слово, а не круг, и ему нужен воздух. */
+  padding: 5px 18px 5px 5px;
+  /* Прозрачный кант той же толщины, что у кнопки: при `border-box` он съедает
+     пиксель набивки, и без него своя строка стояла бы на пиксель правее. */
+  border: 1px solid transparent;
+}
+
+/* Своя строка сама ничего не рисует: всё внутри неё делает кнопка, которая
+   занимает её целиком. Набивку здесь снимаем, иначе она сложилась бы с
+   набивкой кнопки и своя строка снова стала бы выше прочих. */
+.gather__row--self {
+  padding: 0;
+  border: 0;
+}
+
+/* Обесцвеченное лицо — это «ещё не отметился». Цвет возвращается вместе с
+   зелёным кантом, и по столбцу сразу видно, кого ждут. */
+/* Обесцвеченное лицо — «ещё не отметился». Цвет возвращается вместе с зелёным
+   кантом, и по столбцу сразу видно, кого ждут: без плашек это единственный
+   носитель состояния, поэтому он и работает в полную силу. */
+.gather__face {
   display: block;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  padding: 2px;
-  border: 2px solid var(--line-cold);
-  transition:
-    border-color var(--dur-panel) var(--ease-out),
-    box-shadow var(--dur-panel) var(--ease-out);
-}
-
-.facemark__img {
-  width: 100%;
-  height: 100%;
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
-  filter: grayscale(1) brightness(0.72);
-  transition: filter var(--dur-panel) var(--ease-out);
+  border: 2px solid var(--line-mid);
+  filter: grayscale(1);
+  opacity: 0.5;
+  transition: filter 0.3s ease, opacity 0.3s ease, border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
-.facemark--on {
-  border-color: var(--sage-soft);
-  box-shadow: 0 0 0 1px rgba(91, 154, 134, 0.35), 0 0 16px -2px rgba(91, 154, 134, 0.55);
-}
-
-.facemark--on .facemark__img {
+.gather__row--on .gather__face {
   filter: none;
+  opacity: 1;
+  border-color: var(--sage-soft);
+  box-shadow: 0 0 18px -2px rgba(91, 154, 134, 0.75);
 }
 
+.gather__portrait,
+.gather__portrait .portrait__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Имя белым и крупным, с тенью: оно стоит на фоне стола, просвечивающего
+   сквозь скрим, и без тени тонет в нём. */
+.gather__name {
+  min-width: 0;
+  font-size: 1.22rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- Кнопка «Готов» ---- */
+
+/* Кнопка — это и есть своя строка списка: набивка, промежуток и кант ровно те
+   же, что у `.gather__row`, поэтому лицо и имя стоят там же, где у остальных, а
+   расстояние до соседней строки такое же, как между любыми двумя. Кнопка,
+   сдвигающая свою же строку, выбивает столбец из колеи. */
 .readybtn {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 7px 22px 7px 7px;
+  gap: 14px;
+  width: 100%;
+  padding: 5px 18px 5px 5px;
   border: 1px solid var(--line-strong);
+  /* Полукруглая: та же форма, что у портрета рядом. */
   border-radius: 999px;
   background: var(--surface-raised);
   color: inherit;
   font: inherit;
+  text-align: left;
   cursor: pointer;
   transition:
     border-color var(--dur-fade) var(--ease-out),
     background var(--dur-fade) var(--ease-out);
+}
+
+/* Своё лицо — в золоте, чужие в зелени готовности: «вы» видно до того, как
+   прочитано имя. */
+.gather__face--self {
+  filter: none;
+  opacity: 1;
+  border-color: var(--gold);
+  box-shadow: 0 0 18px -4px rgba(200, 160, 74, 0.8);
+}
+
+.readybtn--on .gather__face--self {
+  border-color: var(--sage-soft);
+  box-shadow: 0 0 18px -2px rgba(91, 154, 134, 0.75);
+}
+
+/* Слово справа: оно и делает из строки кнопку, не трогая её содержимого. */
+.readybtn__label {
+  margin-left: auto;
+  padding-left: 12px;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--gold-pale);
 }
 
 .readybtn:hover:not(:disabled) {
@@ -1234,26 +1557,13 @@
   background: rgba(91, 154, 134, 0.1);
 }
 
-.readybtn .facemark {
-  width: 44px;
-  height: 44px;
-}
-
-.readybtn__label {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--gold-pale);
-  white-space: nowrap;
-}
-
 .readybtn--on .readybtn__label {
   color: var(--sage-soft);
 }
 
 @media (max-width: 560px) {
   .toss__stage {
+    width: 240px;
     height: 220px;
   }
 
@@ -1320,6 +1630,20 @@
   box-shadow: 0 0 0 1px rgba(180, 64, 90, 0.4), 0 0 18px -2px rgba(224, 138, 156, 0.75);
 }
 
+/* Окно вето. Цвета те же, что и в окне сомнения, и это не совпадение: за
+   столом два ответа значат одно и то же — пропустил, ход идёт дальше (зелёный)
+   или вмешался, ход останавливается (красный). Разводить их в свою палитру
+   значило бы заставлять читать таблицу вместо стола. */
+.rx__ring--passed {
+  border-color: var(--sage-soft);
+  box-shadow: 0 0 0 1px rgba(91, 154, 134, 0.35), 0 0 18px -2px rgba(91, 154, 134, 0.75);
+}
+
+.rx__ring--vetoed {
+  border-color: var(--crimson-soft);
+  box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.45), 0 0 20px -2px rgba(244, 63, 94, 0.8);
+}
+
 @keyframes rx-spin {
   to {
     rotate: 360deg;
@@ -1347,6 +1671,14 @@
 }
 
 .rx--doubted .rx__tint {
+  background: rgba(180, 64, 90, 0.22);
+}
+
+.rx--passed .rx__tint {
+  background: rgba(91, 154, 134, 0.22);
+}
+
+.rx--vetoed .rx__tint {
   background: rgba(180, 64, 90, 0.22);
 }
 
@@ -1413,4 +1745,115 @@
 .cardmenu__item--toggle.is-on .cardmenu__pip {
   background: currentColor;
   box-shadow: 0 0 6px currentColor;
+}
+
+
+/* ==========================================================================
+   ФАНФАРА — точка между раздачей и первым ходом
+   ==========================================================================
+   Без скрима намеренно: карты только что розданы, и закрывать стол ровно в
+   тот момент, когда его наконец собрали, значило бы прятать результат
+   раздачи. Свет и тень заменяют подложку — стол читается сквозь надпись.
+
+   Ничего не ловит: `pointer-events: none`. Стол под ней всё равно ходов не
+   принимает (заслонка в движке), но курсор не должен упираться в надпись. */
+.fanfare {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* Ореол под словами: широкий и мягкий, без единого края. Плашка здесь
+   вырезала бы прямоугольник посреди стола, а нужно, чтобы свет ложился на
+   сукно. */
+.fanfare__glow {
+  position: absolute;
+  width: min(150vw, 1500px);
+  height: min(70vh, 620px);
+  background: radial-gradient(
+    closest-side,
+    rgba(12, 9, 6, 0.9) 0%,
+    rgba(12, 9, 6, 0.72) 34%,
+    rgba(12, 9, 6, 0.32) 62%,
+    rgba(12, 9, 6, 0) 100%
+  );
+}
+
+.fanfare__inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  text-align: center;
+}
+
+/* Название того, что начинается. Держит взгляд: капитель, разрядка и золото
+   по градиенту — буквы должны выглядеть отлитыми, а не набранными. */
+.fanfare__lead {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 7vw, 4.6rem);
+  line-height: 1;
+  letter-spacing: 0.045em;
+  background: linear-gradient(
+    180deg,
+    #fdf3d8 0%,
+    var(--gold-bright) 38%,
+    var(--gold) 66%,
+    var(--gold-deep) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Тень идёт на отдельном слое: на прозрачном тексте `text-shadow` рисуется
+     поверх заливки и съедает градиент. */
+  filter:
+    drop-shadow(0 2px 1px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 0 34px rgba(200, 160, 74, 0.5));
+}
+
+/* Глагол при названии: тише, шире, вразрядку. Он не спорит с первой строкой,
+   а договаривает её. */
+.fanfare__tail {
+  font-family: var(--font-display);
+  font-size: clamp(0.82rem, 2vw, 1.24rem);
+  line-height: 1;
+  letter-spacing: 0.42em;
+  /* Разрядка добавляет пробел справа от последней буквы — без этого сдвига
+     строка стоит левее центра ровно на него. */
+  text-indent: 0.42em;
+  text-transform: uppercase;
+  color: var(--gold-pale);
+  opacity: 0.85;
+  text-shadow: 0 0 18px rgba(200, 160, 74, 0.45), 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* Линии сверху и снизу: тают к краям, поэтому у объявления нет рамки —
+   только свет. Растут от середины, отсюда и `transform-origin`. */
+.fanfare__rule {
+  width: min(78vw, 520px);
+  height: 1px;
+  transform-origin: center;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(200, 160, 74, 0.15) 18%,
+    var(--gold) 50%,
+    rgba(200, 160, 74, 0.15) 82%,
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fanfare__lead {
+    filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.85));
+  }
+
+  .fanfare__tail {
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+  }
 }

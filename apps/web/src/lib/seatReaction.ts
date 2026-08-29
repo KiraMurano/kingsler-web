@@ -1,7 +1,14 @@
-import type { Action, RevealOutcome, TurnPhase } from '@kinglier/engine/types';
+import type { Action, GameState, RevealOutcome, TurnPhase } from '@kinglier/engine/types';
+import { vetoAnswerRequired, vetoTopActorId } from '@kinglier/engine/resolvers/vetoChain';
 
-/** Что игрок делает в окне сомнения. `null` — окно его не касается. */
-export type SeatReaction = 'thinking' | 'believed' | 'doubted';
+/**
+ * Что игрок делает в открытом окне. `null` — окно его не касается.
+ *
+ * Окон два, и оба — опросы: сомнение («верю / не верю») и вето («вето /
+ * пропустить»). Признаки у них общие не для экономии, а потому что вопрос к
+ * столу один и тот же: чей ответ сейчас держит ход.
+ */
+export type SeatReaction = 'thinking' | 'believed' | 'doubted' | 'passed' | 'vetoed';
 
 export interface SeatReactionInput {
   turnPhase: TurnPhase;
@@ -9,6 +16,15 @@ export interface SeatReactionInput {
   pendingDoubtPassedIds: string[];
   pendingDoubtDoubterId: string | null;
   pendingDoubtActionId: string | null;
+  pendingVetoPassedIds: string[];
+  pendingVetoActionId: string | null;
+  /**
+   * Что лежит поверх действия.
+   *
+   * По нему узнаётся и тот, кто наложил последнее вето, и тот, кого в этом
+   * круге не спрашивают: это один и тот же игрок — свою карту не отменяют.
+   */
+  overlayInstant: GameState['overlayInstant'];
   revealOutcome: RevealOutcome | null;
   playerId: string;
 }
@@ -43,12 +59,43 @@ export function seatReaction({
   pendingDoubtPassedIds,
   pendingDoubtDoubterId,
   pendingDoubtActionId,
+  pendingVetoPassedIds,
+  pendingVetoActionId,
+  overlayInstant,
   revealOutcome,
   playerId
 }: SeatReactionInput): SeatReaction | null {
   if (revealOutcome?.accuserId === playerId) return 'doubted';
 
-  if (!pendingAction || pendingAction.actorId === playerId) return null;
+  if (!pendingAction) return null;
+
+  /*
+   * Окно вето — такой же опрос, и стол обязан показывать его так же: кто уже
+   * пропустил, кто ещё думает, кто вмешался. Без этого окно, которое держится
+   * ответами, а не часами, выглядит зависшим — не видно, чьего ответа ждут.
+   *
+   * Опрос вето ПЕРЕКРЫВАЕТ опрос сомнения, а не показывается рядом: он идёт
+   * по той же заявке, но позже, и стол обязан отвечать на вопрос «что сейчас».
+   * Возвращать зелёное «Верю» после того, как игрок уже пропустил вето, —
+   * значит откатывать метку назад во времени.
+   *
+   * И стоит ДО отсечки автора: пока его действие никто не отменил, его не
+   * спрашивают, но встречное вето в цепочке — это ровно его ответ, и там он
+   * участвует наравне со всеми.
+   */
+  if (pendingVetoActionId === pendingAction.id) {
+    if (overlayInstant?.card === 'Право вето' && overlayInstant.actorId === playerId) {
+      return 'vetoed';
+    }
+    if (!vetoAnswerRequired(playerId, vetoTopActorId(pendingAction.actorId, overlayInstant))) {
+      return null;
+    }
+    if (pendingVetoPassedIds.includes(playerId)) return 'passed';
+    /* Думать можно только пока спрашивают — как и в окне сомнения. */
+    return turnPhase === 'VETO_WINDOW' ? 'thinking' : null;
+  }
+
+  if (pendingAction.actorId === playerId) return null;
 
   /* Опрос принадлежит своей заявке. Чужой — не показывается вовсе. */
   const polled = pendingDoubtActionId === pendingAction.id;

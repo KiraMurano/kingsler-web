@@ -23,15 +23,26 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
     players,
     activePlayerId,
     pendingAction,
+    opening,
     viewerId
   } = useGameStore(
     useShallow(s => ({
       players: s.players,
       activePlayerId: s.activePlayerId,
       pendingAction: s.pendingAction,
+      opening: s.opening,
       viewerId: s.viewerId
     }))
   );
+  /*
+   * Пока идёт открытие партии, активного места нет.
+   *
+   * `activePlayerId` проставлен с самого `startGame` — это и есть победитель
+   * жребия, — и подсветка места выдавала его ЗАДОЛГО до того, как монетка
+   * оторвётся от стола: игрок смотрел бросок, уже зная результат. Ход
+   * начинается вместе с концом открытия, тогда место и загорается.
+   */
+  const activeSeatId = opening ? null : activePlayerId;
   const human = pickViewer(players, viewerId);
   const opponents = seatOpponents(players, human);
 
@@ -55,7 +66,7 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
             key={player.id}
             player={player}
             side={player.side}
-            isActive={activePlayerId === player.id}
+            isActive={activeSeatId === player.id}
             isTargetable={targetable}
             isDimmed={!!pendingTargetAction && !targetable}
             onTarget={() => onSelectTarget(player.id)}

@@ -26,8 +26,7 @@ function toneOf(entry: string): string {
   if (
     entry.includes('поймал') ||
     entry.includes('ПОЗОР') ||
-    entry.includes('отменяется') ||
-    entry.includes('отступает')
+    entry.includes('отменяется')
   ) {
     return 'log__item--danger';
   }

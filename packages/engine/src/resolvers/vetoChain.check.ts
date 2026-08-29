@@ -9,7 +9,6 @@ import { vetoPlayed, vetoReset } from './vetoChain.ts';
 import { useGameStore } from '../GameStore.ts';
 import { mintCard, mintDeck } from '../cardInstance.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { VETO_WINDOW_MS } from '../timing.ts';
 
 // ==========================================================================
 // Чистая арифметика цепочки
@@ -32,7 +31,7 @@ function tableInVetoWindow(vetoOnVeto: boolean, vetoHolders: string[] = []) {
   const state = useGameStore.getState();
   const meId = state.players[0].id;
   useGameStore.setState({
-    openingToss: null,
+    opening: null,
     activePlayerId: meId,
     turnPhase: 'IDLE',
     turnSubPhase: 'CARD_PLAY_PHASE',
@@ -85,7 +84,7 @@ function playVeto(playerId: string) {
   const after = useGameStore.getState();
   assert.equal(after.vetoChain, 1, 'первое вето легло');
   assert.equal(after.isVetoed, true, 'эффект отменён');
-  assert.equal(after.vetoDeadlineAt, null, 'окно закрылось сразу — отвечать некогда');
+  assert.equal(after.isVetoed, true, 'окно закрывается само — отвечать больше нечем');
   void meId;
   timerManager.clearAll();
 }
@@ -93,16 +92,95 @@ function playVeto(playerId: string) {
 // --- Правило включено: окно перезапускается ---
 {
   const { others } = tableInVetoWindow(true);
-  const before = Date.now();
   playVeto(others[0]);
   const after = useGameStore.getState();
   assert.equal(after.vetoChain, 1);
   assert.equal(after.isVetoed, true);
   assert.equal(after.turnPhase, 'VETO_WINDOW', 'окно осталось открытым');
-  assert.ok(
-    after.vetoDeadlineAt !== null && after.vetoDeadlineAt >= before + VETO_WINDOW_MS - 200,
-    'дедлайн отсчитан заново, а не унаследован'
+  assert.deepEqual(
+    after.pendingVetoPassedIds,
+    [],
+    'круг начат заново: прошлые «Пропустить» к встречному вето не относятся'
   );
+  timerManager.clearAll();
+}
+
+// --- Перезапуск круга атомарен: цепочка и ответы меняются одним кадром ---
+//
+// Движок ботов — подписчик стора, и он просыпается на КАЖДЫЙ `set`. Пока
+// ответы гасились отдельным `set` ПОСЛЕ цепочки, он успевал проснуться между
+// ними и видел полукадр: цепочка уже новая, список ответивших ещё старый.
+// Ответившие в прошлом круге отфильтровывались как «уже ответившие»,
+// планировать было некого, а второй `set` движок не будил — цепочка в нём не
+// менялась. Опрос оставался ждать ответов, которых никто не даст: стол вставал
+// намертво ровно на «вето в вето».
+//
+// Проверяем именно кадр: в первом же состоянии, где видна новая цепочка,
+// список ответивших обязан быть пуст.
+{
+  const { others } = tableInVetoWindow(true);
+
+  // Кто-то отвечает в первом круге — этот ответ и не должен пережить вето.
+  useGameStore.getState().passVeto(others[0]);
+  assert.deepEqual(
+    useGameStore.getState().pendingVetoPassedIds,
+    [others[0]],
+    'ответ первого круга засчитан'
+  );
+
+  let frameAtNewChain: string[] | null = null;
+  const unsubscribe = useGameStore.subscribe(state => {
+    if (state.vetoChain === 1 && frameAtNewChain === null) {
+      frameAtNewChain = state.pendingVetoPassedIds;
+    }
+  });
+
+  playVeto(others[1]);
+  unsubscribe();
+
+  assert.deepEqual(
+    frameAtNewChain,
+    [],
+    'в первом же кадре с новой цепочкой ответы прошлого круга уже погашены'
+  );
+  assert.deepEqual(
+    useGameStore.getState().pendingVetoPassedIds,
+    [],
+    'и остаются погашенными'
+  );
+  timerManager.clearAll();
+}
+
+// --- Вето поверх собственного вето не кладут ---
+//
+// Оно ничего не отменяет: чётная цепочка возвращает действие, которое этим же
+// вето и отменяли. Раньше положивший вето бот тут же попадал в новый круг
+// опроса и говорил «Не накладываю Вето» сразу после «Право вето!».
+{
+  const { others } = tableInVetoWindow(true);
+  playVeto(others[0]);
+  assert.equal(useGameStore.getState().vetoChain, 1, 'первое вето легло');
+  const handBefore = useGameStore.getState().players.find(p => p.id === others[0])!.hand.length;
+
+  playVeto(others[0]);
+  const after = useGameStore.getState();
+  assert.equal(after.vetoChain, 1, 'второе вето подряд от того же игрока не принято');
+  assert.equal(after.isVetoed, true, 'отмена осталась в силе');
+  assert.equal(
+    after.players.find(p => p.id === others[0])!.hand.length,
+    handBefore + 1,
+    'карта осталась на руках: движок отверг ход, а не сжёг «Право вето»'
+  );
+  timerManager.clearAll();
+}
+
+// --- И автор не ветирует собственное действие ---
+{
+  const { meId } = tableInVetoWindow(true);
+  playVeto(meId);
+  const after = useGameStore.getState();
+  assert.equal(after.vetoChain, 0, 'своё действие вето не отменяют');
+  assert.equal(after.isVetoed, false);
   timerManager.clearAll();
 }
 

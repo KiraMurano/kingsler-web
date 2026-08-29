@@ -6,9 +6,9 @@ import type { PublicGameState } from '@kinglier/engine/net/redaction';
 const NETWORKED_METHODS = [
   'markReady',
   'performAction', 'skipNormalActionPhase', 'endTurnManually', 'playPlotAction',
-  'playInstant', 'doubtAction', 'passDoubt',
+  'playInstant', 'doubtAction', 'passDoubt', 'passVeto',
   'targetAcceptAttack', 'targetDoubtAttack', 'targetDeclareDuel',
-  'attackerRetreatDuel', 'attackerAcceptDuel', 'closeDuelOutcome',
+  'closeDuelOutcome',
   'closeInformantPeek', 'closeRevealOutcome', 'openConspiracyDialog',
   'closeConspiracyDialog', 'activateConspiracy', 'endTurn'
 ] as const;

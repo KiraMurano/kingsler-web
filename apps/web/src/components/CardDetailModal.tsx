@@ -1,5 +1,5 @@
 /**
- * Карточка карты в Кодексе.
+ * Карточка карты или обычного действия в Кодексе.
  *
  * Шапка отвечает на «что это за карта» одной строкой: имя и бейджи стоят
  * рядом, потому что говорят об одном. Отдельной полкой под именем бейджи
@@ -11,15 +11,20 @@
  * а не после тактики, где его никто не дочитывал.
  */
 import React from 'react';
-import { CARD_DESCRIPTIONS, type GameCard } from '@kinglier/engine/data/cardDescriptions';
+import {
+  CARD_DESCRIPTIONS,
+  type InspectableItem,
+  type GameCard
+} from '@kinglier/engine/data/cardDescriptions';
 import { Dialog } from './ui/Overlay';
 import { Tag } from './ui/Tag';
-import { UiIcon, renderWithIcons } from './ui/Icon';
+import { renderWithIcons } from './ui/Icon';
 
 const CATEGORY_LABEL = {
   role: 'Роль',
   plot: 'Интрига',
-  instant: 'Инстант'
+  instant: 'Инстант',
+  action: 'Обычное действие'
 } as const;
 
 /**
@@ -29,34 +34,45 @@ const CATEGORY_LABEL = {
  */
 const REACTIVE_INSTANTS: GameCard[] = ['Право вето', 'Перенаправление'];
 
-export const CardDetailModal: React.FC<{ card: GameCard | null; onClose: () => void }> = ({
-  card,
-  onClose
-}) => {
+export const CardDetailModal: React.FC<{
+  card: InspectableItem | null;
+  canGoBack?: boolean;
+  onBack?: () => void;
+  onClose: () => void;
+}> = ({ card, canGoBack = false, onBack, onClose }) => {
   if (!card) return null;
   const info = CARD_DESCRIPTIONS[card];
   if (!info) return null;
 
   const isInstant = info.category === 'instant';
-  const isReactive = isInstant && REACTIVE_INSTANTS.includes(card);
+  const isAction = info.category === 'action';
+  const isReactive = isInstant && REACTIVE_INSTANTS.includes(card as GameCard);
+
+  /*
+   * Арт здесь показывают только карты.
+   *
+   * У обычных действий он тоже есть — им подписаны широкие полосы в списке
+   * действий и в кодексе, — но рамка этой модалки нарисована под карту:
+   * вертикальная, в пропорции руки. Полоса 4.5:1 в ней не карта и не полоса, а
+   * растянутая заплата. В подробностях у действия и без арта есть что
+   * показать: правило, цена и тактика.
+   */
+  const showArt = !!info.artImage && !isAction;
 
   return (
     <Dialog
       open
       onClose={onClose}
-      width={640}
+      onBack={canGoBack ? onBack : undefined}
+      width={isAction ? 540 : 640}
       title={
         <span className="detail__head">
           <span className="detail__name">{info.name}</span>
           <span className="detail__badges">
             <Tag tone="gold">{CATEGORY_LABEL[info.category]}</Tag>
-            <Tag>В колоде: {info.copiesCount}</Tag>
+            {info.copiesCount !== undefined && <Tag>В колоде: {info.copiesCount}</Tag>}
+            {isAction && <Tag tone="truth">Нельзя оспорить</Tag>}
             {isInstant && <Tag tone="cold">{isReactive ? 'В любой момент' : 'В свой ход'}</Tag>}
-            {isInstant && (
-              <Tag tone="cold">
-                {isReactive ? 'Не требует' : 'Требует 1'} <UiIcon kind="move" size="xs" />
-              </Tag>
-            )}
             {info.targeted && <Tag tone="cold">Требуется цель</Tag>}
             {info.blocksRole && <Tag tone="truth">Блокирует: {info.blocksRole}</Tag>}
             {info.blockableBy && <Tag tone="bluff">Блокируется: {info.blockableBy}</Tag>}
@@ -65,16 +81,18 @@ export const CardDetailModal: React.FC<{ card: GameCard | null; onClose: () => v
       }
       description={info.loreQuote ? <span className="detail__lore">{info.loreQuote}</span> : undefined}
     >
-      <div className="detail">
-        <div className={`detail__art cardframe cardframe--${info.category}`}>
-          <img src={info.artImage} alt={info.name} />
-        </div>
+      <div className={`detail ${showArt ? '' : 'detail--no-art'}`}>
+        {showArt && (
+          <div className={`detail__art cardframe cardframe--${info.category}`}>
+            <img src={info.artImage} alt={info.name} />
+          </div>
+        )}
 
         <div className="detail__col">
           <div className="notice notice--gold">{renderWithIcons(info.shortDescription)}</div>
 
           <div>
-            <div className="detail__label">Правило карты</div>
+            <div className="detail__label">{isAction ? 'Правило действия' : 'Правило карты'}</div>
             <div className="detail__rule">{renderWithIcons(info.fullDescription)}</div>
           </div>
 

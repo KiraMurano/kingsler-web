@@ -40,9 +40,21 @@ export interface PlacedCard {
   /** True while the table wants this card turned face-up for scrutiny. */
   revealed: boolean;
   /**
+   * Лежит ли карта ПОД теми, кого сопровождает, а не поперёк них.
+   *
+   * Оверлей по умолчанию кладётся поверх ставки: «Право вето» и «Ва-банк»
+   * перечёркивают действие, и это надо видеть. Но на дуэли карт две, они
+   * сходятся в середине стола и обе должны читаться целиком — Ва-банк,
+   * лежащий поверх, закрывает собой ровно то, ради чего дуэль и смотрят.
+   * Уйти вниз он обязан сразу, вместе с началом схождения, а не при вскрытии:
+   * иначе карта на две секунды пропадает под ним и выныривает.
+   */
+  underlay?: boolean;
+
+  /**
    * Did the claim this card was staked on hold up? Set only while a reveal or
    * a duel outcome is on screen, and only for the cards that outcome turned
-   * up — it is what the ПРАВДА / БЛЕФ stamp reads. `undefined` means no
+   * up — it is what the «Правда» / «Блеф» stamp reads. `undefined` means no
    * verdict has been passed on this card, which is different from `false`.
    */
   wasTruth?: boolean;

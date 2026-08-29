@@ -18,7 +18,7 @@ import { ActionBar } from './components/ActionBar';
 import { Chronicle } from './components/Chronicle';
 import { Codex } from './components/Codex';
 import { Modals } from './components/Modals';
-import { OpeningToss } from './components/OpeningToss';
+import { OpeningSequence } from './components/OpeningSequence';
 import { CardDetailModal } from './components/CardDetailModal';
 import { BluffDialog } from './components/BluffDialog';
 import { CourtActionsDialog } from './components/CourtActionsDialog';
@@ -36,10 +36,11 @@ import type { CardInteraction } from './motion/CardLayer.tsx';
 import type { PlacedCard } from './motion/zones.ts';
 import { onlineClient, type ConnectionStatus } from './online/OnlineGameClient';
 import type { CardId, GameCard, InstantType, PlotType, Role } from '@kinglier/engine/types';
-import { CARD_DESCRIPTIONS, isInstant, isPlot } from '@kinglier/engine/data/cardDescriptions';
+import { CARD_DESCRIPTIONS, isInstant, isPlot, type InspectableItem } from '@kinglier/engine/data/cardDescriptions';
 import type { CardMenuKind } from './lib/tableView.ts';
 import type { PendingTargetAction } from './components/targeting';
 import type { Account } from './auth/AuthClient';
+import { InspectCardContext } from './lib/inspectCardContext';
 import './styles/rules.css';
 
 export default function App({
@@ -67,6 +68,7 @@ export default function App({
     revealOutcome,
     duelOutcome,
     coronationCandidateId,
+    opening,
     viewerId,
     startGame,
     performAction,
@@ -74,11 +76,10 @@ export default function App({
     playInstant,
     doubtAction,
     passDoubt,
+    passVeto,
     targetAcceptAttack,
     targetDoubtAttack,
     targetDeclareDuel,
-    attackerRetreatDuel,
-    attackerAcceptDuel,
     turnSubPhase,
     pendingDoubtDoubterId,
     pendingDoubtPassedIds,
@@ -86,8 +87,9 @@ export default function App({
     hasPlayedRoleThisTurn,
     hasPlayedPlotThisTurn,
     isVetoed,
+    vetoChain,
+    pendingVetoPassedIds,
     rules,
-    vetoDeadlineAt,
     endTurnManually,
     openConspiracyDialog
   } = useGameStore(
@@ -104,6 +106,7 @@ export default function App({
       revealOutcome: s.revealOutcome,
       duelOutcome: s.duelOutcome,
       coronationCandidateId: s.coronationCandidateId,
+      opening: s.opening,
       viewerId: s.viewerId,
       startGame: s.startGame,
       performAction: s.performAction,
@@ -111,11 +114,10 @@ export default function App({
       playInstant: s.playInstant,
       doubtAction: s.doubtAction,
       passDoubt: s.passDoubt,
+      passVeto: s.passVeto,
       targetAcceptAttack: s.targetAcceptAttack,
       targetDoubtAttack: s.targetDoubtAttack,
       targetDeclareDuel: s.targetDeclareDuel,
-      attackerRetreatDuel: s.attackerRetreatDuel,
-      attackerAcceptDuel: s.attackerAcceptDuel,
       turnSubPhase: s.turnSubPhase,
       pendingDoubtDoubterId: s.pendingDoubtDoubterId,
       pendingDoubtPassedIds: s.pendingDoubtPassedIds,
@@ -123,8 +125,9 @@ export default function App({
       hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn,
       hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
       isVetoed: s.isVetoed,
+      vetoChain: s.vetoChain,
+      pendingVetoPassedIds: s.pendingVetoPassedIds,
       rules: s.rules,
-      vetoDeadlineAt: s.vetoDeadlineAt,
       endTurnManually: s.endTurnManually,
       openConspiracyDialog: s.openConspiracyDialog
     }))
@@ -134,7 +137,25 @@ export default function App({
   const [rulesOpen, setRulesOpen] = useState(false);
   const [codexOpen, setCodexOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
-  const [inspectedCard, setInspectedCard] = useState<GameCard | null>(null);
+  const [inspectedStack, setInspectedStack] = useState<InspectableItem[]>([]);
+  const inspectedCard = inspectedStack.length > 0 ? inspectedStack[inspectedStack.length - 1] : null;
+
+  const handleInspectCard = (card: InspectableItem | null) => {
+    if (!card) {
+      setInspectedStack([]);
+    } else {
+      setInspectedStack(prev => {
+        if (prev.length === 0) return [card];
+        if (prev[prev.length - 1] === card) return prev;
+        return [...prev, card];
+      });
+    }
+  };
+
+  const handleBackInspect = () => {
+    setInspectedStack(prev => prev.slice(0, -1));
+  };
+
   const [pendingTarget, setPendingTarget] = useState<PendingTargetAction | null>(null);
   const [openMenuCardId, setOpenMenuCardId] = useState<CardId | null>(null);
 
@@ -142,6 +163,9 @@ export default function App({
      пока пуст. Живёт здесь, а не в сторе: движок про черновик выбора ничего
      не знает и знать не должен, он получает готовое действие. */
   const [exchangePick, setExchangePick] = useState<CardId[] | null>(null);
+  /* Идёт ли выбор карты под щит дуэли. Кнопка «Дуэль» только открывает выбор:
+     объявляет дуэль уже нажатие на карту руки. */
+  const [duelPick, setDuelPick] = useState(false);
   const [bluffCardId, setBluffCardId] = useState<CardId | null>(null);
   /* Взведён ли «Ва-банк». Состояние интерфейса, а не партии: пока карта не
      сыграна, в движке ничего не происходит. Снимается при каждом розыгрыше —
@@ -252,14 +276,18 @@ export default function App({
           hasPlayedRoleThisTurn,
           hasPlayedPlotThisTurn,
           isVetoed,
+          opening,
+          vetoChain,
+          pendingVetoPassedIds,
+          overlayInstant,
           vetoOnVeto: rules.vetoOnVeto,
           rules,
           vaBanqueArmed,
-          vetoDeadlineAt,
           coronationCandidateId,
           revealOutcome,
           duelOutcome,
-          exchangePick
+          exchangePick,
+          duelPick
         },
         human?.id ?? ''
       ),
@@ -275,13 +303,17 @@ export default function App({
       hasPlayedRoleThisTurn,
       hasPlayedPlotThisTurn,
       isVetoed,
+      opening,
+      vetoChain,
+      pendingVetoPassedIds,
+      overlayInstant,
       rules,
       vaBanqueArmed,
-      vetoDeadlineAt,
       coronationCandidateId,
       revealOutcome,
       duelOutcome,
       exchangePick,
+      duelPick,
       human
     ]
   );
@@ -309,16 +341,18 @@ export default function App({
         else doubtAction(human.id);
         break;
       case 'believe':
-        passDoubt(human.id);
+        /* Та же пара фаз, что и у «Не верю»: под атакой «Верю» — это ответ
+           жертвы, в общем окне — голос двора. Спрашивают об одном, и ответ
+           засчитывается один раз. */
+        if (view.phase === 'under-attack') targetAcceptAttack(human.id);
+        else passDoubt(human.id);
         break;
-      case 'accept-attack':
-        targetAcceptAttack(human.id);
+      case 'duel':
+        setDuelPick(true);
+        setOpenMenuCardId(null);
         break;
-      case 'duel-accept':
-        attackerAcceptDuel(human.id);
-        break;
-      case 'duel-retreat':
-        attackerRetreatDuel(human.id);
+      case 'veto-pass':
+        passVeto(human.id);
         break;
     }
   };
@@ -331,6 +365,7 @@ export default function App({
   useEffect(() => {
     setPendingTarget(null);
     setExchangePick(null);
+    setDuelPick(false);
   }, [view.phase, activePlayerId]);
 
   const confirmTarget = (targetId: string) => {
@@ -365,6 +400,14 @@ export default function App({
   /* Клик по своей карте только раскрывает меню — играет уже пункт меню.
      Повторный клик по той же карте закрывает: карта сама себе переключатель. */
   const handleCardClick = (cardId: CardId) => {
+    /* Выбранная под щит карта не открывает меню, а сразу выходит на дуэль:
+       согласия нападающего не спрашивают, спор начинается этим нажатием. */
+    if (duelPick && human) {
+      setDuelPick(false);
+      targetDeclareDuel(human.id, cardId);
+      return;
+    }
+
     /* Пока идёт выбор к обмену, карта — это флажок, а не меню: клик отмечает,
        повторный снимает отметку. Больше двух карт в руке не бывает, так что
        ограничивать число отмеченных нечем и незачем. */
@@ -500,7 +543,7 @@ export default function App({
 
     switch (kind) {
       case 'inspect':
-        setInspectedCard(card);
+        handleInspectCard(card);
         break;
       case 'bluff':
         setBluffCardId(cardId);
@@ -530,8 +573,9 @@ export default function App({
       setRulesOpen(false);
       setCodexOpen(false);
       setChronicleOpen(false);
-      setInspectedCard(null);
+      setInspectedStack([]);
       setPendingTarget(null);
+      setDuelPick(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -591,7 +635,7 @@ export default function App({
 
   const cardInteraction: CardInteraction = {
     onActivate: handleCardClick,
-    onInspect: setInspectedCard,
+    onInspect: handleInspectCard,
     claimFor: claimedRoleFor,
     isOwnHand: placed => isOwnHandCard(placed) || isOwnChargedPlot(placed),
     /* Взведённый «Ва-банк» поднимает свою карту, хотя нажимали на соседнюю:
@@ -610,7 +654,8 @@ export default function App({
   };
 
   return (
-    <div className="app">
+    <InspectCardContext.Provider value={handleInspectCard}>
+      <div className="app">
       <TopBar
         codexOpen={codexOpen}
         chronicleOpen={chronicleOpen}
@@ -628,20 +673,25 @@ export default function App({
               <SeatsRow
                 pendingTargetAction={pendingTarget}
                 onSelectTarget={confirmTarget}
-                onInspectCard={setInspectedCard}
+                onInspectCard={handleInspectCard}
               />
               <Arena
                 pendingTargetAction={pendingTarget}
                 onCancelTarget={() => setPendingTarget(null)}
                 prompt={
-                  exchangePick
+                  duelPick
                     ? {
-                        text: 'Выберите карты для смены',
-                        onCancel: () => setExchangePick(null)
+                        text: 'Выберите карту-щит для дуэли',
+                        onCancel: () => setDuelPick(false)
                       }
-                    : null
+                    : exchangePick
+                      ? {
+                          text: 'Выберите карты для смены',
+                          onCancel: () => setExchangePick(null)
+                        }
+                      : null
                 }
-                onInspectCard={setInspectedCard}
+                onInspectCard={handleInspectCard}
               />
 
               {/* Внутри `.table` намеренно: стопки встают над панелью правого
@@ -652,8 +702,10 @@ export default function App({
             <div className="hero">
               <PlayerCrest
                 player={human}
-                isActive={activePlayerId === human.id}
-                onInspectCard={setInspectedCard}
+                /* Пока идёт открытие, активного места нет: подсветка выдала бы
+                   победителя жребия до самого броска. См. `SeatsRow`. */
+                isActive={!opening && activePlayerId === human.id}
+                onInspectCard={handleInspectCard}
               />
 
               <Hand
@@ -679,7 +731,11 @@ export default function App({
               )}
 
               <div className="sidecol">
-                <ActionBar view={view} onAct={runBarAction} />
+                <ActionBar
+                  view={view}
+                  onAct={runBarAction}
+                  promptKey={`${view.phase}-${pendingAction?.id ?? ''}-${turnPhase}`}
+                />
                 <PhasePanel view={view} />
               </div>
             </div>
@@ -702,7 +758,7 @@ export default function App({
       <Codex
         open={codexOpen}
         onClose={() => setCodexOpen(false)}
-        onSelectCard={setInspectedCard}
+        onSelectCard={handleInspectCard}
       />
 
       {bluffCardId && (
@@ -718,7 +774,7 @@ export default function App({
       {courtActionsOpen && (
         <CourtActionsDialog
           onClose={() => setCourtActionsOpen(false)}
-          onInspectCard={setInspectedCard}
+          onInspectCard={handleInspectCard}
           onStartExchange={() => {
             setOpenMenuCardId(null);
             setExchangePick([]);
@@ -728,17 +784,22 @@ export default function App({
 
       {/* Стоит последней из диалогов: её открывают из «Действий двора», и при
           равном z-index кто ниже по разметке, тот и сверху. */}
-      <CardDetailModal card={inspectedCard} onClose={() => setInspectedCard(null)} />
+      <CardDetailModal
+        card={inspectedCard}
+        canGoBack={inspectedStack.length > 1}
+        onBack={handleBackInspect}
+        onClose={() => setInspectedStack([])}
+      />
 
       <Modals
         showRules={rulesOpen}
         onCloseRules={() => setRulesOpen(false)}
       />
 
-      {/* Сам решает, показываться ли: пока в состоянии нет жребия — ничего не
-          рисует. Лежит порталом в body, так что место в разметке роли не
-          играет. */}
-      <OpeningToss />
+      {/* Сам решает, что показывать: сбор двора, жребий, ничего (пока идёт
+          раздача) или фанфару. Лежит порталом в body, так что место в разметке
+          роли не играет. */}
+      <OpeningSequence />
 
       {mode === 'online' && connectionStatus !== 'connected' && (
         <div className="reconnect-overlay">
@@ -759,6 +820,7 @@ export default function App({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </InspectCardContext.Provider>
   );
 }

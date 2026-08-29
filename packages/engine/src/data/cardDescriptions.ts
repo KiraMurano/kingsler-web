@@ -26,25 +26,36 @@ export type InstantType =
 
 export type GameCard = Role | PlotType | InstantType;
 
+export type NormalAction =
+  | 'Просить содержание'
+  | 'Устроить пир'
+  | 'Распустить слух'
+  | 'Сменить карты';
+
+export type InspectableItem = GameCard | NormalAction;
+
 export type CardCategory = 'role' | 'plot' | 'instant';
+export type ItemCategory = CardCategory | 'action';
 
 export interface CardDescription {
-  name: GameCard;
-  category: CardCategory;
+  name: InspectableItem;
+  category: ItemCategory;
   title: string;
   themeColor: string;
   gradient: string;
   borderColor: string;
-  artImage: string;
+  artImage?: string;
   shortDescription: string;
   fullDescription: string;
   strategyTip?: string;
   loreQuote?: string;
   cost: number;
+  costTokens?: number;
+  costGold?: number;
   targeted: boolean;
   blockableBy?: Role;
   blocksRole?: Role;
-  copiesCount: number;
+  copiesCount?: number;
 }
 
 export const ALL_ROLES: Role[] = [
@@ -76,27 +87,37 @@ export const ALL_INSTANTS: InstantType[] = [
   'Обвинение в измене'
 ];
 
-export function isRole(card: GameCard): card is Role {
+export const ALL_NORMAL_ACTIONS: NormalAction[] = [
+  'Просить содержание',
+  'Устроить пир',
+  'Распустить слух',
+  'Сменить карты'
+];
+
+export function isRole(card: InspectableItem): card is Role {
   return ALL_ROLES.includes(card as Role);
 }
 
-export function isPlot(card: GameCard): card is PlotType {
+export function isPlot(card: InspectableItem): card is PlotType {
   return ALL_PLOTS.includes(card as PlotType);
 }
 
-export function isInstant(card: GameCard): card is InstantType {
+export function isInstant(card: InspectableItem): card is InstantType {
   return ALL_INSTANTS.includes(card as InstantType);
 }
 
+export function isNormalAction(card: InspectableItem): card is NormalAction {
+  return ALL_NORMAL_ACTIONS.includes(card as NormalAction);
+}
 
 /**
  * ============================================================================
- * ЕДИНЫЙ РЕЕСТР ОПИСАНИЙ ВСЕХ КАРТ KINGLIER
+ * ЕДИНЫЙ РЕЕСТР ОПИСАНИЙ ВСЕХ КАРТ И ДЕЙСТВИЙ KINGLIER
  * ============================================================================
- * Здесь собраны все тексты, правила, параметры и подсказки для всех карт.
+ * Здесь собраны все тексты, правила, параметры и подсказки для всех карт и действий.
  * Редактируйте этот файл для изменения баланса описаний и подсказок.
  */
-export const CARD_DESCRIPTIONS: Record<GameCard, CardDescription> = {
+export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
   // ==========================================================================
   // 1. РОЛИ (6 карт по 3 копии = 18 карт в колоде)
   // ==========================================================================
@@ -302,9 +323,9 @@ export const CARD_DESCRIPTIONS: Record<GameCard, CardDescription> = {
     gradient: 'linear-gradient(180deg, #5b21b6 0%, #3b0764 50%, #0f172a 100%)',
     borderColor: '#a855f7',
     artImage: '/assets/cards/intrigue-plot.webp',
-    shortDescription: 'Копит 4 заряда от проверок и дуэлей: сбрасывает 3 🪙 или корону цели.',
-    fullDescription: 'Заряжается на +1, когда кто-то объявляет «НЕ ВЕРЮ!» или вызывает на Дуэль. Разряжается ТОЛЬКО на полных 4 зарядах, в свой ход за 1 ⚡, на выбор атакующего:\n• сбросить 3 🪙 у цели;\n• лишить цель 1 👑 — а если у неё лежит «Охранная грамота», корона устоит, но грамота сгорит.\nАктивацию на 4 зарядах нельзя отменить «Правом вето». Само вето играется в момент выкладки карты на стол, и «Обыск покоев» сбрасывает Заговор вместе с накопленными зарядами.',
-    strategyTip: 'Заряженный Заговор — приз для чужого «Обыска покоев»: добрав четвёртый заряд, бейте, а не любуйтесь. Единственный способ снять «Охранную грамоту», кроме слуха и обыска.',
+    shortDescription: 'Копит 4 заряда: сбрасывает 3 🪙 или корону цели.',
+    fullDescription: 'Заряжается на +1, когда объявляют «Не верю!» или вызывают на Дуэль. На 4 зарядах в свой ход за 1 ⚡ позволяет выбрать:\n• сбросить 3 🪙 у цели;\n• лишить цель 1 👑 (если у цели лежит Охранная грамота, корона устоит, но грамота сгорит).\nРазрядку нельзя отменить картой Право вето. Обыск покоев сбрасывает Заговор со всеми зарядами.',
+    strategyTip: 'Заряженный Заговор — главная цель для вражеского Обыска покоев: накопив 4 заряда, бейте сразу.',
     loreQuote: '«В темных коридорах шепчутся тени. Когда заговор созреет, трон зашатается до самого основания.»',
     cost: 0,
     targeted: false,
@@ -319,9 +340,9 @@ export const CARD_DESCRIPTIONS: Record<GameCard, CardDescription> = {
     gradient: 'linear-gradient(180deg, #334155 0%, #1e293b 50%, #0f172a 100%)',
     borderColor: '#94a3b8',
     artImage: '/assets/cards/intrigue-guard.webp',
-    shortDescription: 'Вас нельзя выбрать целью Вора и Шантажиста.',
-    fullDescription: 'Пока карта лежит перед вами, вас нельзя выбрать целью «Вора» и «Шантажиста» \u2014 в том числе «Перенаправлением». НЕ защищает от «Распустить слух», «Обвинения в измене» и «Тайного заговора». Сбрасывается «Обыском покоев» или в тот момент, когда вас уличают в блефе.',
-    strategyTip: 'Выкладывайте, когда набрали золото или короны и стали очевидной мишенью. Помните: слух за 5 🪙 и «Обвинение в измене» проходят насквозь.',
+    shortDescription: 'Защита от атак Вора и Шантажиста.',
+    fullDescription: 'Вас нельзя выбрать целью Вора и Шантажиста — в том числе через Перенаправление. Не защищает от действий Распустить слух, Обвинение в измене и Тайный заговор. Сбрасывается Обыском покоев или если вас поймают на блефе.',
+    strategyTip: 'Выкладывайте, когда накопили золото или короны и стали главной мишенью. Помните: слух за 5 🪙 и Обвинение в измене проходят сквозь стражу.',
     loreQuote: '«Для вас меня сегодня нет. И завтра, пожалуй, тоже.»',
     cost: 0,
     targeted: false,
@@ -336,9 +357,9 @@ export const CARD_DESCRIPTIONS: Record<GameCard, CardDescription> = {
     gradient: 'linear-gradient(180deg, #581c87 0%, #3b0764 50%, #0f172a 100%)',
     borderColor: '#d8b4fe',
     artImage: '/assets/cards/intrigue-protection.webp',
-    shortDescription: 'Вы не теряете 👑, но и не получаете ⚜️.',
-    fullDescription: 'Пока карта лежит перед вами, вы не можете потерять короны \u2014 ни от «Обвинения в измене», ни от «Тайного заговора», ни от слуха. Вас нельзя выбрать целью «Шантажиста» \u2014 ни при объявлении атаки, ни «Перенаправлением». Золото грамота не защищает: «Вор» к вам ходит свободно. Цена защиты: вы не получаете королевских печатей ⚜️. Сбрасывается тремя способами: «Распустить слух» против вас (корону вы не теряете, но грамота сгорает), «Обыск покоев», или когда вас уличают в блефе.',
-    strategyTip: 'Козырь фаворита в круге коронации: сбить вас можно будет только слухом за 5 🪙 или «Обыском покоев». Но пока грамота лежит, печати вам не идут — второй путь к короне закрыт.',
+    shortDescription: 'Защита от потери 👑. Блокирует получение ⚜️.',
+    fullDescription: 'Защищает ваши 👑 от любых атак: вас нельзя выбрать целью Шантажиста, а Обвинение в измене, Распустить слух и Тайный заговор не могут отнять корону (но слух и Заговор сжигают грамоту). Золото не защищено: Вор может вас грабить. Пока грамота на столе, вы не получаете печати ⚜️. Сбрасывается Обыском покоев или если вас поймают на блефе.',
+    strategyTip: 'Надёжный щит для корон перед победным кругом. Помните: золото у вас всё ещё могут украсть, а печати ⚜️ вам не идут.',
     loreQuote: '«Всё совершенно законно. Именно поэтому это так неприятно.»',
     cost: 0,
     targeted: false,
@@ -374,8 +395,8 @@ export const CARD_DESCRIPTIONS: Record<GameCard, CardDescription> = {
     borderColor: '#f59e0b',
     artImage: '/assets/cards/instant-switch.webp',
     shortDescription: 'Переключает цель атаки на другого игрока.',
-    fullDescription: 'Играется сразу после объявления атаки Вора или Шантажиста ПРОТИВ ВАС. Переводит нападение на другого соперника с 🪙 или 👑.',
-    strategyTip: 'Прекрасный способ стравить двух лидеров между собой, сохранив свои ресурсы.',
+    fullDescription: 'Играется сразу после объявления атаки Вора или Шантажиста ПРОТИВ ВАС и стоит 1 ⚡. Переводит нападение на другого соперника с 🪙 или 👑: отвечать «верю / не верю / дуэль» будет он.',
+    strategyTip: 'Прекрасный способ стравить двух лидеров между собой. Но жетон уходит: без него вы не сможете ни проверить нападающего, ни выйти на дуэль — так что уводите удар, только когда сам удар дороже жетона.',
     loreQuote: '«Вы ищете вора не в тех покоях, сударь. Взгляните лучше, что прячет вон тот дворянин...»',
     cost: 0,
     targeted: true,
@@ -448,5 +469,80 @@ export const CARD_DESCRIPTIONS: Record<GameCard, CardDescription> = {
     cost: 0,
     targeted: true,
     copiesCount: 3
+  },
+
+  // ==========================================================================
+  // 4. ОБЫЧНЫЕ ДЕЙСТВИЯ (4 базовых действия двора)
+  // ==========================================================================
+  'Просить содержание': {
+    name: 'Просить содержание',
+    category: 'action',
+    artImage: '/assets/common-actions/action-coin.webp',
+    title: 'Казённая выплата',
+    themeColor: '#3b82f6',
+    gradient: 'linear-gradient(180deg, #1e3a8a 0%, #172554 50%, #0f172a 100%)',
+    borderColor: '#60a5fa',
+    shortDescription: 'Возьмите 1 🪙 из королевской казны.',
+    fullDescription: 'В свой ход за 1 ⚡ возьмите 1 🪙 из общей королевской казны. Это действие нельзя оспорить («Не верю!» не играется) и нельзя отменить картой Право вето.',
+    strategyTip: 'Безопасный способ получить стартовое золото, когда на руках нет Вора или не хочется рисковать проверкой.',
+    loreQuote: '«Корона никогда не обеднеет от одной лишней монеты. Но лучше не просить дважды за день.»',
+    cost: 0,
+    costTokens: 1,
+    costGold: 0,
+    targeted: false
+  },
+
+  'Устроить пир': {
+    name: 'Устроить пир',
+    category: 'action',
+    artImage: '/assets/common-actions/action-feast.webp',
+    title: 'Дворцовое торжество',
+    themeColor: '#eab308',
+    gradient: 'linear-gradient(180deg, #854d0e 0%, #713f12 50%, #0f172a 100%)',
+    borderColor: '#facc15',
+    shortDescription: 'Купите 1 👑 за 10 🪙. Победную корону пиром купить нельзя.',
+    fullDescription: 'В свой ход за 1 ⚡ заплатите 10 🪙 в казну и получите 1 👑. Нельзя оспорить и нельзя ветировать. Победную корону (приносящую победу в игре) пиром купить нельзя: для финала нужны печати ⚜️, проверка Шута или Чёрная книга.',
+    strategyTip: 'Прямой способ превратить избыток золота в корону без необходимости атаковать других игроков.',
+    loreQuote: '«Вино льётся рекой, музыканты не знают усталости, а лорды забывают старые обиды — пока звенит золото.»',
+    cost: 10,
+    costTokens: 1,
+    costGold: 10,
+    targeted: false
+  },
+
+  'Распустить слух': {
+    name: 'Распустить слух',
+    category: 'action',
+    artImage: '/assets/common-actions/action-rumor.webp',
+    title: 'Тайный навет',
+    themeColor: '#a855f7',
+    gradient: 'linear-gradient(180deg, #581c87 0%, #3b0764 50%, #0f172a 100%)',
+    borderColor: '#d8b4fe',
+    shortDescription: 'Сбросьте 1 👑 у соперника за 5 🪙.',
+    fullDescription: 'В свой ход за 1 ⚡ выберите соперника и заплатите 5 🪙 в казну: цель немедленно теряет 1 👑. Это действие нельзя оспорить и нельзя ветировать. Срывает Королевский приём (сбрасывает карту со стола цели) и сжигает Охранную грамоту (грамота сгорает, но корона цели устоит).',
+    strategyTip: 'Главное оружие против лидеров двора и единственный способ сбить Королевский приём до его завершения.',
+    loreQuote: '«Одно неосторожное слово в кулуарах ранит больнее любого клинка.»',
+    cost: 5,
+    costTokens: 1,
+    costGold: 5,
+    targeted: true
+  },
+
+  'Сменить карты': {
+    name: 'Сменить карты',
+    category: 'action',
+    artImage: '/assets/common-actions/action-change.webp',
+    title: 'Обновление свиты',
+    themeColor: '#64748b',
+    gradient: 'linear-gradient(180deg, #334155 0%, #1e293b 50%, #0f172a 100%)',
+    borderColor: '#94a3b8',
+    shortDescription: 'Сбросьте 1–2 карты из руки и доберите новые.',
+    fullDescription: 'В свой ход за 1 ⚡ выберите 1 или 2 карты из руки, отправьте их в сброс и возьмите столько же новых карт из колоды. Нельзя оспорить и нельзя ветировать.',
+    strategyTip: 'Используйте, если на руке оказались ненужные карты или вы ищете конкретную защиту / интригу.',
+    loreQuote: '«Старые советники уходят в тень, когда на пороге появляются новые лица.»',
+    cost: 0,
+    costTokens: 1,
+    costGold: 0,
+    targeted: false
   }
 };

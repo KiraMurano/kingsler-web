@@ -28,10 +28,21 @@ description: >-
 1. **Verify locally before pushing anything.** Run every self-check and typecheck; do not proceed if any fail:
 
 ```bash
-for f in $(find packages/engine/src apps/web/src apps/server/src -name "*.check.ts"); do npx tsx "$f" || echo "FAILED: $f"; done
+npm run check
 npx tsc --noEmit -p apps/web/tsconfig.json
 npx tsc --noEmit -p apps/server/tsconfig.json
 npx tsc --noEmit -p packages/engine/tsconfig.json
+```
+
+`npm run check` гоняет все `*.check.ts` параллельно (см. `scripts/check.mjs`) и
+укладывается меньше чем в минуту. Подряд те же проверки шли около пяти.
+
+Файлы `*.soak.ts` в этот набор НЕ входят: они играют полную партию в реальном
+времени и идут минутами. Гонять их отдельно и только когда правка их касается —
+движок ботов, тайминг ходов, открытие партии:
+
+```bash
+npm run check:soak
 ```
 
 2. **Commit and push to `main`.** This repo has no other deploy branch — pushing to `main` *is* the release. Use a clear commit message, then:

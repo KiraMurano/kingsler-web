@@ -16,8 +16,8 @@ const ACTIVE_PLAYER_ONLY_ACTIONS = new Set([
 
 const SELF_ONLY_ACTIONS = new Set([
   'markReady',
-  'doubtAction', 'passDoubt', 'targetAcceptAttack', 'targetDoubtAttack',
-  'targetDeclareDuel', 'attackerRetreatDuel', 'attackerAcceptDuel',
+  'doubtAction', 'passDoubt', 'passVeto', 'targetAcceptAttack', 'targetDoubtAttack',
+  'targetDeclareDuel',
   'activateConspiracy', 'playInstant'
 ]);
 

@@ -17,7 +17,7 @@ function table(rules: Parameters<typeof useGameStore.getState>[0] extends never 
   const state = useGameStore.getState();
   const meId = state.players[0].id;
   useGameStore.setState({
-    openingToss: null,
+    opening: null,
     activePlayerId: meId,
     turnPhase: 'IDLE',
     turnSubPhase: 'NORMAL_ACTION_PHASE'
@@ -259,7 +259,7 @@ async function underAttack(rules: object) {
   patch(victim, { actionTokens: 2 });
   const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
   useGameStore.getState().targetDeclareDuel(victim, shield);
-  assert.equal(useGameStore.getState().turnPhase, 'DUEL_ATTACKER_WINDOW', 'дуэль объявлена');
+  assert.equal(useGameStore.getState().turnPhase, 'DUEL_CLASH', 'дуэль объявлена и разыгрывается сама');
   assert.equal(useGameStore.getState().players.find(p => p.id === victim)!.actionTokens, 1, 'жетон списан');
   timerManager.clearAll();
 }
@@ -280,7 +280,7 @@ async function underAttack(rules: object) {
   patch(victim, { actionTokens: 0 });
   const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
   useGameStore.getState().targetDeclareDuel(victim, shield);
-  assert.equal(useGameStore.getState().turnPhase, 'DUEL_ATTACKER_WINDOW', 'бесплатная дуэль доступна без жетонов');
+  assert.equal(useGameStore.getState().turnPhase, 'DUEL_CLASH', 'бесплатная дуэль доступна без жетонов');
   assert.equal(useGameStore.getState().players.find(p => p.id === victim)!.actionTokens, 0, 'жетоны не ушли в минус');
   timerManager.clearAll();
 }

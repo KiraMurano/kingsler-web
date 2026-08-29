@@ -28,6 +28,7 @@ import { accOf, genOf } from '@kinglier/engine/utils/russianText';
 import { CONSPIRACY_FULL_CHARGE } from '@kinglier/engine/resolvers/plotResolver';
 import type { GameRules } from '@kinglier/engine/rules';
 import { doubtPayment } from '@kinglier/engine/resolvers/doubtResolver';
+import { vetoAnswerRequired, vetoTopActorId } from '@kinglier/engine/resolvers/vetoChain';
 
 /** Инстанты, которые владелец может выложить открыто в свой ход. */
 const OPENLY_PLAYABLE_INSTANTS: GameCard[] = [
@@ -42,7 +43,6 @@ export type PhaseKind =
   | 'doubt'
   | 'reveal'
   | 'under-attack'
-  | 'duel-answer'
   | 'veto'
   | 'coronation';
 
@@ -59,9 +59,10 @@ export type BarActionKind =
   | 'end-turn'
   | 'doubt'
   | 'believe'
-  | 'accept-attack'
-  | 'duel-accept'
-  | 'duel-retreat';
+  /** Начать выбор карты-щита. Сама дуэль объявляется нажатием на карту. */
+  | 'duel'
+  /** «Пропустить» в окне вето. Окно держится ответами, а не таймером. */
+  | 'veto-pass';
 
 export type Tone = 'gold' | 'danger' | 'calm' | 'good' | 'arcane' | 'ember';
 
@@ -150,7 +151,6 @@ export interface TableView {
    * рассказывать нечего.
    */
   event: string;
-  deadlineAt: number | null;
   bar: BarButton[];
   /** Порядок слотов руки зрителя — тесты и `Hand` обходят её по нему. */
   viewerHandIds: CardId[];
@@ -171,13 +171,23 @@ export interface TableViewInput {
   hasPlayedRoleThisTurn: boolean;
   hasPlayedPlotThisTurn: boolean;
   isVetoed: boolean;
+  /**
+   * Идёт ли открытие партии. Пока идёт — стол ходов не принимает, и показывать
+   * их нечем.
+   */
+  opening: GameState['opening'];
+  /** Сколько «Прав вето» лежит в текущей цепочке. Решает, кого спрашивают. */
+  vetoChain: number;
+  /** Кто уже нажал «Пропустить» в текущем круге окна вето. */
+  pendingVetoPassedIds: string[];
+  /** Что лежит поверх действия: по нему узнаётся последний наложивший вето. */
+  overlayInstant: GameState['overlayInstant'];
   /** Разрешено ли правилами партии класть вето поверх вето. */
   vetoOnVeto: boolean;
   /** Правила партии целиком — из них берётся цена платной проверки. */
   rules: GameRules;
   /** Взведён ли «Ва-банк» — переключатель в меню карты. Состояние интерфейса. */
   vaBanqueArmed: boolean;
-  vetoDeadlineAt: number | null;
   coronationCandidateId: string | null;
   revealOutcome: RevealOutcome | null;
   duelOutcome: DuelOutcome | null;
@@ -192,6 +202,12 @@ export interface TableViewInput {
    * рядом второй правдой.
    */
   exchangePick: CardId[] | null;
+  /**
+   * Идёт ли выбор карты под щит дуэли. Состояние интерфейса, как и
+   * `exchangePick`: кнопка «Дуэль» ничего не решает сама, она открывает выбор
+   * карты, а объявляет дуэль уже нажатие на карту.
+   */
+  duelPick: boolean;
 }
 
 const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avatar });
@@ -339,10 +355,12 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       hint: 'Перевести нападение на другого придворного. Защищаться будет он',
       label: 'Разыграть',
       tone: 'calm',
-      disabled: false,
-      /* Перенаправление — защитный реактивный инстант: 0 ⚡. */
-      spendsToken: false,
-      tokenBlocked: false
+      /* Перенаправление — не щит, а перевод удара на соседа: полноценный ход,
+         и стоит он жетона, как любой другой. */
+      disabled: !hasTokens,
+      spendsToken: true,
+      tokenBlocked: !hasTokens,
+      reason: noTokens
     });
     options.push({
       kind: 'duel-bluff',
@@ -390,7 +408,11 @@ function menuFor(
 ): CardMenuOption[] {
   const card = held.card;
   if (phase === 'turn') return ownTurnMenu(card, viewer, input);
-  if (phase === 'under-attack') return underAttackMenu(card, viewer, input);
+  if (phase === 'under-attack') {
+    /* Идёт выбор щита — карта уже не меню, а сама кнопка: нажатие объявляет
+       дуэль. Ровно как отмеченная к обмену карта перестаёт быть меню. */
+    return input.duelPick ? [] : underAttackMenu(card, viewer, input);
+  }
   /* Обычно поверх уже наложенного вето класть нечего. С правилом «вето на
      вето» — наоборот: встречное вето снимает предыдущее, и карта остаётся
      играбельной всю цепочку. */
@@ -457,14 +479,14 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
 
       const courtReason =
         input.hasUsedNormalActionThisTurn || input.turnSubPhase !== 'NORMAL_ACTION_PHASE'
-          ? 'Действие двора уже было в этом ходу.'
+          ? 'Обычное действие уже было в этом ходу.'
           : noTokens;
       const bar: BarButton[] = [
         {
           kind: 'court-actions',
           spendsToken: true,
           tokenBlocked: !hasTokens,
-          label: 'Действия двора',
+          label: 'Обычные действия',
           tone: 'calm',
           disabled: !!courtReason,
           hint: 'Содержание, пир, слух или обмен карт. Оспорить их нельзя',
@@ -510,16 +532,24 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
           hint: 'Пропустить проверку. Действие сработает как заявлено'
         }
       ];
-    case 'under-attack':
+    case 'under-attack': {
+      /* Пока идёт выбор щита, панель молчит: ход за рукой, а отмена живёт
+         в баннере над столом — ровно как при обмене карт. */
+      if (input.duelPick) return [];
+
+      /* Цена дуэли — настройка партии: с выключенным тумблером щит бесплатен
+         и доступен даже при пустых жетонах. */
+      const duelCosts = input.rules.duelCostsToken;
+      const duelReason = duelCosts && !hasTokens ? noTokens : undefined;
       return [
         {
-          kind: 'accept-attack',
+          kind: 'believe',
           spendsToken: false,
           tokenBlocked: false,
-          label: 'Принять',
-          tone: 'calm',
+          label: 'Верю',
+          tone: 'good',
           disabled: false,
-          hint: 'Позволить нападению сработать, ничего не тратя'
+          hint: 'Не оспаривать нападение. Дальше решает остальной двор'
         },
         {
           kind: 'doubt',
@@ -532,29 +562,37 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
             ? 'Сорвать маску за золото. Карта нападающего вскроется'
             : 'Проверить заявление нападающего. Его карта вскроется',
           reason: doubtReason
-        }
-      ];
-    case 'duel-answer':
-      return [
-        {
-          kind: 'duel-accept',
-          spendsToken: false,
-          tokenBlocked: false,
-          label: 'Принять бой',
-          tone: 'danger',
-          disabled: false,
-          hint: 'Обе карты вскроются одновременно'
         },
         {
-          kind: 'duel-retreat',
-          spendsToken: false,
-          tokenBlocked: false,
-          label: 'Отступить',
-          tone: 'calm',
-          disabled: false,
-          hint: 'Отозвать нападение. Ваша карта уйдёт в сброс'
+          kind: 'duel',
+          spendsToken: duelCosts,
+          tokenBlocked: !!duelReason,
+          label: 'Дуэль',
+          tone: 'danger',
+          disabled: !!duelReason,
+          hint: 'Выставить карту щитом. Обе карты вскроются сразу — согласия нападающего не нужно',
+          reason: duelReason
         }
       ];
+    }
+    case 'veto': {
+      /* Одна кнопка: вето кладётся нажатием на саму карту в руке — оно её
+         тратит, и решение о карте принимается на карте. Здесь только отказ. */
+      const counter = input.isVetoed;
+      return [
+        {
+          kind: 'veto-pass',
+          spendsToken: false,
+          tokenBlocked: false,
+          label: 'Пропустить',
+          tone: 'calm',
+          disabled: false,
+          hint: counter
+            ? 'Оставить отмену в силе. Ход пойдёт дальше, когда ответят все'
+            : 'Не вмешиваться. Ход пойдёт дальше, когда ответят все'
+        }
+      ];
+    }
     default:
       return [];
   }
@@ -562,15 +600,47 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
 
 function phaseOf(input: TableViewInput, viewer: Player): PhaseKind {
   const { turnPhase, pendingAction, activePlayerId, pendingDoubtDoubterId } = input;
+
+  /*
+   * Пока идёт открытие партии, у стола нет ни одной фазы.
+   *
+   * `activePlayerId` проставлен с самого `startGame` — это победитель жребия,
+   * — а `turnPhase` всё открытие стоит в `IDLE`. Вместе это давало победителю
+   * готовую панель своего хода: «Действия двора» и «Завершить ход» появлялись
+   * у него ещё до того, как монетка оторвалась от стола, и он смотрел бросок,
+   * уже зная результат. Ходов движок в это время всё равно не принимает.
+   */
+  if (input.opening) return 'waiting';
+
   if (pendingDoubtDoubterId) return 'reveal';
   if (turnPhase === 'TARGET_REACTION_WINDOW' && pendingAction?.targetId === viewer.id) {
     return 'under-attack';
   }
-  if (turnPhase === 'DUEL_ATTACKER_WINDOW' && pendingAction?.actorId === viewer.id) {
-    return 'duel-answer';
+  /* Окно вето — такой же опрос, как и окно сомнения: показывается тому, кого
+     спрашивают, и ровно до его ответа. Не спрашивают того, чья карта сейчас
+     наверху: ни автора собственного действия, ни того, кто только что положил
+     вето, — отменять своё же нечего. */
+  if (
+    turnPhase === 'VETO_WINDOW' &&
+    pendingAction &&
+    vetoAnswerRequired(
+      viewer.id,
+      vetoTopActorId(pendingAction.actorId, input.overlayInstant)
+    ) &&
+    !input.pendingVetoPassedIds.includes(viewer.id)
+  ) {
+    return 'veto';
   }
-  if (turnPhase === 'VETO_WINDOW') return 'veto';
-  if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== viewer.id) return 'doubt';
+  /* Свой ответ дают один раз. Жертва нападения входит в опрос двора с уже
+     сказанным «Верю», и показывать ей те же кнопки заново значит спрашивать
+     дважды об одном. */
+  if (
+    turnPhase === 'DOUBT_WINDOW' &&
+    pendingAction?.actorId !== viewer.id &&
+    !input.pendingDoubtPassedIds.includes(viewer.id)
+  ) {
+    return 'doubt';
+  }
   /* Свой ход важнее любого объявления.
    *
    * Круг коронации шёл первым — и на своём же ходу игрок получал вместо кнопок
@@ -592,8 +662,6 @@ function titleFor(phase: PhaseKind, actor: PlayerRef | null): string {
       return 'Проверка';
     case 'under-attack':
       return 'Вас атакуют';
-    case 'duel-answer':
-      return 'Вызов на дуэль';
     case 'veto':
       return 'Окно вето';
     case 'coronation':
@@ -642,11 +710,18 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
     case 'reveal':
       return 'Карта вскрывается.';
     case 'under-attack':
-      return 'Примите, проверьте заявление или выставьте карту на дуэль.';
-    case 'duel-answer':
-      return 'Вскрывать карты или отступить?';
+      return input.duelPick
+        ? 'Выберите карту из руки — она станет вашим щитом.'
+        : 'Верю, не верю или дуэль? Ответ один и окончательный.';
     case 'veto':
-      return holdsVeto(viewer) ? 'Можно наложить вето.' : 'Двор может вмешаться.';
+      if (input.isVetoed) {
+        return holdsVeto(viewer)
+          ? 'Действие отменено. Снимите отмену встречным вето или пропустите.'
+          : 'Действие отменено вето. Пропустите, чтобы двор пошёл дальше.';
+      }
+      return holdsVeto(viewer)
+        ? 'Наложите вето картой из руки или пропустите.'
+        : 'Вмешаться нечем — пропустите, чтобы двор пошёл дальше.';
     case 'coronation':
       return 'Сбейте влияние претендента, пока круг не замкнулся.';
     default:
@@ -712,7 +787,6 @@ const EMPTY_VIEW: TableView = {
   title: 'Ожидание',
   guidance: 'Двор собирается.',
   event: '',
-  deadlineAt: null,
   bar: [],
   viewerHandIds: [],
   menus: {}
@@ -755,6 +829,8 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     title,
     titleName ?? '',
     input.exchangePick ? `pick:${input.exchangePick.join('.')}` : '',
+    input.duelPick ? 'duelpick' : '',
+    phase === 'veto' ? `vetochain:${input.vetoChain}` : '',
     guidance,
     event,
     bar.map(b => `${b.kind}${b.disabled ? '!' : ''}`).join(','),
@@ -775,7 +851,6 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     titleName,
     guidance,
     event,
-    deadlineAt: phase === 'veto' ? input.vetoDeadlineAt : null,
     bar,
     viewerHandIds,
     menus

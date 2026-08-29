@@ -10,7 +10,7 @@ import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
 import { executeRevealOutcome } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { ACTION_HOLD_MS, VETO_WINDOW_MS } from '../timing.ts';
+import { ACTION_HOLD_MS } from '../timing.ts';
 import { DEFAULT_RULES } from '../rules.ts';
 
 function human(id: string, hand: GameCard[]): Player {
@@ -54,7 +54,7 @@ useGameStore.setState({
     bot('b1', ['Казначей', 'Рыцарь'])
   ],
   activePlayerId: 'p1',
-  openingToss: null
+  opening: null
 });
 
 useGameStore.getState().performAction({
@@ -123,7 +123,7 @@ assert.equal(
       { ...bot('b2', ['Наследник', 'Шут']), actionTokens: 2 }
     ],
     activePlayerId: 'b1',
-    openingToss: null
+    opening: null
   });
 
   useGameStore.getState().performAction({
@@ -185,7 +185,7 @@ useGameStore.setState({
     human('p3', ['Право вето', 'Шут'])
   ],
   activePlayerId: 'p1',
-  openingToss: null
+  opening: null
 });
 
 const vetoTestAction = {
@@ -203,34 +203,32 @@ useGameStore.setState({ pendingAction: vetoTestAction });
 useGameStore.getState()._triggerVetoWindowOrResolveEffect(vetoTestAction, false);
 assert.equal(useGameStore.getState().turnPhase, 'VETO_WINDOW');
 
-const openedDeadline = useGameStore.getState().vetoDeadlineAt;
-assert.ok(
-  openedDeadline !== null && openedDeadline - Date.now() > VETO_WINDOW_MS - 500,
-  'the window carries an absolute deadline roughly VETO_WINDOW_MS away'
+/* Окно держится ответами, а не часами: само оно не закроется никогда, сколько
+   ни жди — закрывает его последний ответивший. */
+assert.deepEqual(
+  useGameStore.getState().pendingVetoPassedIds,
+  [],
+  'опрос открыт и пуст'
 );
 
 await new Promise(resolve => setTimeout(resolve, 2500));
 assert.equal(
   useGameStore.getState().turnPhase,
   'VETO_WINDOW',
-  'the window still runs — the old "a bot holds it" 2.2 s shortcut is gone'
-);
-assert.equal(
-  useGameStore.getState().vetoDeadlineAt,
-  openedDeadline,
-  'the deadline does not move once the window is open'
+  'без ответов окно стоит: таймера, который закрыл бы его сам, больше нет'
 );
 
-await new Promise(resolve => setTimeout(resolve, VETO_WINDOW_MS - 2500 + ACTION_HOLD_MS + 300));
+/* Отвечают все, кроме автора действия: его собственный ход у него самого не
+   спрашивают, пока поверх не легло чужое вето. */
+for (const p of useGameStore.getState().players) {
+  if (p.id === 'p1') continue;
+  useGameStore.getState().passVeto(p.id);
+}
+await new Promise(resolve => setTimeout(resolve, ACTION_HOLD_MS + 300));
 assert.equal(
   useGameStore.getState().turnPhase,
   'IDLE',
-  'the window runs out on its own and the action proceeds'
-);
-assert.equal(
-  useGameStore.getState().vetoDeadlineAt,
-  null,
-  'the deadline is cleared together with the window'
+  'ответил последний — окно закрылось и действие состоялось'
 );
 
 /* -------------------------------------------------------------------------
