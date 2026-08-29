@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Room } from '@colyseus/sdk';
-import { Check, Copy, Crown, LogIn, CirclePlus, ArrowLeft, LogOut } from 'lucide-react';
+import { Check, Copy, Crown, LogIn, CirclePlus, ArrowLeft, LogOut, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
 import { onlineClient, type LobbyMessage } from './OnlineGameClient';
-import { RulesEditor } from '../rules/RulesEditor';
+import { LobbyRulesDialog } from './LobbyRulesDialog';
 import { DEFAULT_RULES, rulesProblems, type GameRules } from '@kinglier/engine/rules';
 import { ROOM_CODE_LENGTH, sanitizeRoomCode } from './roomCode';
 import { useToast } from '../lib/toast';
@@ -48,6 +48,7 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
   const [room, setRoom] = useState<Room | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [restoring, setRestoring] = useState(!!autoJoinRoomId);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const showToast = useToast();
 
   const attachRoom = (newRoom: Room) => {
@@ -219,24 +220,24 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
             ))}
           </ul>
 
-          {/* Правила видит весь стол, а правит только хост: играть по ним всем,
-              и узнавать о них в первом же ходу — плохая шутка. */}
-          <RulesEditor
-            rules={rules}
-            readOnly={!isHost}
-            onChange={next => onlineClient.sendRules(next)}
-          />
-
           {isHost ? (
-            <Button
-              tone="gold"
-              size="lg"
-              block
-              disabled={rulesProblems(rules).length > 0}
-              onClick={() => onlineClient.startGame()}
-            >
-              Начать игру
-            </Button>
+            <>
+              {/* Настройки — шаг в сторону, а не часть комнаты: карточка
+                  отвечает за то, кто сел за стол, и только. */}
+              <Button tone="plain" block onClick={() => setRulesOpen(true)}>
+                <SlidersHorizontal size={16} /> Настройки игры
+              </Button>
+
+              <Button
+                tone="gold"
+                size="lg"
+                block
+                disabled={rulesProblems(rules).length > 0}
+                onClick={() => onlineClient.startGame()}
+              >
+                Начать игру
+              </Button>
+            </>
           ) : (
             <div className="lobby__waiting">
               <span className="lobby__waiting-dot" />
@@ -245,6 +246,15 @@ export function Lobby({ onGameStarted, onExit, autoJoinRoomId }: LobbyProps) {
           )}
         </div>
       </div>
+
+      {isHost && (
+        <LobbyRulesDialog
+          open={rulesOpen}
+          rules={rules}
+          onChange={next => onlineClient.sendRules(next)}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
     </div>
   );
 }

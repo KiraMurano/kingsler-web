@@ -5,7 +5,7 @@
  *
  * Это не замена взгляду на экран: тест ловит структуру, а не вёрстку. Но он
  * держит то, что сломать легче всего — список правил, который обязан быть один
- * и тот же в лобби и в игре с ботами.
+ * и тот же в модалке лобби и в модалке игры с ботами.
  * Run: npx tsx apps/web/src/rules/RulesEditor.check.ts
  */
 import assert from 'node:assert/strict';
@@ -14,10 +14,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_RULES, normalizeRules, ALL_CARDS } from '@kinglier/engine/rules';
 import { RulesEditor } from './RulesEditor.tsx';
 
-const render = (rules = DEFAULT_RULES, readOnly = false) =>
-  renderToStaticMarkup(
-    React.createElement(RulesEditor, { rules, onChange: () => {}, readOnly })
-  );
+const render = (rules = DEFAULT_RULES) =>
+  renderToStaticMarkup(React.createElement(RulesEditor, { rules, onChange: () => {} }));
 
 // --- 1. Все именованные настройки на экране ---
 {
@@ -89,14 +87,13 @@ const render = (rules = DEFAULT_RULES, readOnly = false) =>
   );
 }
 
-// --- 7. Режим только для чтения не даёт сбросить правила ---
+/* --- 7. Сброс к умолчаниям на месте ---
+ *
+ * Режима «только смотреть» здесь больше нет: настройки правит ровно тот, кто их
+ * видит — оффлайн сам игрок, онлайн хост, и больше никто. Пока редактор стоял
+ * в карточке лобби, его показывали всему столу и половине гасили поля. */
 {
-  assert.ok(render(DEFAULT_RULES, false).includes('Сбросить к умолчаниям'));
-  assert.ok(
-    !render(DEFAULT_RULES, true).includes('Сбросить к умолчаниям'),
-    'не-хост в лобби правила не сбрасывает'
-  );
-  assert.ok(render(DEFAULT_RULES, true).includes('Корон для победы'), 'но видит их все');
+  assert.ok(render().includes('Сбросить к умолчаниям'), 'правила можно вернуть к дефолтным');
 }
 
 console.log('RulesEditor.check: ok');

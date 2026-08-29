@@ -1,12 +1,12 @@
 /**
  * Редактор правил партии — один на два режима.
  *
- * Оффлайн его показывает экран перед игрой с ботами, онлайн — карточка лобби.
+ * Оффлайн его показывает модалка перед игрой с ботами, онлайн — модалка лобби.
  * Компонент один намеренно: два списка правил разъехались бы при первой же
  * новой настройке, и хост в лобби крутил бы не то, что игрок с ботами.
  *
- * `readOnly` — это не «выключить поля», а «показать те же правила тому, кто их
- * не задаёт»: не-хост в лобби должен видеть, во что его зовут играть.
+ * Правит настройки всегда ровно тот, кто их видит: оффлайн — сам игрок, онлайн
+ * — хост, и больше никто. Поэтому режима «только смотреть» здесь нет.
  */
 import React, { useState } from 'react';
 import type { GameCard } from '@kinglier/engine/types';
@@ -108,12 +108,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function RulesEditor({
   rules,
-  onChange,
-  readOnly = false
+  onChange
 }: {
   rules: GameRules;
   onChange: (next: GameRules) => void;
-  readOnly?: boolean;
 }) {
   const [deckOpen, setDeckOpen] = useState(false);
 
@@ -149,7 +147,6 @@ export function RulesEditor({
           value={rules.deck[card] ?? 0}
           min={DECK_COPIES_LIMIT[0]}
           max={DECK_COPIES_LIMIT[1]}
-          disabled={readOnly}
           onChange={copies(card)}
         />
       ))}
@@ -169,7 +166,6 @@ export function RulesEditor({
           value={rules.crownsToWin}
           min={RULE_LIMITS.crownsToWin[0]}
           max={RULE_LIMITS.crownsToWin[1]}
-          disabled={readOnly}
           onChange={num('crownsToWin')}
         />
         <Slider
@@ -178,7 +174,6 @@ export function RulesEditor({
           value={rules.actionTokens}
           min={RULE_LIMITS.actionTokens[0]}
           max={RULE_LIMITS.actionTokens[1]}
-          disabled={readOnly}
           onChange={num('actionTokens')}
         />
       </Section>
@@ -189,7 +184,6 @@ export function RulesEditor({
           value={rules.feastCost}
           min={RULE_LIMITS.feastCost[0]}
           max={RULE_LIMITS.feastCost[1]}
-          disabled={readOnly}
           onChange={num('feastCost')}
         />
         <Slider
@@ -197,7 +191,6 @@ export function RulesEditor({
           value={rules.rumorCost}
           min={RULE_LIMITS.rumorCost[0]}
           max={RULE_LIMITS.rumorCost[1]}
-          disabled={readOnly}
           onChange={num('rumorCost')}
         />
         <Slider
@@ -206,7 +199,6 @@ export function RulesEditor({
           value={rules.blackmailCost}
           min={RULE_LIMITS.blackmailCost[0]}
           max={RULE_LIMITS.blackmailCost[1]}
-          disabled={readOnly}
           onChange={num('blackmailCost')}
         />
       </Section>
@@ -216,21 +208,18 @@ export function RulesEditor({
           label="Дуэль тратит жетон хода"
           hint="Выключено — щит на дуэли бесплатен и доступен без жетонов."
           value={rules.duelCostsToken}
-          disabled={readOnly}
           onChange={flag('duelCostsToken')}
         />
         <Toggle
           label="Вето на вето"
           hint="Встречное вето снимает предыдущее. Длина цепочки ничем не ограничена."
           value={rules.vetoOnVeto}
-          disabled={readOnly}
           onChange={flag('vetoOnVeto')}
         />
         <Toggle
           label="Платная проверка"
           hint="Любую проверку можно купить за золото, когда жетонов нет. Гасит «Срыв масок»."
           value={rules.paidDoubtEnabled}
-          disabled={readOnly}
           onChange={flag('paidDoubtEnabled')}
         />
         {rules.paidDoubtEnabled && (
@@ -239,7 +228,6 @@ export function RulesEditor({
             value={rules.paidDoubtCost}
             min={RULE_LIMITS.paidDoubtCost[0]}
             max={RULE_LIMITS.paidDoubtCost[1]}
-            disabled={readOnly}
             onChange={num('paidDoubtCost')}
           />
         )}
@@ -247,7 +235,7 @@ export function RulesEditor({
           label="Срыв масок"
           hint="То же, но только для жертвы атаки Вора или Шантажиста."
           value={rules.unmaskEnabled}
-          disabled={readOnly || rules.paidDoubtEnabled}
+          disabled={rules.paidDoubtEnabled}
           onChange={flag('unmaskEnabled')}
         />
         {rules.unmaskEnabled && (
@@ -256,7 +244,6 @@ export function RulesEditor({
             value={rules.unmaskCost}
             min={RULE_LIMITS.unmaskCost[0]}
             max={RULE_LIMITS.unmaskCost[1]}
-            disabled={readOnly}
             onChange={num('unmaskCost')}
           />
         )}
@@ -295,11 +282,9 @@ export function RulesEditor({
         </div>
       )}
 
-      {!readOnly && (
-        <Button tone="plain" block onClick={() => onChange(DEFAULT_RULES)}>
-          Сбросить к умолчаниям
-        </Button>
-      )}
+      <Button tone="plain" block onClick={() => onChange(DEFAULT_RULES)}>
+        Сбросить к умолчаниям
+      </Button>
     </div>
   );
 }
