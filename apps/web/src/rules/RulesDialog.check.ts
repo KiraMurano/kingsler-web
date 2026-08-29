@@ -1,8 +1,8 @@
 /**
  * Модалка настроек и диалог сохранения набора: структура, а не вёрстка.
  * Держит то, что легко сломать при перестановке — кнопки старта и загрузки на
- * месте, пустой список объясняет себя, сводка набора показывает те правила,
- * которые сохраняют.
+ * месте в ОБЕИХ модалках, пустой список объясняет себя, сводка набора
+ * показывает те правила, которые сохраняют.
  * Run: npx tsx apps/web/src/rules/RulesDialog.check.ts
  */
 import assert from 'node:assert/strict';
@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_RULES } from '@kinglier/engine/rules';
 import { RulesDialog } from './RulesDialog.tsx';
 import { SavePresetDialog } from './SavePresetDialog.tsx';
+import { LobbyRulesDialog } from '../online/LobbyRulesDialog.tsx';
 
 /* Компоненты читают localStorage через `globalThis`. В node его нет, и это
    ровно тот случай, который хранилище обязано пережить молча. */
@@ -58,6 +59,27 @@ import { SavePresetDialog } from './SavePresetDialog.tsx';
     React.createElement(SavePresetDialog, { open: false, rules: DEFAULT_RULES, onClose: () => {} })
   );
   assert.equal(html, '');
+}
+
+/* --- Загрузка наборов есть и в лобби ---
+ *
+ * Сохранённый баланс нужен там же, где настройки вообще правят. Пока список
+ * жил внутри модалки игры с ботами, в лобби его не было вовсе — хост крутил
+ * ползунки руками, имея под рукой сохранённый набор. */
+{
+  const html = renderToStaticMarkup(
+    React.createElement(LobbyRulesDialog, {
+      open: true,
+      rules: DEFAULT_RULES,
+      onChange: () => {},
+      onClose: () => {}
+    })
+  );
+  assert.ok(html.includes('Настройки игры'), 'заголовок на месте');
+  assert.ok(html.includes('Загрузить настройки'), 'загрузка наборов есть и здесь');
+  assert.ok(html.includes('Корон для победы'), 'и сам редактор правил');
+  assert.ok(html.includes('Готово'), 'кнопка закрывает, а не стартует партию');
+  assert.ok(!html.includes('Начать игру'), 'старт живёт в лобби, а не в настройках');
 }
 
 console.log('RulesDialog.check: ok');

@@ -52,6 +52,7 @@ type State = {
 };
 type Lobby = {
   seats: { playerId: string; nickname: string; avatar: string; title: string }[];
+  hostSessionId: string | null;
   rules: { crownsToWin: number; actionTokens: number; feastCost: number };
 };
 let hostState: State | null = null;
@@ -123,5 +124,59 @@ assert.equal(
 );
 
 host.leave();
+
+/* --- Переподключение хоста не отбирает у него комнату ---
+ *
+ * Хост хранился соединением (`sessionId`), и оно менялось при любом
+ * переподключении: `onJoin` выдавал вернувшемуся новый id и переписывал его в
+ * место, а хостом продолжало числиться мёртвое соединение. Хост переставал
+ * быть хостом — ни настроек, ни кнопки старта, — и хостом не становился никто.
+ * Комната умирала молча: бейдж «Хост» в списке мест считался иначе (по первому
+ * месту) и продолжал показывать правду.
+ *
+ * Своя комната, а не продолжение прошлой: сервер отключает старое соединение
+ * хоста, и партию выше пришлось бы доигрывать уже другим клиентом.
+ *
+ * Снимок читаем через гостя: его обработчик подписан давно, а у только что
+ * подключившегося клиента он регистрируется уже после рассылки. */
+{
+  client.auth.token = await JWT.sign({ userId: anya.id });
+  const room = await client.create('kinglier');
+
+  const guestClient = new Client(`ws://localhost:${PORT}`);
+  guestClient.auth.token = await JWT.sign({ userId: borya.id });
+  const watcher = await guestClient.joinById(room.roomId);
+  let seen: Lobby | null = null;
+  watcher.onMessage('lobby', (data: Lobby) => { seen = data; });
+  watcher.send('lobby');
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal((seen as Lobby | null)?.hostSessionId, room.sessionId, 'хост — тот, кто создал');
+
+  // Хост возвращается новым соединением: старое сервер отключает.
+  client.auth.token = await JWT.sign({ userId: anya.id });
+  const rejoined = await client.joinById(room.roomId);
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  assert.equal((seen as Lobby).seats.length, 2, 'переподключение не отбирает место');
+  assert.equal(
+    (seen as Lobby).hostSessionId,
+    rejoined.sessionId,
+    'хостом числится новое соединение того же места, а не мёртвое старое'
+  );
+
+  // И правит правила он по-прежнему.
+  rejoined.send('rules', { crownsToWin: 4 });
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal((seen as Lobby).rules.crownsToWin, 4, 'вернувшийся хост снова задаёт правила');
+
+  // А гость хостом от чужого переподключения не стал.
+  watcher.send('rules', { crownsToWin: 9 });
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal((seen as Lobby).rules.crownsToWin, 4, 'правила от гостя отброшены');
+
+  rejoined.leave();
+  watcher.leave();
+}
+
 console.log('KinglierRoom.lobby.check.ts passed.');
 process.exit(0);

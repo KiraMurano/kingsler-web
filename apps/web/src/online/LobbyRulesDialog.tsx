@@ -11,7 +11,8 @@
  * Правила живут не здесь: их держит снимок лобби на сервере, а этот диалог
  * только показывает их и отправляет изменения. Своего состояния у него нет
  * намеренно — иначе у хоста и у сервера оказались бы две правды, и разошлись
- * бы они на первом же чужом подключении.
+ * бы они на первом же чужом подключении. Загруженный набор уходит туда же, что
+ * и любое движение ползунка.
  */
 import React from 'react';
 import { Check } from 'lucide-react';
@@ -19,6 +20,7 @@ import type { GameRules } from '@kinglier/engine/rules';
 import { Dialog } from '../components/ui/Overlay';
 import { Button } from '../components/ui/Button';
 import { RulesEditor } from '../rules/RulesEditor';
+import { PresetPicker } from '../rules/PresetPicker';
 
 export const LobbyRulesDialog: React.FC<{
   open: boolean;
@@ -39,6 +41,10 @@ export const LobbyRulesDialog: React.FC<{
       </div>
 
       <div className="ruleswrap__foot">
+        {/* Тот же выбор наборов, что и перед игрой с ботами: сохранённый баланс
+            нужен там же, где настройки вообще правят. */}
+        <PresetPicker onPick={onChange} />
+
         {/* Кнопка закрывает, а не сохраняет: каждое движение ползунка уже
             ушло на сервер, и «сохранить» здесь обещало бы шаг, которого нет. */}
         <Button tone="gold" size="lg" block onClick={onClose}>

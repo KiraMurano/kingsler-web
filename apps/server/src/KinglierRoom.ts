@@ -71,6 +71,10 @@ interface LobbyMessage {
     title: string;
     connected: boolean;
   }[];
+  /**
+   * Соединение хоста — выводится из его МЕСТА на каждую рассылку, а не
+   * хранится. Место переживает переподключение, соединение — нет.
+   */
   hostSessionId: string | null;
   phase: Phase;
   /** Правила партии, выставленные хостом. Видны всем — играть по ним всем. */
@@ -81,7 +85,17 @@ export class KinglierRoom extends Room {
   maxClients = 4;
 
   private seats: Seat[] = [];
-  private hostSessionId: string | null = null;
+  /**
+   * Хост — это МЕСТО, а не соединение.
+   *
+   * Хранился `sessionId`, и он ломался на любом переподключении: `onJoin`
+   * выдавал вернувшемуся игроку новый `sessionId`, переписывал его в место, а
+   * `hostSessionId` продолжал указывать на мёртвое соединение. Хост переставал
+   * быть хостом — ни настроек, ни кнопки старта, — и хостом не становился
+   * никто. Комната умирала молча, потому что бейдж «Хост» в списке мест
+   * считался иначе (по первому месту) и продолжал показывать правду.
+   */
+  private hostPlayerId: string | null = null;
   private rules: GameRules = DEFAULT_RULES;
   private phase: Phase = 'WAITING';
   protected worker: GameWorkerClient | null = null;
@@ -144,9 +158,8 @@ export class KinglierRoom extends Room {
       throw new Error('game already in progress');
     }
 
-    if (!this.hostSessionId) this.hostSessionId = client.sessionId;
-
     const playerId = `p${this.seats.length + 1}`;
+    if (!this.hostPlayerId) this.hostPlayerId = playerId;
     this.seats.push({
       playerId,
       userId: auth.userId,
@@ -203,8 +216,8 @@ export class KinglierRoom extends Room {
       this.worker?.setSeatBotControlled(seat.playerId);
     } else {
       this.seats = this.seats.filter(s => s !== seat);
-      if (this.hostSessionId === client.sessionId) {
-        this.hostSessionId = this.seats[0]?.sessionId ?? null;
+      if (this.hostPlayerId === seat.playerId) {
+        this.hostPlayerId = this.seats[0]?.playerId ?? null;
       }
     }
     this.broadcastLobby();
@@ -217,6 +230,17 @@ export class KinglierRoom extends Room {
     }
   }
 
+  /** Место хоста. Пусто, если за столом ещё никого нет. */
+  private hostSeat(): Seat | undefined {
+    return this.seats.find(seat => seat.playerId === this.hostPlayerId);
+  }
+
+  /** Ведёт ли это соединение место хоста. */
+  private isHost(client: Client): boolean {
+    const host = this.hostSeat();
+    return !!host && host.sessionId === client.sessionId;
+  }
+
   protected lobbySnapshot(): LobbyMessage {
     return {
       seats: this.seats.map(seat => ({
@@ -226,7 +250,7 @@ export class KinglierRoom extends Room {
         title: seat.title,
         connected: seat.connected
       })),
-      hostSessionId: this.hostSessionId,
+      hostSessionId: this.hostSeat()?.sessionId ?? null,
       phase: this.phase,
       rules: this.rules
     };
@@ -241,7 +265,7 @@ export class KinglierRoom extends Room {
    * что не так, до нажатия «Начать».
    */
   protected handleRules(client: Client, payload: unknown): void {
-    if (this.phase !== 'WAITING' || client.sessionId !== this.hostSessionId) return;
+    if (this.phase !== 'WAITING' || !this.isHost(client)) return;
     this.rules = normalizeRules(payload);
     this.broadcastLobby();
   }
@@ -251,7 +275,7 @@ export class KinglierRoom extends Room {
   }
 
   protected handleStart(client: Client): void {
-    if (this.phase !== 'WAITING' || client.sessionId !== this.hostSessionId || this.seats.length === 0) {
+    if (this.phase !== 'WAITING' || !this.isHost(client) || this.seats.length === 0) {
       return;
     }
 
