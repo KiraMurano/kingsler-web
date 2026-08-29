@@ -43,8 +43,19 @@ export function canBeTargetedBy(target: Player, roleClaim: Role): boolean {
  * «Перенаправления» — нельзя выбрать самого нападающего и нельзя перевести на
  * недопустимую роли цель — живут на месте вызова: они про перенаправление, а
  * не про цель саму по себе.
+ *
+ * Общий знаменатель тот же, что и у ролей: целью не может быть тот, у кого этот
+ * удар заведомо ничего не отнимет.
  */
 export function canBeTargetedByInstant(target: Player, instantType: InstantType): boolean {
   if (instantType === 'Обыск покоев') return target.activePlot !== null;
+
+  /* Обвинение отнимает корону — значит и запреты у него те же, что у
+     «Шантажиста»: пустая корона и «Охранная грамота». «Стража покоев» здесь не
+     помеха, она держит только Вора и Шантажиста (RULES.md §8). */
+  if (instantType === 'Обвинение в измене') {
+    return target.favor > 0 && target.activePlot?.type !== 'Охранная грамота';
+  }
+
   return true;
 }

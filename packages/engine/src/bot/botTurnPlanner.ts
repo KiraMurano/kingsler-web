@@ -2,6 +2,7 @@ import { useGameStore } from '../GameStore';
 import type { CardId, CardInstance, Role, PlotType } from '../types';
 import { isPlot } from '../cards';
 import { faces, holds, idOf } from '../cardInstance';
+import { canBeTargetedByInstant } from '../targeting';
 import { getBotArchetype } from '../botsConfig';
 import {
   selectBestThiefTarget,
@@ -218,9 +219,16 @@ export function makeBotMove(botId: string): void {
   // Приоритет 2: Розыгрыш Инстантов ⚡ (Обвинение в измене, Обыск покоев, Дворцовый переполох)
   const treasonId = idOf(bot.hand, 'Обвинение в измене');
   if (treasonId) {
-    const target = leader && leader.favor >= 1
-      ? leader
-      : opponents.filter(p => p.favor >= 1).sort((a, b) => b.favor - a.favor)[0];
+    /* Цели отбирает общий предикат, а не своя мерка: движок теперь отвергает
+       обвинение туда, где корону не отнять (0 👑 или «Охранная грамота»), и
+       бот, выбравший такую цель, остался бы с отклонённым ходом — а
+       отклонённый ход состояние не меняет, значит и заново его планировать
+       движку ботов не по чему. Ход встал бы навсегда. */
+    const targetable = opponents.filter(p => canBeTargetedByInstant(p, 'Обвинение в измене'));
+    const target =
+      leader && targetable.some(p => p.id === leader.id)
+        ? leader
+        : [...targetable].sort((a, b) => b.favor - a.favor)[0];
 
     if (target && (target.favor >= 2 || state.coronationCandidateId === target.id || Math.random() < 0.75)) {
       useGameStore.getState().playInstant(bot.id, 'Обвинение в измене', treasonId, target.id);
@@ -230,7 +238,10 @@ export function makeBotMove(botId: string): void {
 
   const searchId = idOf(bot.hand, 'Обыск покоев');
   if (searchId) {
-    const target = selectBestSearchTarget(bot, opponents);
+    const target = selectBestSearchTarget(
+      bot,
+      opponents.filter(p => canBeTargetedByInstant(p, 'Обыск покоев'))
+    );
     if (
       target &&
       shouldPlaySearchNow(bot, target, {
