@@ -308,7 +308,6 @@ export interface GameState {
   activateConspiracy: (playerId: string, targetPlayerId: string, effect: 'gold' | 'crown', isFreeReaction?: boolean) => void;
   
   endTurn: () => void;
-  restartGame: () => void;
 
   // Internal helper methods
   addSealsToPlayer: (playerId: string, count: number) => void;

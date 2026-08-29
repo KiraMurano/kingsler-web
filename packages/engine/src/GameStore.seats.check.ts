@@ -83,17 +83,6 @@ for (let i = 0; i < 40; i++) {
 assert.ok(anyaSeats.size > 1, 'seating must vary between games');
 assert.ok(neighbours.size > 1, 'the player to your left must not always be the same seat');
 
-// restartGame сохраняет живых игроков и пересаживает стол заново.
-useGameStore.getState().startGame(HUMANS);
-useGameStore.getState().restartGame();
-const restarted = useGameStore.getState();
-const restartedAnya = restarted.players.find(p => p.id === 'p1');
-assert.ok(restartedAnya, 'restart must keep the human seats');
-assert.equal(restartedAnya.name, 'Аня');
-assert.equal(restartedAnya.avatar, '/avatars/yulia.webp');
-assert.equal(restartedAnya.title, 'Прагматик');
-assert.equal(restarted.players.length, 4);
-
 // Backward compatibility: calling with no seats keeps today's solo-vs-3-bots behavior.
 useGameStore.getState().startGame();
 const solo = useGameStore.getState();

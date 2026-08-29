@@ -68,13 +68,27 @@ export function doubtAction(
   set: StateSetter,
   doubterId: string
 ): void {
-  const { pendingAction, turnPhase, players, pendingDoubtDoubterId, pendingDoubtPassedIds } = get();
+  const {
+    pendingAction,
+    turnPhase,
+    players,
+    pendingDoubtDoubterId,
+    pendingDoubtPassedIds,
+    pendingDoubtActionId
+  } = get();
   if ((turnPhase !== 'DOUBT_WINDOW' && turnPhase !== 'TARGET_REACTION_WINDOW') || !pendingAction || !pendingAction.roleClaim) return;
 
   /* Сказавший «Верю» ответ уже дал: переиграть его на «Не верю» нельзя.
      Иначе жертва, поверившая нападению, добирала бы себе вторую попытку в том
-     же окне — ровно та лишняя фаза, которой здесь больше нет. */
-  if (pendingDoubtPassedIds.includes(doubterId)) return;
+     же окне — ровно та лишняя фаза, которой здесь больше нет.
+
+     Но именно в ЭТОМ опросе: список принадлежит своей заявке, и ответ, данный
+     по прошлому действию, запрещать ничего не должен. Без этой сверки жертва
+     не могла проверить нападающего, если минуту назад сказала «Верю» кому-то
+     другому — и не могла понять, почему кнопка не работает. */
+  if (pendingDoubtActionId === pendingAction.id && pendingDoubtPassedIds.includes(doubterId)) {
+    return;
+  }
 
   /* Проверяет тот, кто успел первым. Второй «Не верю» поверх заявленного
      снял бы отложенное вскрытие (`clearAll` ниже) и списал бы ещё один жетон

@@ -365,18 +365,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  restartGame: () => {
-    const seats = get().players
-      .filter(player => !player.isBot)
-      .map(player => ({
-        id: player.id,
-        name: player.name,
-        avatar: player.avatar,
-        title: player.title
-      }));
-    get().startGame(seats);
-  },
-
   // --------------------------------------------------------------------------
   // RESOURCE & SEALS RESOLUTION
   // --------------------------------------------------------------------------
@@ -589,9 +577,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 2. Targeted Attack Actions (Вор / Шантажист)
     const isTargetedAttack = (action.roleClaim === 'Вор' || action.roleClaim === 'Шантажист') && !!action.targetId;
     if (isTargetedAttack) {
+      /* Опрос двора начинается прямо здесь, вместе с окном реакции жертвы: её
+         ответ — это и есть её голос в нём (см. `targetAcceptAttack`).
+         Список ответивших гасится по той же причине, что и в окне сомнения
+         ниже: он принадлежит своей заявке. Пока он доживал до нападения,
+         сказанное по прошлому действию «Верю» молча запрещало жертве крикнуть
+         «Не верю» — кнопка нажималась, и не происходило ничего. */
       set({
         pendingAction: action,
         turnPhase: 'TARGET_REACTION_WINDOW',
+        pendingDoubtPassedIds: [],
+        pendingDoubtActionId: action.id,
         timerSeconds: 0,
         timerMaxSeconds: 0
       });
