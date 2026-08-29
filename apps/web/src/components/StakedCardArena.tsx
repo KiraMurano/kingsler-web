@@ -9,31 +9,12 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { GameCard } from '@kinglier/engine/data/cardDescriptions';
-import type { Player } from '@kinglier/engine/types';
-import { courtly } from '../lib/text';
-import { genOf } from '@kinglier/engine/utils/russianText';
+import { tableCaption, overlayCaption } from '../lib/tableCaption';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import { dur } from '../motion/tokens.ts';
 
-/** Last word of a titled name: «Графиня Елена» → «Елена». */
-function givenName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1] || name;
-}
-
 /**
- * Бейдж короткий, поэтому титул отбрасывается: «Вор против Елены», а не
- * «Вор против Графини Елены». Склоняется только имя бота — ник живого игрока
- * остаётся как есть.
- */
-function claimBadge(claim: string, target?: Player | null): string {
-  if (!target) return claim;
-  const кого = genOf({ name: givenName(target.name), isBot: target.isBot });
-  return `${claim} против ${кого}`;
-}
-
-/**
- * The label under a card on the table — «Наследник против Бориса», «дуэль».
+ * The label under a card on the table — «Барон Дима заявляет Вора», «Дуэль».
  *
  * It used to snap from one claim to the next mid-action; now the old wording
  * sinks away before the new one rises, keyed on the text itself so an
@@ -91,40 +72,34 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
     }))
   );
 
-  const target = pendingAction?.targetId
-    ? players.find(p => p.id === pendingAction.targetId)
-    : null;
-
   if (!pendingAction && !overlayInstant) return null;
 
   const overlayAnchor = overlayInstant ? (
     <CardAnchor zone={{ kind: 'overlay' }} className="cardanchor--overlay" />
   ) : null;
 
+  /* Что происходит — одной фразой. Собирается в одном месте на все ветки:
+     подпись обязана звучать одинаково, чем бы ни ходили. */
+  const caption = tableCaption(pendingAction, players);
+  const overlaid = overlayCaption(overlayInstant, pendingAction, players);
+
   /* 1. Plain court action — a badge, no card is staked. */
   if (pendingAction?.type === 'normal') {
-    const isCardExchange = pendingAction.name.includes('Сменить');
-    const actorName = players.find(p => p.id === pendingAction.actorId)?.name ?? '';
-    const exchangesTwoCards = (pendingAction.stakedCardIds?.length ?? 1) >= 2;
-    const label = isCardExchange
-      ? `${actorName} меняет карт${exchangesTwoCards ? 'ы' : 'у'}`
-      : courtly(pendingAction.name);
     return (
       <div className="staked">
-        <ClaimBadge solo text={claimBadge(label, target)} />
+        <ClaimBadge solo text={caption ?? ''} />
       </div>
     );
   }
 
   /* 2. An instant laid openly in the middle while its window runs. */
   if (pendingAction?.type === 'instant') {
-    const laid = (pendingAction.instantType || pendingAction.name) as GameCard;
     return (
       <div className="staked">
         <div className="staked__pile">
           <CardAnchor zone={{ kind: 'table' }} />
           {overlayAnchor}
-          <ClaimBadge text={claimBadge(laid, target)} />
+          <ClaimBadge text={overlaid ?? caption ?? ''} />
         </div>
       </div>
     );
@@ -133,14 +108,13 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
   /* 3. Laying a plot goes to the seat slot, not the table. The table keeps
      only the veto overlay or an already-slotted plot being resolved. */
   if (pendingAction?.type === 'plot') {
-    const plot = (pendingAction.plotType || pendingAction.name) as GameCard;
     const laying = !pendingAction.conspiracyEffect && !pendingAction.isMorningTrigger;
     if (laying && !overlayAnchor) return null;
     return (
       <div className="staked">
         <div className="staked__pile">
           {overlayAnchor}
-          <ClaimBadge text={claimBadge(plot, target)} />
+          <ClaimBadge text={overlaid ?? caption ?? ''} />
         </div>
       </div>
     );
@@ -178,7 +152,7 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
                     висеть там, где заявку делали. Якорь вложен в сторону
                     атакующего — Ва-банк принадлежит его заявке, а не столу. */}
                 {overlayAnchor}
-                <ClaimBadge text={claimBadge(attackerClaim, target)} />
+                <ClaimBadge text={attackerClaim} />
               </CardAnchor>
             </div>
             <div className="duel__side">
@@ -199,19 +173,12 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
   }
 
   /* 5. A single staked card under scrutiny. */
-  const claimed = String(pendingAction?.roleClaim || pendingAction?.name || '');
-  const badge = overlayInstant
-    ? overlayInstant.card === 'Перенаправление'
-      ? claimBadge(overlayInstant.card, target)
-      : overlayInstant.card
-    : claimBadge(claimed, target);
-
   return (
     <div className="staked">
       <div className="staked__pile">
         <CardAnchor zone={{ kind: 'stake' }} />
         {overlayAnchor}
-        <ClaimBadge text={badge} />
+        <ClaimBadge text={overlaid ?? caption ?? ''} />
       </div>
     </div>
   );
