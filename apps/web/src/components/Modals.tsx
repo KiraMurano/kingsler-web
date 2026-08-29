@@ -6,7 +6,7 @@ import type { ConspiracyPromptData, Player, GameCard } from '@kinglier/engine/ty
 import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '@kinglier/engine/resolvers/plotResolver';
 import { courtly } from '../lib/text';
 import { pickViewer } from '../lib/viewer';
-import { Save } from 'lucide-react';
+import { LogOut, Save } from 'lucide-react';
 import { SavePresetDialog } from '../rules/SavePresetDialog';
 import { Dialog } from './ui/Overlay';
 import { Button } from './ui/Button';
@@ -164,9 +164,16 @@ function ConspiracyDialog({
 interface ModalsProps {
   showRules: boolean;
   onCloseRules: () => void;
+  /**
+   * Выход в меню после партии.
+   *
+   * Живёт снаружи: `Root` знает, что при выходе надо ещё и покинуть комнату и
+   * убрать `?room=` из адреса, а движок про меню не знает вовсе.
+   */
+  onExitToMenu: () => void;
 }
 
-export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
+export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules, onExitToMenu }) => {
   const [savePresetOpen, setSavePresetOpen] = useState(false);
   const {
     players,
@@ -178,7 +185,6 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
     activateConspiracy,
     turnPhase,
     winnerId,
-    restartGame,
     rules
   } = useGameStore(
     useShallow(s => ({
@@ -191,7 +197,6 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
       activateConspiracy: s.activateConspiracy,
       turnPhase: s.turnPhase,
       winnerId: s.winnerId,
-      restartGame: s.restartGame,
       rules: s.rules
     }))
   );
@@ -256,7 +261,7 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
     return (
       <Dialog
         open
-        onClose={restartGame}
+        onClose={onExitToMenu}
         width={540}
         title={
           isDraw
@@ -288,8 +293,18 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules }) => {
             </div>
           ))}
         </div>
-        <Button tone="gold" size="lg" block style={{ marginTop: 16 }} onClick={restartGame}>
-          Новая партия
+        {/* Выход, а не новая партия: состав стола, правила и режим — оффлайн
+            или комната — выбирают в меню, и начинать «ещё раз» вслепую, тем же
+            составом и по тем же числам, значит решать это за игрока. Закрытие
+            диалога ведёт туда же: за ним всё равно лежит доигранный стол. */}
+        <Button
+          tone="gold"
+          size="lg"
+          block
+          style={{ marginTop: 16 }}
+          onClick={onExitToMenu}
+        >
+          <LogOut size={18} /> Выйти в меню
         </Button>
       </Dialog>
     );

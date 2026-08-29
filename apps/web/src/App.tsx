@@ -794,6 +794,7 @@ export default function App({
       <Modals
         showRules={rulesOpen}
         onCloseRules={() => setRulesOpen(false)}
+        onExitToMenu={onExit}
       />
 
       {/* Сам решает, что показывать: сбор двора, жребий, ничего (пока идёт
