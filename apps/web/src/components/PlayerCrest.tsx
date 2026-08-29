@@ -11,28 +11,34 @@ import { CrossfadeText } from './ui/CrossfadeText';
 import { AnimatedNumber } from './ui/AnimatedNumber';
 import { PlotSlot } from './PlotSlot';
 
-const CROWNS_TO_WIN = 6;
-
 export const CrownsTrack: React.FC<{
   favor: number;
   compact?: boolean;
   events?: readonly DeltaEvent[];
-}> = ({ favor, compact, events = [] }) => (
-  <div className={`crowns ${compact ? 'crowns--compact' : ''}`}>
-    <div className="crowns__head">
-      <span className="eyebrow">До престола</span>
-      <span className="crowns__value delta-anchor">
-        <UiIcon kind="crown" size="sm" /> <AnimatedNumber value={favor} />/{CROWNS_TO_WIN}
-        <Deltas events={events} kind="crown" />
-      </span>
+}> = ({ favor, compact, events = [] }) => {
+  /* Дорожка обязана показывать порог ИМЕННО ЭТОЙ партии: он настраивается
+     перед стартом, и зашитая шестёрка врала бы и цифрой, и числом делений. */
+  const crownsToWin = useGameStore(s => s.rules.crownsToWin);
+
+  return (
+    <div className={`crowns ${compact ? 'crowns--compact' : ''}`}>
+      <div className="crowns__head">
+        <span className="eyebrow">До престола</span>
+        <span className="crowns__value delta-anchor">
+          <UiIcon kind="crown" size="sm" /> <AnimatedNumber value={favor} />/{crownsToWin}
+          <Deltas events={events} kind="crown" />
+        </span>
+      </div>
+      {/* Число делений уезжает в CSS переменной: сетка сама делит ширину на
+          столько колонок, сколько корон нужно для победы. */}
+      <div className="crowns__track" style={{ '--crowns': crownsToWin } as React.CSSProperties}>
+        {Array.from({ length: crownsToWin }).map((_, i) => (
+          <span key={i} className={`crowns__seg ${favor > i ? 'crowns__seg--on' : ''}`} />
+        ))}
+      </div>
     </div>
-    <div className="crowns__track">
-      {Array.from({ length: CROWNS_TO_WIN }).map((_, i) => (
-        <span key={i} className={`crowns__seg ${favor > i ? 'crowns__seg--on' : ''}`} />
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 interface PlayerCrestProps {
   player: Player;

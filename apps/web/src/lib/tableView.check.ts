@@ -50,8 +50,8 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
     isVetoed: false,
-  vetoOnVeto: false,
-  rules: DEFAULT_RULES,
+    vetoOnVeto: false,
+    rules: DEFAULT_RULES,
     vetoDeadlineAt: null,
     coronationCandidateId: null,
     revealOutcome: null,
@@ -416,6 +416,49 @@ function action(over: Partial<Action> = {}): Action {
 
   assert.notEqual(one.id, two.id, 'отметка меняет картинку, значит и подпись под ней');
   assert.notEqual(idle.id, empty.id, 'открытый выбор — уже другая картинка');
+}
+
+// ==========================================================================
+// Круг коронации не отбирает ход
+// ==========================================================================
+// Регрессия: круг проверялся раньше своего хода, и активный игрок получал
+// вместо кнопок табличку «сбейте влияние претендента». Сбивать было нечем —
+// панель действий не появлялась, и стол стоял до конца круга.
+{
+  const view = deriveTableView(input({ activePlayerId: 'p1', coronationCandidateId: 'p2' }), 'p1');
+  assert.equal(view.phase, 'turn', 'на своём ходу игрок ходит, а не смотрит на объявление');
+  assert.ok(view.bar.length > 0, 'кнопки действий на месте');
+  assert.ok(
+    view.guidance.includes('Круг коронации'),
+    'но про круг игроку всё равно сказано — это последний шанс сбить претендента'
+  );
+}
+
+// Чужой ход во время круга — по-прежнему объявление.
+{
+  const view = deriveTableView(input({ activePlayerId: 'p2', coronationCandidateId: 'p2' }), 'p1');
+  assert.equal(view.phase, 'coronation', 'вне своего хода круг остаётся объявлением');
+}
+
+// Круг за самого зрителя читается иначе: ему нечего сбивать.
+{
+  const view = deriveTableView(input({ activePlayerId: 'p1', coronationCandidateId: 'p1' }), 'p1');
+  assert.equal(view.phase, 'turn');
+  assert.ok(view.guidance.includes('за вас'), 'претенденту сказано, что круг идёт за него');
+}
+
+// Реакции по-прежнему важнее своего хода: окно вето не должно теряться.
+{
+  const view = deriveTableView(
+    input({
+      activePlayerId: 'p1',
+      coronationCandidateId: 'p2',
+      turnPhase: 'VETO_WINDOW',
+      pendingAction: action()
+    }),
+    'p1'
+  );
+  assert.equal(view.phase, 'veto', 'окно вето важнее и хода, и круга');
 }
 
 console.log('tableView.check: ok');

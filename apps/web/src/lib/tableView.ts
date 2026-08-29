@@ -500,8 +500,14 @@ function phaseOf(input: TableViewInput, viewer: Player): PhaseKind {
   }
   if (turnPhase === 'VETO_WINDOW') return 'veto';
   if (turnPhase === 'DOUBT_WINDOW' && pendingAction?.actorId !== viewer.id) return 'doubt';
-  if (input.coronationCandidateId) return 'coronation';
+  /* Свой ход важнее любого объявления.
+   *
+   * Круг коронации шёл первым — и на своём же ходу игрок получал вместо кнопок
+   * табличку «сбейте влияние претендента». Сбивать было нечем: панель действий
+   * не появлялась, и стол стоял до конца круга. Круг — это объявление, а не
+   * фаза, отбирающая ход; предупреждение о нём переехало в `guidance`. */
   if (activePlayerId === viewer.id && turnPhase === 'IDLE' && !pendingAction) return 'turn';
+  if (input.coronationCandidateId) return 'coronation';
   return 'waiting';
 }
 
@@ -548,6 +554,17 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
    */
   switch (phase) {
     case 'turn':
+      /* Идущий круг коронации — самое важное, что игрок должен знать на своём
+         ходу: это последний шанс сбить претендента. */
+      if (input.coronationCandidateId && input.coronationCandidateId !== viewer.id) {
+        const претендент = players.find(p => p.id === input.coronationCandidateId);
+        return претендент
+          ? `Круг коронации: сбейте влияние ${accOf(претендент)}, пока круг не замкнулся.`
+          : 'Круг коронации: сбейте влияние претендента, пока круг не замкнулся.';
+      }
+      if (input.coronationCandidateId === viewer.id) {
+        return 'Круг коронации идёт за вас — удержите короны до конца круга.';
+      }
       return 'Выберите действие двора или нажмите на карту, чтобы сыграть её.';
     case 'doubt':
       return 'Поверить или проверить?';
