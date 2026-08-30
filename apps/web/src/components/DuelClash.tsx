@@ -20,6 +20,7 @@ import { createPortal } from 'react-dom';
 import { useReducedMotion } from 'motion/react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { useAnchorRects } from '../motion/AnchorRegistry.tsx';
+import { designViewport, uiScale } from '../lib/uiScale.ts';
 import { zoneKey } from '../motion/zones.ts';
 
 /** Сколько искр в снопе. Больше — каша, меньше — не читается как удар. */
@@ -144,14 +145,17 @@ export const DuelClash: React.FC = () => {
       const delta = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      const dpr = window.devicePixelRatio || 1;
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      if (node.width !== Math.round(width * dpr)) {
-        node.width = Math.round(width * dpr);
-        node.height = Math.round(height * dpr);
+      /* Холст растянут на окно, но лежит внутри масштаба интерфейса: его
+         CSS-размер меряется в пикселях макета, а не экрана, и один макетный
+         пиксель занимает `dpr * uiScale()` физических. Искры прилетают из
+         ректов якорей, то есть тоже в макетных, — система координат одна. */
+      const ratio = (window.devicePixelRatio || 1) * uiScale();
+      const { width, height } = designViewport();
+      if (node.width !== Math.round(width * ratio)) {
+        node.width = Math.round(width * ratio);
+        node.height = Math.round(height * ratio);
       }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
       const live = burst.current;

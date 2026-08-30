@@ -25,6 +25,7 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import { TOSS_SPIN_MS, TOSS_VERDICT_MS } from '@kinglier/engine/timing';
 import type { OpeningData, Player } from '@kinglier/engine/types';
 import { Portrait } from './Portrait';
+import { designRect } from '../lib/uiScale.ts';
 
 /**
  * Сколько оборотов монетка делает за полёт.
@@ -179,7 +180,7 @@ function useTableCenter(): { x: number; y: number } | null {
     if (!table) return;
 
     const measure = () => {
-      const r = table.getBoundingClientRect();
+      const r = designRect(table);
       setCenter({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
     };
     measure();

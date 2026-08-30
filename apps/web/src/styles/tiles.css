@@ -160,7 +160,3 @@
   }
 }
 
-@media (max-width: 900px) {
-  .tilegrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tile { min-height: 158px; }
-}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
+import { designRect, designViewport } from '../../lib/uiScale.ts';
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -31,8 +32,8 @@ export function Select<T extends string>({
 
   const updatePosition = () => {
     if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
+    const rect = designRect(triggerRef.current);
+    const spaceBelow = designViewport().height - rect.bottom;
     const estimatedMenuHeight = Math.min(options.length * 40 + 16, 240);
     const openUpwards = spaceBelow < estimatedMenuHeight && rect.top > estimatedMenuHeight;
 

@@ -199,7 +199,7 @@
 .dialog__panel {
   position: relative;
   width: 100%;
-  max-height: 88vh;
+  max-height: calc(88 * var(--vh));
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-lg);
@@ -1321,7 +1321,7 @@
      ровно там, где его впервые называют. Место есть — это оверлей во весь
      экран, — и брать его надо по содержимому. */
   width: max-content;
-  max-width: min(92vw, 560px);
+  max-width: min(calc(92 * var(--vw)), 560px);
   padding: 10px 26px 10px 10px;
   border: 1px solid var(--line-mid);
   border-radius: 999px;
@@ -1378,7 +1378,7 @@
   flex-direction: column;
   align-items: stretch;
   gap: 20px;
-  width: min(92vw, 420px);
+  width: min(calc(92 * var(--vw)), 420px);
 }
 
 .gather__head {
@@ -1561,22 +1561,6 @@
   color: var(--sage-soft);
 }
 
-@media (max-width: 560px) {
-  .toss__stage {
-    width: 240px;
-    height: 220px;
-  }
-
-  .toss__coin {
-    width: 160px;
-    height: 160px;
-  }
-
-  .toss__name {
-    font-size: 1rem;
-  }
-}
-
 /* ==========================================================================
    ОТВЕТ В ОКНЕ СОМНЕНИЯ — НА ЛИЦЕ
    ========================================================================== */
@@ -1747,7 +1731,6 @@
   box-shadow: 0 0 6px currentColor;
 }
 
-
 /* ==========================================================================
    ФАНФАРА — точка между раздачей и первым ходом
    ==========================================================================
@@ -1771,8 +1754,8 @@
    сукно. */
 .fanfare__glow {
   position: absolute;
-  width: min(150vw, 1500px);
-  height: min(70vh, 620px);
+  width: min(calc(150 * var(--vw)), 1500px);
+  height: min(calc(70 * var(--vh)), 620px);
   background: radial-gradient(
     closest-side,
     rgba(12, 9, 6, 0.9) 0%,
@@ -1796,7 +1779,7 @@
    по градиенту — буквы должны выглядеть отлитыми, а не набранными. */
 .fanfare__lead {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 7vw, 4.6rem);
+  font-size: clamp(2rem, calc(7 * var(--vw)), 4.6rem);
   line-height: 1;
   letter-spacing: 0.045em;
   background: linear-gradient(
@@ -1820,7 +1803,7 @@
    а договаривает её. */
 .fanfare__tail {
   font-family: var(--font-display);
-  font-size: clamp(0.82rem, 2vw, 1.24rem);
+  font-size: clamp(0.82rem, calc(2 * var(--vw)), 1.24rem);
   line-height: 1;
   letter-spacing: 0.42em;
   /* Разрядка добавляет пробел справа от последней буквы — без этого сдвига
@@ -1835,7 +1818,7 @@
 /* Линии сверху и снизу: тают к краям, поэтому у объявления нет рамки —
    только свет. Растут от середины, отсюда и `transform-origin`. */
 .fanfare__rule {
-  width: min(78vw, 520px);
+  width: min(calc(78 * var(--vw)), 520px);
   height: 1px;
   transform-origin: center;
   background: linear-gradient(
@@ -1857,7 +1840,6 @@
     text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
   }
 }
-
 
 /* ==========================================================================
    ЭКРАН ПРОГРЕВА — пока арты двора едут в кэш
@@ -1882,7 +1864,7 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  width: min(88vw, 380px);
+  width: min(calc(88 * var(--vw)), 380px);
   text-align: center;
 }
 
@@ -1891,7 +1873,7 @@
    родственно. */
 .preload__title {
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 8vw, 3.4rem);
+  font-size: clamp(2.1rem, calc(8 * var(--vw)), 3.4rem);
   line-height: 1;
   letter-spacing: 0.08em;
   background: linear-gradient(

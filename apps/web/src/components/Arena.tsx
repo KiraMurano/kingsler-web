@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import type { GameCard } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
 import { dur } from '../motion/tokens.ts';
+import { designRect, designViewport } from '../lib/uiScale.ts';
 
 /** Что просят сделать за столом и как от этого отказаться. */
 export interface ArenaPrompt {
@@ -70,11 +71,12 @@ export const Arena: React.FC<ArenaProps> = ({ pendingTargetAction, onCancelTarge
   useLayoutEffect(() => {
     if (!open) return;
     const measure = () => {
-      const r = arena.current?.getBoundingClientRect();
-      if (!r) return;
+      const node = arena.current;
+      if (!node) return;
+      const r = designRect(node);
       setAt({
         x: r.left + r.width / 2,
-        bottom: window.innerHeight - (r.bottom - r.height * BAR_BOTTOM)
+        bottom: designViewport().height - (r.bottom - r.height * BAR_BOTTOM)
       });
     };
     measure();

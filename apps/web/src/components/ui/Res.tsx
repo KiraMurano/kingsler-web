@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { courtly, resourceDeltaKind } from '../../lib/text';
 import { UiIcon, renderWithIcons, type UiIconKind } from './Icon';
 import { AnimatedNumber } from './AnimatedNumber';
+import { designRect } from '../../lib/uiScale.ts';
 
 /**
  * Resource chips. Visualised via crisp WebP resource icons.
@@ -114,7 +115,7 @@ export const Deltas: React.FC<{ events: readonly DeltaEvent[]; kind: ResourceKin
     const measure = () => {
       const host = mark.current?.parentElement;
       if (!host) return;
-      const r = host.getBoundingClientRect();
+      const r = designRect(host);
       setAt({ x: r.left + r.width / 2, y: r.top - DELTA_LIFT });
     };
     measure();

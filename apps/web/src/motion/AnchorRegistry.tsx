@@ -33,12 +33,13 @@
  * rather than predicting it.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { designRect } from '../lib/uiScale.ts';
 import { zoneKey } from './zones.ts';
 import type { Zone } from './zones.ts';
 
 /** Live rects, keyed by `zoneKey(zone)`. */
 export interface AnchorRects {
-  /** The zone's rect as of the last frame, or `null` if nothing registered it. */
+  /** The zone's rect as of the last frame, in design px, or `null` if nothing registered it. */
   get: (key: string) => DOMRect | null;
 }
 
@@ -60,7 +61,7 @@ export const AnchorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const rectsRef = useRef<Map<string, DOMRect>>(new Map());
 
   const measure = useCallback((key: string, node: HTMLElement) => {
-    rectsRef.current.set(key, node.getBoundingClientRect());
+    rectsRef.current.set(key, designRect(node));
   }, []);
 
   const register = useCallback(
@@ -92,7 +93,7 @@ export const AnchorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       /* All reads, no writes: one reflow for the whole set. */
       for (const [key, node] of nodesRef.current) {
         if (!node.isConnected) continue;
-        rects.set(key, node.getBoundingClientRect());
+        rects.set(key, designRect(node));
       }
     };
     handle = requestAnimationFrame(tick);

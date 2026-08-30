@@ -59,6 +59,7 @@ import type { CardId } from '@kinglier/engine/cardInstance';
 import type { GameCard } from '@kinglier/engine/types';
 import { CARD_INFO } from '@kinglier/engine/cards';
 import { useAnchorRects } from './AnchorRegistry.tsx';
+import { designRect } from '../lib/uiScale.ts';
 import { dur, spring, tilt } from './tokens.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
 import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
@@ -70,8 +71,8 @@ const CARD_BACK = '/assets/cards/back-dual-face.webp';
  * Written as CSS rather than as numbers so it tracks the viewport on its own;
  * the numeric width is read back off a hidden element of exactly this size.
  */
-const CARD_BASE_HEIGHT = 'min(32vh, 258px)';
-const CARD_BASE_WIDTH = 'calc(min(32vh, 258px) * 2 / 3)';
+const CARD_BASE_HEIGHT = 'min(calc(32 * var(--vh)), 258px)';
+const CARD_BASE_WIDTH = 'calc(min(calc(32 * var(--vh)), 258px) * 2 / 3)';
 
 /** Above the table and its badges, below backdrops, sheets and dialogs. */
 const CARD_LAYER_Z = 75;
@@ -902,7 +903,7 @@ export const CardLayer: React.FC<{ cards: PlacedCard[] }> = ({ cards }) => {
     const node = baseRef.current;
     if (!node) return;
     const read = () => {
-      const rect = node.getBoundingClientRect();
+      const rect = designRect(node);
       baseSize.current = { width: rect.width, height: rect.height };
     };
     read();

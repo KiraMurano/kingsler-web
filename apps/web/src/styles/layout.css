@@ -3,8 +3,8 @@
    ========================================================================== */
 
 #root {
-  width: 100vw;
-  height: 100vh;
+  width: calc(100 * var(--vw));
+  height: calc(100 * var(--vh));
   overflow: hidden;
   background:
     radial-gradient(ellipse 80% 70% at 50% 42%, rgba(8, 10, 14, 0.28) 0%, rgba(5, 7, 12, 0.5) 100%),
@@ -169,7 +169,7 @@
    * добавляет колонке веса снизу. Три пикселя вычета ставят видимые края
    * вровень: по числам колонка ниже панели, на глаз — одной высоты. */
   --mini-trim: 3px;
-  --table: round(down, min(72vmin, calc(100% - 150px)), 2px);
+  --table: round(down, min(calc(72 * var(--vmin)), calc(100% - 150px)), 2px);
   position: absolute;
   width: var(--table);
   height: var(--table);
@@ -729,7 +729,7 @@
   align-items: center;
   gap: 10px;
   width: max-content;
-  max-width: min(320px, 84vw);
+  max-width: min(320px, calc(84 * var(--vw)));
   padding: 14px 20px;
   border-radius: 18px;
   border: 1px solid rgba(180, 64, 90, 0.55);
@@ -809,7 +809,7 @@
 .staked__pile {
   position: relative;
   isolation: isolate;
-  height: clamp(152px, 27vh, 216px);
+  height: clamp(152px, calc(27 * var(--vh)), 216px);
   aspect-ratio: 2 / 3;
   overflow: visible;
 }
@@ -841,7 +841,7 @@
 }
 
 .duel__side .cardanchor {
-  height: clamp(140px, 24vh, 188px);
+  height: clamp(140px, calc(24 * var(--vh)), 188px);
   aspect-ratio: 2 / 3;
 }
 
@@ -921,7 +921,7 @@
 }
 
 .pile__slot {
-  width: calc(min(32vh, 258px) * 2 / 3 * 0.45);
+  width: calc(min(calc(32 * var(--vh)), 258px) * 2 / 3 * 0.45);
   aspect-ratio: 2 / 3;
 }
 
@@ -991,7 +991,7 @@
 
 .tablecard {
   position: relative;
-  height: clamp(152px, 27vh, 216px);
+  height: clamp(152px, calc(27 * var(--vh)), 216px);
   aspect-ratio: 2 / 3;
   border-radius: 9px;
   overflow: hidden;
@@ -1120,7 +1120,7 @@
   /* Шире прежнего: подпись стала предложением с именем игрока, а не названием
      карты, и в 220px «Барон Дима распускает слух против Графини Елены»
      ломалось на три строки. */
-  max-width: min(340px, 72vw);
+  max-width: min(340px, calc(72 * var(--vw)));
   padding: 3px 9px;
   border-radius: 12px;
   border: 1px solid var(--line-strong);
@@ -1157,7 +1157,7 @@
   position: relative;
   pointer-events: auto;
   width: max-content;
-  max-width: min(280px, 42vw);
+  max-width: min(280px, calc(42 * var(--vw)));
   padding: 12px 14px;
   text-align: left;
   border-radius: var(--radius);
@@ -1325,7 +1325,7 @@
 /* Высота карты в руке названа один раз: её берут и слоты руки, и правая
    колонка, которая по ним выравнивается. */
 .hero {
-  --hand-h: min(32vh, 258px);
+  --hand-h: min(calc(32 * var(--vh)), 258px);
   position: absolute;
   left: 16px;
   right: 16px;
@@ -1925,8 +1925,8 @@
 
 .handcard {
   position: relative;
-  height: min(32vh, 258px);
-  width: calc(min(32vh, 258px) * 2 / 3);
+  height: min(calc(32 * var(--vh)), 258px);
+  width: calc(min(calc(32 * var(--vh)), 258px) * 2 / 3);
   flex: 0 0 auto;
   border-radius: 12px;
   overflow: hidden;
@@ -2373,7 +2373,7 @@
 .booting {
   display: grid;
   place-items: center;
-  height: 100vh;
+  height: calc(100 * var(--vh));
   font-family: var(--font-display);
   letter-spacing: 0.3em;
   color: var(--text-dim);

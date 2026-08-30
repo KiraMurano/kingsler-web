@@ -245,7 +245,7 @@
 
 .ruleswrap__scroll {
   overflow-y: auto;
-  max-height: min(52vh, 520px);
+  max-height: min(calc(52 * var(--vh)), 520px);
   padding-right: 4px;
   /* Нижняя строка на границе обрезается всегда — затухание превращает обрез в
      обещание «дальше есть ещё» вместо сломанной вёрстки. */
@@ -361,8 +361,3 @@
   gap: 8px;
 }
 
-@media (max-width: 520px) {
-  .rules__actions {
-    grid-template-columns: 1fr;
-  }
-}
