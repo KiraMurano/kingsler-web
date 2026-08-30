@@ -60,11 +60,17 @@ import type { GameCard } from '@kinglier/engine/types';
 import { CARD_INFO } from '@kinglier/engine/cards';
 import { useAnchorRects } from './AnchorRegistry.tsx';
 import { designRect } from '../lib/uiScale.ts';
+import { cardTilt } from '../lib/cardTilt.ts';
+import { cardArt, TABLE_ART_WIDTH } from '../lib/cardArt.ts';
 import { dur, spring, tilt } from './tokens.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
 import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
 
-const CARD_BACK = '/assets/cards/back-dual-face.webp';
+/* Ширина копии — под самое крупное из состояний этого узла: карту в руке
+   (154 px макета). Слот интриги и мини-карта у соседа мельче, но это тот же
+   узел и тот же файл: подменять его на лету значит моргать картинкой в
+   полёте. */
+const CARD_BACK = cardArt('/assets/cards/back-dual-face.webp', TABLE_ART_WIDTH);
 
 /**
  * The card node's intrinsic size, from which every other size is a `scale`.
@@ -666,12 +672,14 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!lift) return;
-    const box = e.currentTarget.getBoundingClientRect();
-    const dx = (e.clientX - (box.left + box.width / 2)) / (box.width / 2);
-    const dy = (e.clientY - (box.top + box.height / 2)) / (box.height / 2);
-    const cap = tilt.pointerMax;
-    tiltYTarget.set(Math.max(-cap, Math.min(cap, dx * cap)));
-    tiltXTarget.set(Math.max(-cap, Math.min(cap, -dy * cap)));
+    const next = cardTilt(
+      e.currentTarget.getBoundingClientRect(),
+      e.clientX,
+      e.clientY,
+      tilt.pointerMax
+    );
+    tiltXTarget.set(next.x);
+    tiltYTarget.set(next.y);
   };
 
   const releaseTilt = () => {
@@ -768,7 +776,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
                 .filter(Boolean)
                 .join(' ')}
               style={{
-                backgroundImage: info ? `url(${info.artImage})` : undefined,
+                backgroundImage: info ? `url(${cardArt(info.artImage, TABLE_ART_WIDTH)})` : undefined,
                 ...(reduce
                   ? {
                       /* Crossfade instead of a turn: lie flat, on top of the

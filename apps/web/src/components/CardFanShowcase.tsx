@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import { Sparkles, Users, ScrollText, Zap, type LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
+import { spring, tilt } from '../motion/tokens.ts';
+import { cardTilt } from '../lib/cardTilt.ts';
+import { cardArt } from '../lib/cardArt.ts';
 
 type CategoryKey = 'roles' | 'plots' | 'instants';
 
@@ -11,28 +15,6 @@ interface FanCardData {
   artImage: string;
   tagline: string;
 }
-
-const ALL_PRELOAD_IMAGES = [
-  '/assets/cards/back-dual-face.webp',
-  '/assets/cards/joker.webp',
-  '/assets/cards/thief.webp',
-  '/assets/cards/knight.webp',
-  '/assets/cards/heir.webp',
-  '/assets/cards/treasurer.webp',
-  '/assets/cards/blackmailer.webp',
-  '/assets/cards/intrigue-reception.webp',
-  '/assets/cards/intrigue-blackbook.webp',
-  '/assets/cards/intrigue-inforator.webp',
-  '/assets/cards/intrigue-dossier.webp',
-  '/assets/cards/intrigue-bulla.webp',
-  '/assets/cards/intrigue-plot.webp',
-  '/assets/cards/instant-veto.webp',
-  '/assets/cards/instant-switch.webp',
-  '/assets/cards/instant-allin.webp',
-  '/assets/cards/instant-uproar.webp',
-  '/assets/cards/instant-search.webp',
-  '/assets/cards/instant-treason.webp'
-];
 
 const CATEGORY_DATA: Record<
   CategoryKey,
@@ -121,18 +103,18 @@ const CATEGORY_DATA: Record<
         tagline: 'Глаза и уши во всех покоях замка'
       },
       {
-        id: 'dossier',
-        name: 'Досье',
+        id: 'guard',
+        name: 'Стража покоев',
         category: 'plots',
-        artImage: '/assets/cards/intrigue-dossier.webp',
-        tagline: 'Компромат на каждого соперника за столом'
+        artImage: '/assets/cards/intrigue-guard.webp',
+        tagline: 'Караул у дверей: ни вору, ни шантажисту'
       },
       {
-        id: 'bulla',
-        name: 'Золотая булла',
+        id: 'protection',
+        name: 'Охранная грамота',
         category: 'plots',
-        artImage: '/assets/cards/intrigue-bulla.webp',
-        tagline: 'Королевский эдикт, меняющий ход игры'
+        artImage: '/assets/cards/intrigue-protection.webp',
+        tagline: 'Королевское заступничество над вашими коронами'
       },
       {
         id: 'plot',
@@ -197,13 +179,149 @@ const CATEGORY_DATA: Record<
 
 const CATEGORIES: CategoryKey[] = ['roles', 'plots', 'instants'];
 
+/** Насколько карта под курсором крупнее соседок. Одна цифра на весь веер. */
+const HOVER_SCALE = 1.1;
+
+type SlotAnimState = 'idle' | 'revealing' | 'waving';
+
+/**
+ * Одна карта веера.
+ *
+ * Вынесена из `.map()` не ради порядка, а по необходимости: притяжение к
+ * курсору держится на моушен-значениях, а хуки в цикле не вызвать.
+ *
+ * Наведение сделано ровно тем же приёмом, что и у карт в руке за столом (см.
+ * `motion/CardLayer.tsx`): карта не двигается с места, а слегка подрастает и
+ * наклоняется в сторону курсора. Наклон живёт на отдельном узле, чтобы
+ * вращаться вокруг середины карты, а не вокруг точки, по которой развёрнут
+ * веер, — и потому же не дерётся за `transform` с переворотом внутри.
+ *
+ * То, что карта остаётся на месте, — не вкусовщина. Прошлый вариант поднимал
+ * её на 46px и увеличивал в 1.12 вокруг точки под нижним краем: на крупном
+ * экране карта уезжала из-под курсора, наведение слетало, карта возвращалась —
+ * и так по кругу. Отсюда и «дёргается влево-вправо» на 4K. Увеличение вокруг
+ * собственного центра из-под курсора уехать не может: точка внутри
+ * прямоугольника при таком масштабировании остаётся внутри.
+ */
+const FanCard: React.FC<{
+  card: FanCardData;
+  index: number;
+  total: number;
+  animState: SlotAnimState;
+  hovered: boolean;
+  onHoverChange: (card: FanCardData | null) => void;
+  onToggle: (card: FanCardData) => void;
+}> = ({ card, index, total, animState, hovered, onHoverChange, onToggle }) => {
+  const reduce = !!useReducedMotion();
+
+  const tiltXTarget = useMotionValue(0);
+  const tiltYTarget = useMotionValue(0);
+  const tiltX = useSpring(tiltXTarget, spring.hover);
+  const tiltY = useSpring(tiltYTarget, spring.hover);
+
+  const releaseTilt = () => {
+    tiltXTarget.set(0);
+    tiltYTarget.set(0);
+  };
+
+  /* Наведение снимает не только курсор: переключение категории гасит его из
+     родителя, и наклон обязан уехать в ноль вместе с ним. */
+  useEffect(() => {
+    if (hovered) return;
+    tiltXTarget.set(0);
+    tiltYTarget.set(0);
+  }, [hovered, tiltXTarget, tiltYTarget]);
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    /* Пальцу наклонять нечего: наклон читается только когда курсор ходит по
+       карте, а касание — это точка, которая появляется и исчезает. */
+    if (reduce || e.pointerType !== 'mouse') return;
+    const next = cardTilt(
+      e.currentTarget.getBoundingClientRect(),
+      e.clientX,
+      e.clientY,
+      tilt.pointerMax
+    );
+    tiltXTarget.set(next.x);
+    tiltYTarget.set(next.y);
+  };
+
+  /* Симметричный разлёт: -2.5, -1.5, -0.5, 0.5, 1.5, 2.5 */
+  const offset = index - (total - 1) / 2;
+
+  return (
+    <div
+      className={`fan-card-wrapper ${hovered ? 'fan-card-wrapper--hovered' : ''}`}
+      style={{
+        '--rotate-deg': `${offset * 7.2}deg`,
+        '--translate-x': `${offset * 116}px`,
+        /* Квадратичный провис: крайние карты уходят вниз широкой дугой. */
+        '--translate-y': `${offset * offset * 5.2}px`,
+        zIndex: hovered ? 60 : 10 + index
+      } as React.CSSProperties}
+      onPointerEnter={() => onHoverChange(card)}
+      onPointerLeave={() => {
+        releaseTilt();
+        onHoverChange(null);
+      }}
+      onPointerMove={onPointerMove}
+      onClick={() => onToggle(card)}
+    >
+      <motion.div
+        className="fan-card-tilt"
+        style={{
+          rotateX: reduce ? 0 : tiltX,
+          rotateY: reduce ? 0 : tiltY,
+          transformStyle: 'preserve-3d'
+        }}
+        /* Только `scale`: `rotateX`/`rotateY` выше — моушен-значения из
+           `style`, и анимировать их ещё и отсюда значит драться за одно
+           свойство. Тот же уговор действует у карт за столом. */
+        animate={{ scale: hovered && !reduce ? HOVER_SCALE : 1 }}
+        transition={spring.hover}
+      >
+        <div
+          className={[
+            'fan-card-3d',
+            animState === 'revealing' ? 'fan-card-3d--reveal' : '',
+            animState === 'waving' ? 'fan-card-3d--wave' : '',
+            animState === 'idle' ? 'fan-card-3d--face-up' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <div className={`fan-card-face fan-card-face--front fan-card-face--${card.category}`}>
+            <img
+              src={cardArt(card.artImage, 768)}
+              alt={card.name}
+              draggable={false}
+              className="fan-card-face__art"
+            />
+            <div className="fan-card-face__glow" />
+          </div>
+
+          <div className="fan-card-face fan-card-face--back">
+            <img
+              src={cardArt('/assets/cards/back-dual-face.webp', 768)}
+              alt="Рубашка карты"
+              draggable={false}
+              className="fan-card-face__art"
+            />
+            <div className="fan-card-face__glow" />
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export function CardFanShowcase({ onOpenLogin }: { onOpenLogin: () => void }) {
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('roles');
   
   // Stable card slots: each slot maintains its current data without unmounting DOM
   const [slotCards, setSlotCards] = useState<FanCardData[]>(() => CATEGORY_DATA.roles.cards);
   // Track wave flipping per slot
-  const [slotAnimStates, setSlotAnimStates] = useState<('idle' | 'revealing' | 'waving')[]>([
+  const [slotAnimStates, setSlotAnimStates] = useState<SlotAnimState[]>([
     'idle', 'idle', 'idle', 'idle', 'idle', 'idle'
   ]);
   const [hoveredCard, setHoveredCard] = useState<FanCardData | null>(null);
@@ -217,14 +335,6 @@ export function CardFanShowcase({ onOpenLogin }: { onOpenLogin: () => void }) {
     timersRef.current.forEach(t => clearTimeout(t));
     timersRef.current = [];
   };
-
-  // Preload all 18 images into memory on mount
-  useEffect(() => {
-    ALL_PRELOAD_IMAGES.forEach(src => {
-      const img = new Image();
-      img.src = src;
-    });
-  }, []);
 
   // Initial wave reveal when scrolled into view
   useEffect(() => {
@@ -320,13 +430,6 @@ export function CardFanShowcase({ onOpenLogin }: { onOpenLogin: () => void }) {
 
   return (
     <section className="fan-showcase" ref={containerRef} id="cards-showcase">
-      {/* Hidden preloaded images rendered in DOM so GPU caches all textures */}
-      <div className="visually-hidden" aria-hidden="true">
-        {ALL_PRELOAD_IMAGES.map(src => (
-          <img key={src} src={src} alt="" loading="eager" decoding="sync" />
-        ))}
-      </div>
-
       <div className="fan-showcase__header">
         <span className="fan-showcase__badge">
           <Sparkles size={14} /> КОЛОДА КОРОЛЕВСКОГО ДВОРА
@@ -363,68 +466,24 @@ export function CardFanShowcase({ onOpenLogin }: { onOpenLogin: () => void }) {
       {/* The Wide 3D Fan Deck Container */}
       <div className="fan-stage">
         <div className="fan-deck fan-deck--open">
-          {slotCards.map((card, index) => {
-            // Symmetrical offset: -2.5, -1.5, -0.5, 0.5, 1.5, 2.5
-            const offset = index - (total - 1) / 2;
-            const rotateDeg = offset * 7.2;
-            const translateX = offset * 116;
-            // Quadratic drop so outer cards cascade down gracefully in a broad royal arc
-            const translateY = offset * offset * 5.2;
-            const zIndex = 10 + index;
-            const isHovered = hoveredCard?.id === card.id;
-            const animState = slotAnimStates[index];
-
-            return (
-              <div
-                key={`slot-${index}`}
-                className={`fan-card-wrapper ${isHovered ? 'fan-card-wrapper--hovered' : ''}`}
-                style={{
-                  '--rotate-deg': `${rotateDeg}deg`,
-                  '--translate-x': `${translateX}px`,
-                  '--translate-y': `${translateY}px`,
-                  zIndex: isHovered ? 60 : zIndex
-                } as React.CSSProperties}
-                onMouseEnter={() => !isTransitioningRef.current && setHoveredCard(card)}
-                onMouseLeave={() => setHoveredCard(null)}
-                onClick={() => !isTransitioningRef.current && setHoveredCard(prev => (prev?.id === card.id ? null : card))}
-              >
-                <div
-                  className={[
-                    'fan-card-3d',
-                    animState === 'revealing' ? 'fan-card-3d--reveal' : '',
-                    animState === 'waving' ? 'fan-card-3d--wave' : '',
-                    animState === 'idle' ? 'fan-card-3d--face-up' : ''
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  {/* Front Face (Illustrated Art - clean without overlapping text tag) */}
-                  <div className={`fan-card-face fan-card-face--front fan-card-face--${card.category}`}>
-                    <img
-                      src={card.artImage}
-                      alt={card.name}
-                      loading="eager"
-                      draggable={false}
-                      className="fan-card-face__art"
-                    />
-                    <div className="fan-card-face__glow" />
-                  </div>
-
-                  {/* Back Face (Royal Card Back) */}
-                  <div className="fan-card-face fan-card-face--back">
-                    <img
-                      src="/assets/cards/back-dual-face.webp"
-                      alt="Рубашка карты"
-                      loading="eager"
-                      draggable={false}
-                      className="fan-card-face__art"
-                    />
-                    <div className="fan-card-face__glow" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {slotCards.map((card, index) => (
+            <FanCard
+              key={`slot-${index}`}
+              card={card}
+              index={index}
+              total={total}
+              animState={slotAnimStates[index]}
+              hovered={hoveredCard?.id === card.id}
+              onHoverChange={next => {
+                if (isTransitioningRef.current) return;
+                setHoveredCard(next);
+              }}
+              onToggle={next => {
+                if (isTransitioningRef.current) return;
+                setHoveredCard(prev => (prev?.id === next.id ? null : next));
+              }}
+            />
+          ))}
         </div>
 
         {/* Hovered Card Inspector / Caption */}

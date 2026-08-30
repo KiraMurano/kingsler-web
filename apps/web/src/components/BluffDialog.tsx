@@ -22,6 +22,7 @@ import { UiIcon, renderWithIcons } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
 import { byId, holds } from '@kinglier/engine/cardInstance';
+import { cardArt } from '../lib/cardArt.ts';
 
 const VA_BANQUE_EFFECT: Record<string, string> = {
   Наследник: '+2 👑 при успешной проверке',
@@ -148,7 +149,7 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({
           return (
             <Tile
               key={role}
-              art={info.artImage}
+              art={cardArt(info.artImage, 512)}
               name={role}
               tone={withVaBanque ? 'arcane' : 'gold'}
               badge={<Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'Правда' : 'Блеф'}</Tag>}

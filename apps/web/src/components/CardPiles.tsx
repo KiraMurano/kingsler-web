@@ -25,8 +25,10 @@ import React from 'react';
 import { useGameStore } from '@kinglier/engine/GameStore';
 import { CardAnchor } from '../motion/AnchorRegistry.tsx';
 import type { Zone } from '../motion/zones.ts';
+import { cardArt } from '../lib/cardArt.ts';
 
-const CARD_BACK = '/assets/cards/back-dual-face.webp';
+/* 512 — под 69 px макета, столько занимает стопка колоды и сброса. */
+const CARD_BACK = cardArt('/assets/cards/back-dual-face.webp', 512);
 
 const Pile: React.FC<{
   zone: Zone;

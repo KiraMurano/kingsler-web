@@ -105,9 +105,11 @@
   justify-content: space-between;
   padding: 0 clamp(20px, calc(6 * var(--vw)), 64px);
   z-index: 100;
-  background: rgba(5, 7, 12, 0.75);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* Без `backdrop-filter`: шапка закреплена над прокручивающимся содержимым,
+     и размытие пересчитывалось бы каждый кадр прокрутки по всей её ширине —
+     на 4K это заметная часть просадки. Плотность фона поднята с 0.75, иначе
+     сквозь неё просвечивали бы уезжающие карты. */
+  background: rgba(5, 7, 12, 0.92);
   border-bottom: 1px solid var(--line);
   animation: fade-in 0.3s ease-out;
 }
@@ -546,35 +548,30 @@
   align-items: flex-end;
 }
 
+/*
+ * Обёртка держит только место карты в веере — разворот и смещение. Наведение
+ * её не трогает вовсе: как только оно двигало карту, курсор с неё съезжал,
+ * и на крупных экранах это читалось как дрожание. Увеличение и наклон живут
+ * на `.fan-card-tilt` внутри, вокруг середины карты.
+ *
+ * `perspective` здесь, а не на `.fan-stage`: та задаёт перспективу только
+ * своим прямым детям, а нужна она карте — иначе наклон к курсору выйдет
+ * плоским сдвигом без глубины. Число то же, что у карт за столом.
+ */
 .fan-card-wrapper {
   position: absolute;
   width: 168px;
   height: 252px;
   transform-origin: 50% 140%;
-  will-change: transform, filter;
-  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease, z-index 0.1s ease;
-  cursor: pointer;
   transform: translate(var(--translate-x), var(--translate-y)) rotate(var(--rotate-deg));
+  perspective: 900px;
+  cursor: pointer;
 }
 
-.fan-card-wrapper:hover,
-.fan-card-wrapper--hovered {
-  transform: translate(var(--translate-x), calc(var(--translate-y) - 46px)) rotate(var(--rotate-deg)) scale(1.12);
-  filter: drop-shadow(0 22px 36px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 24px rgba(200, 160, 74, 0.42));
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-  pointer-events: none;
-  opacity: 0;
+.fan-card-tilt {
+  width: 100%;
+  height: 100%;
+  will-change: transform;
 }
 
 .fan-card-3d {
@@ -631,7 +628,7 @@
   border: 1.5px solid rgba(200, 160, 74, 0.35);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 18px rgba(0, 0, 0, 0.5);
   background: #0c1018;
-  transition: border-color 0.35s ease;
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 .fan-card-face--back {
@@ -643,9 +640,19 @@
   border-color: rgba(200, 160, 74, 0.55);
 }
 
-.fan-card-wrapper:hover .fan-card-face--front,
-.fan-card-wrapper--hovered .fan-card-face--front {
+/*
+ * Подсветка карты под курсором — тенью самой грани, а не `filter` на обёртке.
+ * `drop-shadow` считает размытие по содержимому элемента отдельным проходом,
+ * и радиус у него в физических пикселях: на 4K те же 36px превращались в 108,
+ * то есть в огромное размытие каждый кадр. У карты прямоугольник со
+ * скруглением — `box-shadow` рисует ровно ту же тень и достаётся почти даром.
+ */
+.fan-card-wrapper--hovered .fan-card-face--front,
+.fan-card-wrapper--hovered .fan-card-face--back {
   border-color: rgba(232, 200, 119, 0.85);
+  box-shadow:
+    0 22px 36px rgba(0, 0, 0, 0.85),
+    0 0 24px rgba(200, 160, 74, 0.42);
 }
 
 .fan-card-face__art {
@@ -803,23 +810,142 @@
   padding: 4px 0 6px;
 }
 
-.login-code {
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  font-weight: 800;
-  letter-spacing: 0.38em;
-  text-align: center;
-  text-indent: 0.38em;
-  font-variant-numeric: tabular-nums;
-  padding: 14px 16px;
-  max-width: 280px;
-  background: rgba(5, 7, 12, 0.85);
-  border-color: var(--line-mid);
+/* --------------------------------------------------------------------------
+   Ввод кода из письма
+
+   Настоящее поле — одно, оно лежит поверх квадратиков и прозрачно во всём:
+   текст, каретка, фон, рамка, подсветка выделения. Прятать его в `opacity: 0`
+   или уносить за экран нельзя — браузер должен считать его обычным видимым
+   полем, иначе подсказка автозаполнения кода приезжает не туда.
+   -------------------------------------------------------------------------- */
+.codeinput {
+  position: relative;
+  display: inline-flex;
 }
 
-.login-code:focus {
+.codeinput__field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  /* Курсор такой же, как у обычного поля: квадратики под ним — просто
+     картинка, и «текстовость» ввода должна читаться указателем. */
+  cursor: text;
+  outline: none;
+  /* Нужен, чтобы поле принимало клик по всей ширине группы. */
+  z-index: 1;
+  font-size: 16px;
+}
+
+/* Выделение внутри прозрачного поля показало бы синий прямоугольник поверх
+   квадратиков — единственный след, который текст всё же оставляет. */
+.codeinput__field::selection {
+  background: transparent;
+}
+
+.codeinput__slots {
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.codeinput__slot {
+  position: relative;
+  width: 48px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-mid);
+  border-radius: var(--radius);
+  background: rgba(5, 7, 12, 0.85);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  transition:
+    border-color var(--dur-fade) var(--ease-out),
+    box-shadow var(--dur-fade) var(--ease-out),
+    transform var(--dur-fade) var(--ease-out);
+}
+
+.codeinput__slot.is-filled {
+  border-color: rgba(200, 160, 74, 0.45);
+  color: var(--gold-pale);
+}
+
+/* Подсвечен тот квадратик, в котором стоит каретка. Обводка снаружи, а не
+   рамкой: рамка сдвинула бы цифру на пиксель, и ряд бы дёрнулся. */
+.codeinput__slot.is-active {
   border-color: var(--gold-bright);
-  box-shadow: 0 0 0 3px rgba(232, 200, 119, 0.22), 0 0 20px rgba(200, 160, 74, 0.2);
+  box-shadow:
+    0 0 0 3px rgba(232, 200, 119, 0.22),
+    0 0 20px rgba(200, 160, 74, 0.2);
+  transform: translateY(-1px);
+}
+
+.codeinput.is-invalid .codeinput__slot {
+  border-color: rgba(180, 64, 90, 0.55);
+  color: var(--crimson-soft);
+}
+
+.codeinput.is-invalid .codeinput__slot.is-active {
+  border-color: var(--crimson-soft);
+  box-shadow: 0 0 0 3px rgba(180, 64, 90, 0.22);
+}
+
+.codeinput.is-disabled {
+  opacity: 0.55;
+}
+
+.codeinput.is-disabled .codeinput__field {
+  cursor: default;
+}
+
+/* Точка в пустом квадратике: пустой ряд иначе читается как «поле сломалось». */
+.codeinput__placeholder {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-mid);
+}
+
+/* Каретки у поля нет — мигает эта черта, и только в пустом квадратике: поверх
+   набранной цифры она бы её перечёркивала. */
+.codeinput__caret {
+  position: absolute;
+  width: 2px;
+  height: 26px;
+  border-radius: 1px;
+  background: var(--gold-bright);
+  animation: codeinput-caret 1.06s steps(1, end) infinite;
+}
+
+@keyframes codeinput-caret {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codeinput__caret {
+    animation: none;
+  }
+
+  .codeinput__slot {
+    transition: none;
+  }
 }
 
 .login-form__error {

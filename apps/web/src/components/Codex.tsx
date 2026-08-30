@@ -12,6 +12,7 @@ import { Tag } from './ui/Tag';
 import { renderWithIcons } from './ui/Icon';
 import { ActionCard } from './ActionCard';
 import { pickViewer } from '../lib/viewer';
+import { cardArt } from '../lib/cardArt.ts';
 
 type CodexTab = 'actions' | 'roles' | 'plots' | 'instants';
 
@@ -155,7 +156,7 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
                   onClick={() => onSelectCard(card)}
                 >
                   <div className={`codexrow__art cardframe cardframe--${info.category}`}>
-                    <img src={info.artImage} alt={info.name} />
+                    <img src={cardArt(info.artImage, 256)} alt={info.name} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div

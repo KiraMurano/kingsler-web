@@ -19,6 +19,7 @@ import {
 import { Dialog } from './ui/Overlay';
 import { Tag } from './ui/Tag';
 import { renderWithIcons } from './ui/Icon';
+import { cardArt } from '../lib/cardArt.ts';
 
 const CATEGORY_LABEL = {
   role: 'Роль',
@@ -84,7 +85,7 @@ export const CardDetailModal: React.FC<{
       <div className={`detail ${showArt ? '' : 'detail--no-art'}`}>
         {showArt && (
           <div className={`detail__art cardframe cardframe--${info.category}`}>
-            <img src={info.artImage} alt={info.name} />
+            <img src={cardArt(info.artImage, 768)} alt={info.name} />
           </div>
         )}
 

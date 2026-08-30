@@ -17,6 +17,7 @@
 import React from 'react';
 import type { InspectableItem } from '@kinglier/engine/data/cardDescriptions';
 import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
+import { cardArt } from '../lib/cardArt.ts';
 
 export const ActionCard: React.FC<{
   action: InspectableItem;
@@ -44,7 +45,7 @@ export const ActionCard: React.FC<{
       className={`actioncard${off ? ' actioncard--off' : ''}`}
       aria-disabled={off}
       onClick={onClick}
-      style={info.artImage ? { backgroundImage: `url(${info.artImage})` } : undefined}
+      style={info.artImage ? { backgroundImage: `url(${cardArt(info.artImage, 512)})` } : undefined}
     >
       {/* Полог под текстом: арт светлый и подробный, буквы по нему не читаются.
           Отдельным узлом, а не тенью на тексте, — тень обводит каждую букву и

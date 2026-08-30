@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { PROFILE_AVATARS } from '@kinglier/engine/profile';
+import { cardArt, TABLE_ART_WIDTH } from './cardArt.ts';
 
 /**
  * Сколько картинок тянем разом.
@@ -34,7 +35,7 @@ const LANES = 6;
  * Всё остальное берётся из описаний карт и списка аватаров.
  */
 const FIXED = [
-  '/assets/cards/back-dual-face.webp',
+  cardArt('/assets/cards/back-dual-face.webp', TABLE_ART_WIDTH),
   '/assets/ui/thumbsup-500.webp',
   '/assets/ui/coin-500.webp',
   '/assets/ui/coin-side-500.webp'
@@ -42,9 +43,12 @@ const FIXED = [
 
 /** Порядок важен: первым греем то, что появится на столе раньше всего. */
 function assetList(extra: readonly string[]): string[] {
+  /* Греем ровно ту копию, которой стол и рисует карты. Прогрев оригиналов был
+     бы прогревом впустую: браузер всё равно пошёл бы за другим файлом. */
   const arts = Object.values(CARD_DESCRIPTIONS)
     .map(info => info.artImage)
-    .filter((src): src is string => !!src);
+    .filter((src): src is string => !!src)
+    .map(src => cardArt(src, TABLE_ART_WIDTH));
 
   /* `Set` не только от дублей: аватар вошедшего игрока обычно уже есть в
      списке профилей, и грузить его дважды незачем. */

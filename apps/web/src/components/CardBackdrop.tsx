@@ -1,3 +1,4 @@
+import { cardArt } from '../lib/cardArt.ts';
 const CARDS = [
   ['/assets/cards/back-dual-face.webp', '5%', '8%', '-24deg'],
   ['/assets/cards/intrigue-plot.webp', '22%', '72%', '17deg'],
@@ -17,7 +18,8 @@ export function CardBackdrop({ hidden = false }: { hidden?: boolean } = {}) {
         <img
           key={`${src}-${index}`}
           className="card-backdrop__card"
-          src={src}
+          /* 512 — под 115 px макета, столько занимает карта фона. */
+          src={cardArt(src, 512)}
           alt=""
           decoding="async"
           draggable={false}

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Crown, KeyRound, LogIn, Mail, ChevronDown, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Overlay';
+import { CodeInput } from '../components/ui/CodeInput';
 import { CardFanShowcase } from '../components/CardFanShowcase';
 import {
   requestMagicLink,
@@ -15,6 +16,21 @@ import { DEFAULT_RULES } from '@kinglier/engine/rules';
 import '../styles/screen.css';
 
 type LoginStatus = 'idle' | 'sending' | 'sent' | 'verifying';
+
+/**
+ * Локальная заглушка входа — чтобы окно с кодом было чем открыть.
+ *
+ * В разработке сервер отдаёт `devToken` вместо письма (слать некуда), и вход
+ * происходит сразу же — окно с кодом при этом не показывается вовсе, то есть
+ * посмотреть на него без почтового ящика нельзя. Заглушка придерживает этот
+ * токен, показывает окно и принимает любые шесть цифр, а входит по токену.
+ *
+ * `import.meta.env.DEV` — не проверка во время работы, а константа времени
+ * сборки: в продовой сборке она `false`, ветка ниже вырезается вместе с телом,
+ * и попасть на боевой сайт не может. Проверка кода в проде не меняется ни на
+ * строчку — меняется только внешний вид поля.
+ */
+const DEV_LOGIN_STUB = import.meta.env.DEV;
 
 const GAME_HIGHLIGHTS = [
   {
@@ -41,6 +57,8 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
   const [status, setStatus] = useState<LoginStatus>('idle');
   const [error, setError] = useState('');
   const toast = useToast();
+  /* Токен из ответа сервера, придержанный заглушкой до ввода любых шести цифр. */
+  const devTokenRef = useRef<string | null>(null);
 
   const finishLogin = async (token: string) => {
     setToken(token);
@@ -58,25 +76,50 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
     try {
       const { devToken } = await requestMagicLink(normalizedEmail);
       if (devToken) {
+        if (DEV_LOGIN_STUB) {
+          devTokenRef.current = devToken;
+          setStatus('sent');
+          return;
+        }
         await finishLogin(devToken);
         return;
       }
       setStatus('sent');
     } catch {
+      /* Даже с лежащим сервером окно должно открыться — смотреть на него это
+         и есть смысл заглушки. Войти будет нечем, о чём скажет проверка. */
+      if (DEV_LOGIN_STUB) {
+        devTokenRef.current = null;
+        setStatus('sent');
+        return;
+      }
       setStatus('idle');
       toast('Не удалось отправить письмо. Попробуйте ещё раз.');
     }
   };
 
-  const verifyCode = async () => {
-    if (code.length !== 6 || status === 'verifying') return;
+  const verifyCode = async (entered = code) => {
+    if (entered.length !== 6 || status === 'verifying') return;
     setError('');
     setStatus('verifying');
     try {
-      await finishLogin(await verifyMagicCode(email, code));
+      if (DEV_LOGIN_STUB) {
+        const token = devTokenRef.current;
+        if (!token) {
+          setStatus('sent');
+          setError('Заглушка разработки: сервер не ответил, входить нечем — но окно смотреть можно.');
+          return;
+        }
+        await finishLogin(token);
+        return;
+      }
+      await finishLogin(await verifyMagicCode(email, entered));
     } catch {
       setStatus('sent');
       setError('Неверный или истёкший код.');
+      /* Стираем набранное: исправлять одну цифру в неверном коде обычно
+         бессмысленно, а пустой ряд сразу готов принять новый. */
+      setCode('');
     }
   };
 
@@ -136,7 +179,7 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
               <LogIn size={18} /> Начать схватку за корону
             </Button>
             <Button tone="bare" size="lg" onClick={scrollToCards}>
-              Колода двора <ChevronDown size={17} />
+              Колода <ChevronDown size={17} />
             </Button>
           </div>
 
@@ -201,15 +244,15 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
               Код отправлен на <strong>{email}</strong>
             </p>
             <div className="login-code-wrapper">
-              <input
-                className="field login-code"
+              <CodeInput
                 value={code}
-                onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                placeholder="000000"
-                aria-label="Шестизначный код"
+                onChange={setCode}
+                /* Шестая цифра — это и есть «отправить»: лишнее нажатие на
+                   кнопку тут ничего не решает, а кнопка остаётся для тех, кто
+                   вставил код и ждёт явного действия. */
+                onComplete={next => void verifyCode(next)}
+                disabled={status === 'verifying'}
+                invalid={!!error}
                 autoFocus
               />
             </div>
