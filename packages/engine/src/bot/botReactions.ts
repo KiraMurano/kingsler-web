@@ -5,6 +5,7 @@ import { evaluateBotDoubt } from './botEvaluator';
 import { selectBestRedirectionTarget } from './botTargeting';
 import { holds, idOf } from '../cardInstance';
 import { vetoAnswerRequired, vetoTopActorId } from '../resolvers/vetoChain';
+import { duelPayment } from '../resolvers/duelResolver';
 import {
   ACTION_HOLD_MS,
   BOT_REACTION_MS,
@@ -131,15 +132,17 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
     players
   );
 
-  /* Дуэль у ботов стоит столько же, сколько у человека: правило одно на всех. */
-  const duelTokenCost = useGameStore.getState().rules.duelCostsToken ? 1 : 0;
+  /* Дуэль у ботов стоит столько же, сколько у человека: цену считает та же
+     функция, что и для движка с интерфейсом. Своя мерка здесь уже приводила к
+     тому, что бот выбирал ход, который движок отвергал молча. */
+  const canDuel = duelPayment(rules, target) !== null;
 
   let chosenAction: 'accept' | 'doubt' | 'duel' = 'accept';
 
   if (hasCard) {
     if (doubtEval.shouldDoubt && doubtEval.score >= 0.98 && target.actionTokens >= 1) {
       chosenAction = 'doubt';
-    } else if (target.actionTokens >= duelTokenCost) {
+    } else if (canDuel) {
       chosenAction = 'duel';
     }
   } else {
@@ -151,7 +154,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
         fakeDuelChance = 0.65;
       }
 
-      if (target.actionTokens >= duelTokenCost && Math.random() < fakeDuelChance) {
+      if (canDuel && Math.random() < fakeDuelChance) {
         chosenAction = 'duel';
       } else {
         chosenAction = 'accept';

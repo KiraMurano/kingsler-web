@@ -28,6 +28,7 @@ import { accOf, genOf } from '@kinglier/engine/utils/russianText';
 import { CONSPIRACY_FULL_CHARGE } from '@kinglier/engine/resolvers/plotResolver';
 import type { GameRules } from '@kinglier/engine/rules';
 import { doubtPayment } from '@kinglier/engine/resolvers/doubtResolver';
+import { duelPayment } from '@kinglier/engine/resolvers/duelResolver';
 import { vetoAnswerRequired, vetoTopActorId } from '@kinglier/engine/resolvers/vetoChain';
 
 /** Инстанты, которые владелец может выложить открыто в свой ход. */
@@ -59,8 +60,6 @@ export type BarActionKind =
   | 'end-turn'
   | 'doubt'
   | 'believe'
-  /** Начать выбор карты-щита. Сама дуэль объявляется нажатием на карту. */
-  | 'duel'
   /** «Пропустить» в окне вето. Окно держится ответами, а не таймером. */
   | 'veto-pass';
 
@@ -202,12 +201,6 @@ export interface TableViewInput {
    * рядом второй правдой.
    */
   exchangePick: CardId[] | null;
-  /**
-   * Идёт ли выбор карты под щит дуэли. Состояние интерфейса, как и
-   * `exchangePick`: кнопка «Дуэль» ничего не решает сама, она открывает выбор
-   * карты, а объявляет дуэль уже нажатие на карту.
-   */
-  duelPick: boolean;
 }
 
 const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avatar });
@@ -349,6 +342,38 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
   const noTokens = hasTokens ? undefined : 'Нет жетонов действия.';
   const shield = shieldRoleFor(input.pendingAction?.roleClaim);
 
+  /*
+   * Цену дуэли считает движок, а не этот экран.
+   *
+   * Здесь стояло собственное «нужен жетон» — и оно врало ровно там, где
+   * правила партии говорили иначе: с выключенным «Дуэль тратит жетон хода»
+   * меню всё равно требовало жетон, и щит было не поднять. Теперь и меню, и
+   * движок спрашивают одну функцию, и разойтись им негде.
+   */
+  const duel = duelPayment(input.rules, viewer);
+  const duelReason = duel
+    ? undefined
+    : input.rules.duelCostsToken && !hasTokens && !input.rules.paidDuelEnabled
+      ? noTokens
+      : 'Не хватает золота.';
+  /* Молнию перечёркиваем только когда дело действительно в жетонах: при
+     нехватке золота она бы врала. */
+  const duelTokenBlocked = duelReason === noTokens;
+  const price = duel && duel.gold > 0 ? ` · ${duel.gold} 🪙` : '';
+
+  const duelOption = (bluff: boolean): CardMenuOption => ({
+    kind: bluff ? 'duel-bluff' : 'duel-shield',
+    hint: bluff
+      ? 'Выставить карту как щит вслепую. Обе карты вскроются сразу — блеф раскроется'
+      : 'Выставить настоящий щит: при вскрытии он остановит нападение',
+    label: `${bluff ? 'Дуэль: блеф' : 'Дуэль: защита'}${price}`,
+    tone: bluff ? 'danger' : 'good',
+    disabled: !duel,
+    spendsToken: (duel?.tokens ?? 0) > 0,
+    tokenBlocked: duelTokenBlocked,
+    reason: duelReason
+  });
+
   if (card === 'Перенаправление') {
     options.push({
       kind: 'play',
@@ -362,38 +387,9 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       tokenBlocked: !hasTokens,
       reason: noTokens
     });
-    options.push({
-      kind: 'duel-bluff',
-      hint: 'Выставить карту как щит вслепую. Примут вызов — блеф раскроется',
-      label: 'Дуэль: блеф',
-      tone: 'danger',
-      disabled: !hasTokens,
-      spendsToken: true,
-      tokenBlocked: !hasTokens,
-      reason: noTokens
-    });
-  } else if (card === shield) {
-    options.push({
-      kind: 'duel-shield',
-      hint: 'Выставить настоящий щит: при вскрытии он остановит нападение',
-      label: 'Дуэль: защита',
-      tone: 'good',
-      disabled: !hasTokens,
-      spendsToken: true,
-      tokenBlocked: !hasTokens,
-      reason: noTokens
-    });
+    options.push(duelOption(true));
   } else {
-    options.push({
-      kind: 'duel-bluff',
-      hint: 'Выставить карту как щит вслепую. Примут вызов — блеф раскроется',
-      label: 'Дуэль: блеф',
-      tone: 'danger',
-      disabled: !hasTokens,
-      spendsToken: true,
-      tokenBlocked: !hasTokens,
-      reason: noTokens
-    });
+    options.push(duelOption(card !== shield));
   }
 
   options.push(inspectOption());
@@ -408,11 +404,7 @@ function menuFor(
 ): CardMenuOption[] {
   const card = held.card;
   if (phase === 'turn') return ownTurnMenu(card, viewer, input);
-  if (phase === 'under-attack') {
-    /* Идёт выбор щита — карта уже не меню, а сама кнопка: нажатие объявляет
-       дуэль. Ровно как отмеченная к обмену карта перестаёт быть меню. */
-    return input.duelPick ? [] : underAttackMenu(card, viewer, input);
-  }
+  if (phase === 'under-attack') return underAttackMenu(card, viewer, input);
   /* Обычно поверх уже наложенного вето класть нечего. С правилом «вето на
      вето» — наоборот: встречное вето снимает предыдущее, и карта остаётся
      играбельной всю цепочку. */
@@ -532,15 +524,14 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
           hint: 'Пропустить проверку. Действие сработает как заявлено'
         }
       ];
-    case 'under-attack': {
-      /* Пока идёт выбор щита, панель молчит: ход за рукой, а отмена живёт
-         в баннере над столом — ровно как при обмене карт. */
-      if (input.duelPick) return [];
-
-      /* Цена дуэли — настройка партии: с выключенным тумблером щит бесплатен
-         и доступен даже при пустых жетонах. */
-      const duelCosts = input.rules.duelCostsToken;
-      const duelReason = duelCosts && !hasTokens ? noTokens : undefined;
+    case 'under-attack':
+      /*
+       * Две кнопки, а не три. Дуэль объявляется нажатием на карту, которой
+       * защищаются, — и иначе не может: щит это конкретная карта из руки, а
+       * кнопка её не называет. Отдельная «Дуэль» была лишним шагом к тому же
+       * меню на карте, и шагом обманчивым: она обещала действие, а открывала
+       * выбор.
+       */
       return [
         {
           kind: 'believe',
@@ -562,19 +553,8 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
             ? 'Сорвать маску за золото. Карта нападающего вскроется'
             : 'Проверить заявление нападающего. Его карта вскроется',
           reason: doubtReason
-        },
-        {
-          kind: 'duel',
-          spendsToken: duelCosts,
-          tokenBlocked: !!duelReason,
-          label: 'Дуэль',
-          tone: 'danger',
-          disabled: !!duelReason,
-          hint: 'Выставить карту щитом. Обе карты вскроются сразу — согласия нападающего не нужно',
-          reason: duelReason
         }
       ];
-    }
     case 'veto': {
       /* Одна кнопка: вето кладётся нажатием на саму карту в руке — оно её
          тратит, и решение о карте принимается на карте. Здесь только отказ. */
@@ -710,9 +690,7 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
     case 'reveal':
       return 'Карта вскрывается.';
     case 'under-attack':
-      return input.duelPick
-        ? 'Выберите карту из руки — она станет вашим щитом.'
-        : 'Верю, не верю или дуэль? Ответ один и окончательный.';
+      return 'Верю, не верю или дуэль картой из руки? Ответ один и окончательный.';
     case 'veto':
       if (input.isVetoed) {
         return holdsVeto(viewer)
@@ -829,7 +807,6 @@ export function deriveTableView(input: TableViewInput, viewerId: string): TableV
     title,
     titleName ?? '',
     input.exchangePick ? `pick:${input.exchangePick.join('.')}` : '',
-    input.duelPick ? 'duelpick' : '',
     phase === 'veto' ? `vetochain:${input.vetoChain}` : '',
     guidance,
     event,

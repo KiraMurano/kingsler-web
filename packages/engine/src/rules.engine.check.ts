@@ -10,6 +10,8 @@ import { resolveCoronationAtTurnStart, fallenCoronationPatch } from './resolvers
 import { addSealsToPlayer } from './resolvers/sealsResolver.ts';
 import { mintDeck } from './cardInstance.ts';
 import { timerManager } from './utils/timerManager.ts';
+import { duelPayment } from './resolvers/duelResolver.ts';
+import { normalizeRules } from './rules.ts';
 
 /** Партия на заданных правилах, ход у первого места, жребий снят. */
 function table(rules: Parameters<typeof useGameStore.getState>[0] extends never ? never : object) {
@@ -282,6 +284,80 @@ async function underAttack(rules: object) {
   useGameStore.getState().targetDeclareDuel(victim, shield);
   assert.equal(useGameStore.getState().turnPhase, 'DUEL_CLASH', 'бесплатная дуэль доступна без жетонов');
   assert.equal(useGameStore.getState().players.find(p => p.id === victim)!.actionTokens, 0, 'жетоны не ушли в минус');
+  timerManager.clearAll();
+}
+
+// ==========================================================================
+// Стоимость дуэли: три настройки, одна цена
+// ==========================================================================
+//
+// Надбавка золотом, требование жетона и возможность заменить жетон золотом
+// складываются в одну цену, и складываться должны в одном месте: порознь их
+// уже пробовали, и меню на карте успело разойтись с движком.
+
+/** Цена вызова при этих правилах для защитника с такими ресурсами. */
+const price = (rules: object, tokens: number, gold: number) =>
+  duelPayment(normalizeRules(rules), {
+    id: 'd', name: 'Защитник', avatar: '', seatNumber: 1, isBot: false,
+    gold, favor: 0, seals: 0, actionTokens: tokens, hand: [], activePlot: null
+  });
+
+// Надбавка независима от жетона: платится и вместо него, и вместе с ним.
+assert.deepEqual(
+  price({ duelCostsToken: false, duelCost: 1 }, 0, 1),
+  { tokens: 0, gold: 1 },
+  'жетон не нужен — дуэль за монету'
+);
+assert.deepEqual(
+  price({ duelCostsToken: true, duelCost: 1 }, 2, 1),
+  { tokens: 1, gold: 1 },
+  'жетон нужен — за жетон И монету'
+);
+assert.equal(
+  price({ duelCostsToken: false, duelCost: 1 }, 5, 0),
+  null,
+  'надбавку нечем платить — дуэли нет, сколько бы ни было жетонов'
+);
+assert.deepEqual(
+  price({ duelCostsToken: true, duelCost: 0 }, 1, 0),
+  { tokens: 1, gold: 0 },
+  'без надбавки всё как раньше: один жетон'
+);
+
+/* Платная дуэль: жетона нет, его заменяет золото по цене платной проверки —
+   и надбавка платится сверх неё. */
+const paidDuel = {
+  duelCostsToken: true, paidDoubtEnabled: true, paidDoubtCost: 2,
+  paidDuelEnabled: true, duelCost: 1
+};
+assert.deepEqual(price(paidDuel, 1, 5), { tokens: 1, gold: 1 }, 'жетон есть — платит им');
+assert.deepEqual(price(paidDuel, 0, 5), { tokens: 0, gold: 3 }, 'жетона нет — 2 за проверку + 1 надбавка');
+assert.equal(price(paidDuel, 0, 2), null, 'на выкуп не хватает — дуэли нет');
+
+/* Зависимости «Платной дуэли» держит `normalizeRules`, а не экран: правила
+   приходят от клиента-хоста, и верить им нельзя. */
+assert.equal(
+  normalizeRules({ ...paidDuel, duelCostsToken: false }).paidDuelEnabled,
+  false,
+  'без требования жетона заменять в цене нечего'
+);
+assert.equal(
+  normalizeRules({ ...paidDuel, paidDoubtEnabled: false }).paidDuelEnabled,
+  false,
+  'без платной проверки неоткуда взять цену'
+);
+assert.equal(normalizeRules({}).duelCost, 0, 'по умолчанию дуэль золота не стоит');
+
+// --- И то же самое на живом столе: без жетона щит покупается ---
+{
+  const victim = await underAttack(paidDuel);
+  patch(victim, { actionTokens: 0, gold: 6 });
+  const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
+  useGameStore.getState().targetDeclareDuel(victim, shield);
+
+  const after = useGameStore.getState();
+  assert.equal(after.turnPhase, 'DUEL_CLASH', 'платная дуэль поднимает щит без жетона');
+  assert.equal(after.players.find(p => p.id === victim)!.gold, 3, 'списаны 2 + 1 монеты');
   timerManager.clearAll();
 }
 

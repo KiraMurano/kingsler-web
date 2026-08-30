@@ -26,6 +26,17 @@ export interface GameRules {
   blackmailCost: number;
   /** Стоит ли вызов на дуэль жетона действия. */
   duelCostsToken: boolean;
+  /**
+   * Надбавка золотом за вызов на дуэль. Независима от всего остального:
+   * платится и вместе с жетоном, и вместо него. 0 — дуэль золота не стоит.
+   */
+  duelCost: number;
+  /**
+   * «Платная дуэль»: без жетона щит можно поднять за золото, по цене платной
+   * проверки. Имеет смысл только когда дуэль вообще стоит жетона и когда
+   * проверку разрешено покупать, — `normalizeRules` это и гарантирует.
+   */
+  paidDuelEnabled: boolean;
   /** Можно ли отменить «Право вето» другим «Правом вето». */
   vetoOnVeto: boolean;
   /** «Срыв масок»: жертва атаки Вора/Шантажиста может купить проверку. */
@@ -47,6 +58,7 @@ const LIMITS = {
   feastCost: [1, 10],
   rumorCost: [1, 10],
   blackmailCost: [0, 10],
+  duelCost: [0, 10],
   unmaskCost: [1, 10],
   paidDoubtCost: [1, 10]
 } as const satisfies Record<string, readonly [number, number]>;
@@ -71,6 +83,8 @@ export const DEFAULT_RULES: GameRules = {
   rumorCost: 5,
   blackmailCost: 0,
   duelCostsToken: true,
+  duelCost: 0,
+  paidDuelEnabled: false,
   vetoOnVeto: false,
   unmaskEnabled: false,
   unmaskCost: 3,
@@ -106,6 +120,7 @@ export function normalizeRules(raw: unknown): GameRules {
   }
 
   const paidDoubtEnabled = bool(src.paidDoubtEnabled, DEFAULT_RULES.paidDoubtEnabled);
+  const duelCostsToken = bool(src.duelCostsToken, DEFAULT_RULES.duelCostsToken);
 
   return {
     crownsToWin: clampInt(src.crownsToWin, DEFAULT_RULES.crownsToWin, LIMITS.crownsToWin),
@@ -113,7 +128,16 @@ export function normalizeRules(raw: unknown): GameRules {
     feastCost: clampInt(src.feastCost, DEFAULT_RULES.feastCost, LIMITS.feastCost),
     rumorCost: clampInt(src.rumorCost, DEFAULT_RULES.rumorCost, LIMITS.rumorCost),
     blackmailCost: clampInt(src.blackmailCost, DEFAULT_RULES.blackmailCost, LIMITS.blackmailCost),
-    duelCostsToken: bool(src.duelCostsToken, DEFAULT_RULES.duelCostsToken),
+    duelCostsToken,
+    duelCost: clampInt(src.duelCost, DEFAULT_RULES.duelCost, LIMITS.duelCost),
+    /* «Платная дуэль» — это замена жетона золотом по цене платной проверки.
+       Без жетона в цене заменять нечего, а без платной проверки неоткуда взять
+       цену. Обе зависимости проверяются здесь, а не на экране: правила
+       приходят от клиента, и верить им нельзя. */
+    paidDuelEnabled:
+      duelCostsToken && paidDoubtEnabled
+        ? bool(src.paidDuelEnabled, DEFAULT_RULES.paidDuelEnabled)
+        : false,
     vetoOnVeto: bool(src.vetoOnVeto, DEFAULT_RULES.vetoOnVeto),
     /* Взаимоисключение: «Платная проверка» — надмножество «Срыва масок».
        Держать оба включёнными нечего, и решать это должен один код, а не

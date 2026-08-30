@@ -13,7 +13,8 @@ import { deriveTableView } from './tableView.ts';
 import type { TableViewInput } from './tableView.ts';
 import type { Action, GameCard, Player } from '@kinglier/engine/types';
 import type { CardInstance } from '@kinglier/engine/cardInstance';
-import { DEFAULT_RULES } from '@kinglier/engine/rules';
+import type { GameRules } from '@kinglier/engine/rules';
+import { DEFAULT_RULES, normalizeRules } from '@kinglier/engine/rules';
 
 let seq = 0;
 function hand(...cards: GameCard[]): CardInstance[] {
@@ -61,7 +62,6 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     revealOutcome: null,
     duelOutcome: null,
     exchangePick: null,
-    duelPick: false,
     ...over
   };
 }
@@ -134,7 +134,7 @@ function action(over: Partial<Action> = {}): Action {
   assert.notEqual(a.id, c.id, 'сменилась заявка — сменился view.id');
 }
 
-// 4. Нападение: ответ жертвы однофазный — верю, не верю, дуэль.
+// 4. Нападение: ответ жертвы однофазный — верю, не верю или дуэль картой.
 {
   const attacked = input({
     activePlayerId: 'p2',
@@ -148,11 +148,12 @@ function action(over: Partial<Action> = {}): Action {
   });
   const view = deriveTableView(attacked, 'p1');
   assert.equal(view.phase, 'under-attack');
-  assert.deepEqual(
-    view.bar.map(b => b.kind),
-    ['believe', 'doubt', 'duel'],
-    'один вопрос — три ответа, и второго вопроса не будет'
-  );
+
+  /* Две кнопки, а не три: дуэль объявляется нажатием на карту, которой
+     защищаются, и кнопкой её не назвать. Отдельная «Дуэль» была лишним шагом
+     к тому же меню на карте. */
+  assert.deepEqual(view.bar.map(b => b.kind), ['believe', 'doubt']);
+
   const [shieldId, redirectId] = view.viewerHandIds;
   assert.deepEqual(view.menus[shieldId].map(o => o.kind), ['duel-shield', 'inspect']);
   assert.deepEqual(view.menus[redirectId].map(o => o.kind), ['play', 'duel-bluff', 'inspect']);
@@ -161,13 +162,73 @@ function action(over: Partial<Action> = {}): Action {
     true,
     '«Перенаправление» — ход, а не щит: стоит жетона'
   );
+}
 
-  /* Нажали «Дуэль» — панель молчит, рука становится выбором щита. */
-  const picking = deriveTableView({ ...attacked, duelPick: true }, 'p1');
-  assert.equal(picking.phase, 'under-attack');
-  assert.deepEqual(picking.bar, [], 'во время выбора щита кнопок нет');
-  assert.deepEqual(picking.menus[shieldId], [], 'карта сама себе кнопка — меню не нужно');
-  assert.notEqual(picking.id, view.id, 'выбор щита виден в id');
+/* 4a. Цену дуэли в меню задают правила партии, а не собственная мерка экрана.
+ *
+ * Дефект, ради которого это здесь: меню требовало жетон всегда, и с выключенным
+ * «Дуэль тратит жетон хода» щит было не поднять вовсе. */
+{
+  const underAttack = (rules: GameRules, over: Partial<Player> = {}) =>
+    deriveTableView(
+      input({
+        activePlayerId: 'p2',
+        turnPhase: 'TARGET_REACTION_WINDOW',
+        pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' }),
+        rules,
+        players: [
+          player('p1', { hand: hand('Казначей', 'Шут'), actionTokens: 0, gold: 0, ...over }),
+          player('p2'),
+          player('p3')
+        ]
+      }),
+      'p1'
+    );
+  const shieldOf = (view: ReturnType<typeof deriveTableView>) =>
+    view.menus[view.viewerHandIds[0]].find(o => o.kind === 'duel-shield')!;
+
+  // Жетонов нет, но правила их и не требуют — щит поднимается.
+  const free = shieldOf(underAttack(normalizeRules({ duelCostsToken: false })));
+  assert.equal(free.disabled, false, 'без требования жетона дуэль доступна и при 0 ⚡');
+  assert.equal(free.spendsToken, false, 'и молнию на ней не рисуем');
+
+  // Жетон нужен, а его нет — и купить нечем.
+  const blocked = shieldOf(underAttack(normalizeRules({ duelCostsToken: true })));
+  assert.equal(blocked.disabled, true);
+  assert.match(blocked.reason!, /^Нет жетонов/);
+  assert.equal(blocked.tokenBlocked, true, 'дело именно в жетонах — молнию перечёркиваем');
+
+  // Надбавка золотом видна в подписи и берётся из правил.
+  const paid = shieldOf(
+    underAttack(normalizeRules({ duelCostsToken: false, duelCost: 2 }), { gold: 5 })
+  );
+  assert.equal(paid.disabled, false);
+  assert.match(paid.label, /2 🪙/, 'цена названа на самой кнопке');
+
+  // Надбавка есть, а золота на неё нет — и это не про жетоны.
+  const broke = shieldOf(
+    underAttack(normalizeRules({ duelCostsToken: false, duelCost: 2 }), { gold: 1 })
+  );
+  assert.equal(broke.disabled, true);
+  assert.match(broke.reason!, /^Не хватает золота/);
+  assert.equal(broke.tokenBlocked, false, 'молния бы врала: жетоны ни при чём');
+
+  // Платная дуэль: жетона нет, но его заменяет золото по цене проверки.
+  const bought = shieldOf(
+    underAttack(
+      normalizeRules({
+        duelCostsToken: true,
+        paidDoubtEnabled: true,
+        paidDoubtCost: 2,
+        paidDuelEnabled: true,
+        duelCost: 1
+      }),
+      { gold: 5 }
+    )
+  );
+  assert.equal(bought.disabled, false, 'без жетона щит покупается');
+  assert.match(bought.label, /3 🪙/, 'цена проверки плюс стоимость дуэли');
+  assert.equal(bought.spendsToken, false, 'жетона у неё нет — платит золотом');
 }
 
 // 4b. Сказавшего «Верю» второй раз не спрашивают: жертва входит в опрос двора
@@ -309,12 +370,6 @@ function action(over: Partial<Action> = {}): Action {
     input({ activePlayerId: 'p2' }),
     input({ activePlayerId: 'p2', turnPhase: 'DOUBT_WINDOW', pendingAction: action() }),
     input({ turnPhase: 'VETO_WINDOW', activePlayerId: 'p2', pendingAction: action() }),
-    input({
-      activePlayerId: 'p2',
-      turnPhase: 'TARGET_REACTION_WINDOW',
-      pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' }),
-      duelPick: true
-    })
   ]) {
     const view = deriveTableView(состояние, 'p1');
     assert.ok(view.guidance.length > 0, `пустая подсказка в фазе ${view.phase}`);

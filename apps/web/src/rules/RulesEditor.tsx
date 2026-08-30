@@ -23,7 +23,12 @@ import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
 
 type NumericRule = keyof typeof RULE_LIMITS;
-type BoolRule = 'duelCostsToken' | 'vetoOnVeto' | 'unmaskEnabled' | 'paidDoubtEnabled';
+type BoolRule =
+  | 'duelCostsToken'
+  | 'paidDuelEnabled'
+  | 'vetoOnVeto'
+  | 'unmaskEnabled'
+  | 'paidDoubtEnabled';
 
 function Slider({
   label,
@@ -115,6 +120,12 @@ export function RulesEditor({
 }) {
   const [deckOpen, setDeckOpen] = useState(false);
 
+  /* «Платную дуэль» есть смысл включать только когда дуэль вообще стоит жетона
+     и когда проверку разрешено покупать: она заменяет первое ценой второго.
+     То же правило стоит в `normalizeRules` — здесь оно объясняет, а там
+     защищает: правила приходят от клиента-хоста, и верить им нельзя. */
+  const duelCanBePaid = rules.duelCostsToken && rules.paidDoubtEnabled;
+
   const num = (key: NumericRule) => (value: number) => onChange({ ...rules, [key]: value });
   const flag = (key: BoolRule) => (value: boolean) => {
     /* Взаимоисключение решается здесь же, а не молча в движке: игрок должен
@@ -128,7 +139,16 @@ export function RulesEditor({
       onChange({ ...rules, unmaskEnabled: true, paidDoubtEnabled: false });
       return;
     }
-    onChange({ ...rules, [key]: value });
+    /* «Платная дуэль» держится на двух соседях: выключили любого — гаснет и
+       она. Иначе в правилах осталась бы включённая настройка, которая ничего
+       не значит, и игрок бы этого не увидел. */
+    const dropsPaidDuel =
+      !value && (key === 'duelCostsToken' || key === 'paidDoubtEnabled');
+    onChange({
+      ...rules,
+      [key]: value,
+      ...(dropsPaidDuel ? { paidDuelEnabled: false } : null)
+    });
   };
   const copies = (card: GameCard) => (value: number) =>
     onChange({ ...rules, deck: { ...rules.deck, [card]: value } });
@@ -206,9 +226,17 @@ export function RulesEditor({
       <Section title="Реакции и вето">
         <Toggle
           label="Дуэль тратит жетон хода"
-          hint="Выключено — щит на дуэли бесплатен и доступен без жетонов."
+          hint="Выключено — щит на дуэли жетона не стоит."
           value={rules.duelCostsToken}
           onChange={flag('duelCostsToken')}
+        />
+        <Slider
+          label="Стоимость дуэли"
+          hint="Надбавка золотом за вызов. Платится сверх жетона, а без жетона — вместо него. 0 — надбавки нет."
+          value={rules.duelCost}
+          min={RULE_LIMITS.duelCost[0]}
+          max={RULE_LIMITS.duelCost[1]}
+          onChange={num('duelCost')}
         />
         <Toggle
           label="Вето на вето"
@@ -250,6 +278,31 @@ export function RulesEditor({
         {rules.paidDoubtEnabled && (
           <div className="rulenote">
             «Платная проверка» включает в себя «Срыв масок», поэтому второй тумблер погашен.
+          </div>
+        )}
+        {/* Платная дуэль — это замена жетона золотом, поэтому она требует обоих
+            соседей: без жетона в цене нечего заменять, без платной проверки
+            неоткуда взять цену. Пока их нет, тумблер погашен и объясняет себя,
+            а не прячется: спрятанная настройка выглядит как отсутствующая. */}
+        <Toggle
+          label="Платная дуэль"
+          hint="Без жетона щит можно поднять за золото — по цене платной проверки."
+          value={rules.paidDuelEnabled}
+          disabled={!duelCanBePaid}
+          onChange={flag('paidDuelEnabled')}
+        />
+        {!duelCanBePaid && (
+          <div className="rulenote">
+            «Платная дуэль» заменяет жетон золотом, поэтому нужны оба: «Дуэль тратит жетон
+            хода» и «Платная проверка» — она задаёт цену.
+          </div>
+        )}
+        {rules.paidDuelEnabled && (
+          <div className="rulenote">
+            Вызов без жетона обойдётся в {rules.paidDoubtCost + rules.duelCost} 🪙
+            {rules.duelCost > 0
+              ? ` — цена проверки (${rules.paidDoubtCost}) плюс стоимость дуэли (${rules.duelCost}).`
+              : '.'}
           </div>
         )}
       </Section>

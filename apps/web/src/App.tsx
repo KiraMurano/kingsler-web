@@ -163,9 +163,6 @@ export default function App({
      пока пуст. Живёт здесь, а не в сторе: движок про черновик выбора ничего
      не знает и знать не должен, он получает готовое действие. */
   const [exchangePick, setExchangePick] = useState<CardId[] | null>(null);
-  /* Идёт ли выбор карты под щит дуэли. Кнопка «Дуэль» только открывает выбор:
-     объявляет дуэль уже нажатие на карту руки. */
-  const [duelPick, setDuelPick] = useState(false);
   const [bluffCardId, setBluffCardId] = useState<CardId | null>(null);
   /* Взведён ли «Ва-банк». Состояние интерфейса, а не партии: пока карта не
      сыграна, в движке ничего не происходит. Снимается при каждом розыгрыше —
@@ -286,8 +283,7 @@ export default function App({
           coronationCandidateId,
           revealOutcome,
           duelOutcome,
-          exchangePick,
-          duelPick
+          exchangePick
         },
         human?.id ?? ''
       ),
@@ -313,7 +309,6 @@ export default function App({
       revealOutcome,
       duelOutcome,
       exchangePick,
-      duelPick,
       human
     ]
   );
@@ -347,10 +342,6 @@ export default function App({
         if (view.phase === 'under-attack') targetAcceptAttack(human.id);
         else passDoubt(human.id);
         break;
-      case 'duel':
-        setDuelPick(true);
-        setOpenMenuCardId(null);
-        break;
       case 'veto-pass':
         passVeto(human.id);
         break;
@@ -365,7 +356,6 @@ export default function App({
   useEffect(() => {
     setPendingTarget(null);
     setExchangePick(null);
-    setDuelPick(false);
   }, [view.phase, activePlayerId]);
 
   const confirmTarget = (targetId: string) => {
@@ -400,14 +390,6 @@ export default function App({
   /* Клик по своей карте только раскрывает меню — играет уже пункт меню.
      Повторный клик по той же карте закрывает: карта сама себе переключатель. */
   const handleCardClick = (cardId: CardId) => {
-    /* Выбранная под щит карта не открывает меню, а сразу выходит на дуэль:
-       согласия нападающего не спрашивают, спор начинается этим нажатием. */
-    if (duelPick && human) {
-      setDuelPick(false);
-      targetDeclareDuel(human.id, cardId);
-      return;
-    }
-
     /* Пока идёт выбор к обмену, карта — это флажок, а не меню: клик отмечает,
        повторный снимает отметку. Больше двух карт в руке не бывает, так что
        ограничивать число отмеченных нечем и незачем. */
@@ -575,7 +557,6 @@ export default function App({
       setChronicleOpen(false);
       setInspectedStack([]);
       setPendingTarget(null);
-      setDuelPick(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -679,17 +660,12 @@ export default function App({
                 pendingTargetAction={pendingTarget}
                 onCancelTarget={() => setPendingTarget(null)}
                 prompt={
-                  duelPick
+                  exchangePick
                     ? {
-                        text: 'Выберите карту-щит для дуэли',
-                        onCancel: () => setDuelPick(false)
+                        text: 'Выберите карты для смены',
+                        onCancel: () => setExchangePick(null)
                       }
-                    : exchangePick
-                      ? {
-                          text: 'Выберите карты для смены',
-                          onCancel: () => setExchangePick(null)
-                        }
-                      : null
+                    : null
                 }
                 onInspectCard={handleInspectCard}
               />

@@ -1,4 +1,12 @@
-import type { CardId, CardInstance, GameState, DuelOutcome, DuelResultType } from '../types';
+import type {
+  CardId,
+  CardInstance,
+  GameRules,
+  GameState,
+  DuelOutcome,
+  DuelResultType,
+  Player
+} from '../types';
 import { byId, pluck } from '../cardInstance';
 import { isRole } from '../cards';
 import { botMemory } from '../bot/botMemory';
@@ -12,6 +20,53 @@ type StateGetter = () => GameState;
 type StateSetter = (
   partial: Partial<GameState> | ((state: GameState) => Partial<GameState>)
 ) => void;
+
+/**
+ * Чем защищающийся платит за вызов на дуэль — и может ли вообще.
+ *
+ * Три настройки складываются в одну цену, и складывать их надо в одном месте:
+ * порознь их уже пробовали, и интерфейс успел разойтись с движком — меню на
+ * карте спрашивало жетон даже там, где правила его не требовали.
+ *
+ *  - `duelCost` — надбавка золотом, независимая от всего: платится и вместе с
+ *    жетоном, и вместо него.
+ *  - `duelCostsToken` — нужен ли сверх надбавки жетон действия.
+ *  - `paidDuelEnabled` — можно ли, когда жетона нет, заменить его золотом по
+ *    цене платной проверки.
+ *
+ * Жетон предпочтительнее золота там, где есть выбор: он восполняется в начале
+ * хода, золото — нет. Выбор не предлагается игроку диалогом: это лишний клик в
+ * каждом споре, а решения он не добавляет.
+ */
+export function duelPayment(
+  rules: GameRules,
+  defender: Player
+): { tokens: number; gold: number } | null {
+  const surcharge = rules.duelCost;
+
+  if (!rules.duelCostsToken) {
+    return defender.gold >= surcharge ? { tokens: 0, gold: surcharge } : null;
+  }
+
+  if (defender.actionTokens >= 1) {
+    return defender.gold >= surcharge ? { tokens: 1, gold: surcharge } : null;
+  }
+
+  if (rules.paidDuelEnabled) {
+    const gold = rules.paidDoubtCost + surcharge;
+    return defender.gold >= gold ? { tokens: 0, gold } : null;
+  }
+
+  return null;
+}
+
+/** Чем заплатили — словами для летописи. */
+function priceLabel(payment: { tokens: number; gold: number }): string {
+  const parts: string[] = [];
+  if (payment.tokens > 0) parts.push(`потрачен ${payment.tokens} ⚡`);
+  if (payment.gold > 0) parts.push(`${payment.gold} 🪙`);
+  return parts.length > 0 ? parts.join(' и ') : 'бесплатно';
+}
 
 export function targetDeclareDuel(
   get: StateGetter,
@@ -27,23 +82,27 @@ export function targetDeclareDuel(
   const target = players.find(p => p.id === targetId);
   if (!actor || !target) return;
 
-  /* Стоит ли защита на дуэли жетона хода — настройка партии. С выключенным
-     тумблером щит бесплатен и доступен даже при 0 ⚡: это ровно тот случай,
-     когда лидера бьют по кругу, а отбиваться ему нечем. */
-  const tokenCost = rules.duelCostsToken ? 1 : 0;
-  if (target.actionTokens < tokenCost) return;
+  /* Чем платит защищающийся — решает `duelPayment`: там сложены все три
+     настройки цены. `null` означает «нечем», и тогда щит не поднимается. */
+  const payment = duelPayment(rules, target);
+  if (!payment) return;
 
   const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
   const staked = byId(target.hand, cardId) ?? target.hand[0];
   if (!staked) return;
 
-  if (tokenCost > 0) {
-    triggerResourceFloat(set, target.id, '-1 ⚡', false);
-  }
+  if (payment.tokens > 0) triggerResourceFloat(set, target.id, '-1 ⚡', false);
+  if (payment.gold > 0) triggerResourceFloat(set, target.id, `-${payment.gold} 🪙 дуэль`, false);
 
   set(state => ({
     players: state.players.map(p =>
-      p.id === target.id ? { ...p, actionTokens: p.actionTokens - tokenCost } : p
+      p.id === target.id
+        ? {
+            ...p,
+            actionTokens: p.actionTokens - payment.tokens,
+            gold: p.gold - payment.gold
+          }
+        : p
     ),
     turnPhase: 'DUEL_CLASH',
     pendingDuelDefenderCardId: staked.id,
@@ -54,7 +113,10 @@ export function targetDeclareDuel(
       ...state.activeSpeechReactions,
       [target.id]: `«ДУЭЛЬ! Мой щит — ${blockingRole}!»`
     },
-    history: [`🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}»${tokenCost > 0 ? ' (потрачен 1 ⚡)' : ' (бесплатно)'}!`, ...state.history].slice(0, 50)
+    history: [
+      `🤺 ${target.name} вызывает ${actor.name} на ДУЭЛЬ, заявляя «${blockingRole}» (${priceLabel(payment)})!`,
+      ...state.history
+    ].slice(0, 50)
   }));
 
   // Charge active conspiracies on duel declaration
