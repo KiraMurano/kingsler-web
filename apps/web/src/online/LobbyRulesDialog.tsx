@@ -36,10 +36,9 @@ export const LobbyRulesDialog: React.FC<{
     description="Применятся к этой партии. Их задаёт хост — остальным за столом они не видны"
   >
     <div className="ruleswrap">
-      <div className="ruleswrap__scroll">
-        <RulesEditor rules={rules} onChange={onChange} />
-      </div>
+      <RulesEditor rules={rules} onChange={onChange} />
 
+      {/* В конце списка, а не в закреплённом подвале: см. `RulesDialog`. */}
       <div className="ruleswrap__foot">
         {/* Тот же выбор наборов, что и перед игрой с ботами: сохранённый баланс
             нужен там же, где настройки вообще правят. */}

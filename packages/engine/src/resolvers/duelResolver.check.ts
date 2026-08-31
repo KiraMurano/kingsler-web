@@ -27,6 +27,7 @@ import { timerManager } from '../utils/timerManager.ts';
 import { assertCardCensus, locateCards } from './cardCensus.check.ts';
 import { DEFAULT_RULES } from '../rules.ts';
 import { ACTION_HOLD_MS } from '../timing.ts';
+import type { Coronation } from './coronation.ts';
 
 /** Like `mintDeck`, but ids stay unique across hands — two seats holding
  *  `c0` would make the whole-state card census meaningless. */
@@ -58,7 +59,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     turnPhase: 'DUEL_CLASH' as GameState['turnPhase'],
     pendingAction: null as Action | null,
     pendingDuelDefenderCardId: null as string | null,
-    pendingDuelDefenderRoleClaim: 'Казначей' as GameState['pendingDuelDefenderRoleClaim'],
+    pendingDuelDefenderRoleClaim: 'Дуэлянт' as GameState['pendingDuelDefenderRoleClaim'],
     duelOutcome: null,
     isVaBanqueActive: false,
     isVetoed: false,
@@ -66,8 +67,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     isPendingActionAfterTruthChallenge: false,
     overlayInstant: null,
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     activeSpeechReactions: {} as Record<string, string>,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
     history: [] as string[],
@@ -100,7 +100,9 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
 {
   const attackerHand = mintDeck(['Вор', 'Шут']);
-  const defenderHand = mintDeck(['Рыцарь', 'Шут']);
+  /* Щит здесь обязан быть блефом: заявлен «Дуэлянт», на стол ляжет «Казначей».
+     Иначе сценарий проверяет не прорыв, а блокировку. */
+  const defenderHand = mintDeck(['Казначей', 'Шут']);
   const attackerStakeId = attackerHand[0].id;
   const defenderStakeId = defenderHand[0].id;
 
@@ -126,7 +128,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     ]
   });
 
-  // Attacker tells the truth, defender's shield ("Рыцарь") is a bluff -> breakthrough.
+  // Атакующий сказал правду, щит защищающегося — блеф: атака проходит.
   resolveDuelClash(get, set);
   assert.equal(api.duelOutcome?.resultType, 'attacker_breakthrough');
   assert.equal(
@@ -180,11 +182,12 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     attackerStake: Role;
     defenderStake: Role;
   }[] = [
-    // Attacker claims «Вор», defender shields with «Казначей».
-    { resultType: 'clash_blocked', attackerStake: 'Вор', defenderStake: 'Казначей' },
-    { resultType: 'attacker_breakthrough', attackerStake: 'Вор', defenderStake: 'Рыцарь' },
-    { resultType: 'defender_counter', attackerStake: 'Шут', defenderStake: 'Казначей' },
-    { resultType: 'mutual_bluff', attackerStake: 'Шут', defenderStake: 'Рыцарь' }
+    /* Атака «Вор», щит — «Дуэлянт»: он теперь один на обе атаки, Казначей
+       от Вора больше не защищает. */
+    { resultType: 'clash_blocked', attackerStake: 'Вор', defenderStake: 'Дуэлянт' },
+    { resultType: 'attacker_breakthrough', attackerStake: 'Вор', defenderStake: 'Казначей' },
+    { resultType: 'defender_counter', attackerStake: 'Шут', defenderStake: 'Дуэлянт' },
+    { resultType: 'mutual_bluff', attackerStake: 'Шут', defenderStake: 'Казначей' }
   ];
 
   for (const c of cases) {
@@ -211,7 +214,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     const { get, set, api } = makeHarness({
       pendingAction: pending,
       pendingDuelDefenderCardId: defenderStakeId,
-      pendingDuelDefenderRoleClaim: 'Казначей',
+      pendingDuelDefenderRoleClaim: 'Дуэлянт',
       deck,
       players: [
         player({ id: 'p1', name: 'Атакующий', hand: attackerHand }),
@@ -350,7 +353,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 
   for (const c of cases) {
     const attackerStake: Role = c.attackerTruth ? 'Вор' : 'Шут';
-    const defenderStake: Role = c.defenderTruth ? 'Казначей' : 'Рыцарь';
+    const defenderStake: Role = c.defenderTruth ? 'Дуэлянт' : 'Казначей';
     const attackerHand = mintDeck([attackerStake, 'Наследник']);
     const defenderHand = mintDeck([defenderStake, 'Наследник']);
     const attackerStakeId = attackerHand[0].id;
@@ -373,7 +376,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     const { get, set, api } = makeHarness({
       pendingAction: pending,
       pendingDuelDefenderCardId: defenderStakeId,
-      pendingDuelDefenderRoleClaim: 'Казначей',
+      pendingDuelDefenderRoleClaim: 'Дуэлянт',
       isVaBanqueActive: c.vaBanque,
       players: [
         player({ id: 'p1', name: 'Атакующий', hand: attackerHand, seals: c.startSeals, favor: 3 }),
@@ -433,7 +436,8 @@ function makeHarness(overrides: Partial<GameState> = {}) {
 // решения со стороны атакующего.
 {
   const attackerHand = mintDeck(['Вор', 'Наследник']);
-  const defenderHand = mintDeck(['Казначей', 'Шут']);
+  /* Обе правды: щит двора — «Дуэлянт», и он же лежит у защитника на руке. */
+  const defenderHand = mintDeck(['Дуэлянт', 'Шут']);
   const attackerStakeId = attackerHand[0].id;
   const defenderStakeId = defenderHand[0].id;
 

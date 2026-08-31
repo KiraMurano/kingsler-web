@@ -4,6 +4,7 @@ import { canBeTargetedBy, canBeTargetedByInstant } from '@kinglier/engine/target
 import { useShallow } from 'zustand/react/shallow';
 import { OpponentSeat } from './OpponentSeat';
 import { seatOpponents } from '../lib/seats';
+import { isCoronationCandidate } from '@kinglier/engine/resolvers/coronation';
 import { pickViewer } from '../lib/viewer';
 import type { GameCard, Player } from '@kinglier/engine/types';
 import type { PendingTargetAction } from './targeting';
@@ -24,16 +25,19 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
     activePlayerId,
     pendingAction,
     opening,
-    viewerId
+    viewerId,
+    coronations
   } = useGameStore(
     useShallow(s => ({
       players: s.players,
       activePlayerId: s.activePlayerId,
       pendingAction: s.pendingAction,
       opening: s.opening,
-      viewerId: s.viewerId
+      viewerId: s.viewerId,
+      coronations: s.coronations
     }))
   );
+
   /*
    * Пока идёт открытие партии, активного места нет.
    *
@@ -43,6 +47,7 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
    * начинается вместе с концом открытия, тогда место и загорается.
    */
   const activeSeatId = opening ? null : activePlayerId;
+
   const human = pickViewer(players, viewerId);
   const opponents = seatOpponents(players, human);
 
@@ -76,6 +81,7 @@ export const SeatsRow: React.FC<SeatsRowProps> = ({
             isActive={activeSeatId === player.id}
             isTargetable={targetable}
             isDimmed={!!pendingTargetAction && !targetable}
+            isCrowning={isCoronationCandidate(coronations, player.id)}
             onTarget={() => onSelectTarget(player.id)}
             onInspectCard={onInspectCard}
           />

@@ -43,7 +43,7 @@ function table(botTokens: number) {
   useGameStore.setState({
     players: [
       seat('p1', false, ['Наследник', 'Шут']),
-      seat('p2', false, ['Казначей', 'Рыцарь']),
+      seat('p2', false, ['Казначей', 'Дуэлянт']),
       seat('b1', true, ['Вор', 'Шут'], botTokens),
       seat('b2', true, ['Казначей', 'Наследник'], botTokens)
     ],
@@ -64,6 +64,7 @@ function table(botTokens: number) {
     isVetoed: false,
     pendingVetoPassedIds: [],
     pendingVetoActionId: null,
+    pendingRedirectFromId: null,
     history: []
   });
 

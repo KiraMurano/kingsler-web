@@ -25,6 +25,7 @@ import {
 import { timerManager } from '../utils/timerManager.ts';
 import { assertCardCensus } from './cardCensus.check.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
   (globalThis as { window: typeof globalThis }).window = globalThis;
@@ -64,13 +65,13 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     timerMaxSeconds: 0,
     isTimerPaused: false,
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     pendingAction: null as Action | null,
     pendingDoubtDoubterId: null as string | null,
     pendingDoubtPassedIds: [] as string[],
     pendingVetoPassedIds: [] as string[],
     pendingVetoActionId: null as string | null,
+    pendingRedirectFromId: null,
     hasUsedNormalActionThisTurn: false,
     hasPlayedRoleThisTurn: false,
     hasPlayedPlotThisTurn: false,
@@ -130,7 +131,7 @@ function lateBotVetoTimerFires(
 {
   const actorHand = mint(['Королевский приём', 'Наследник']);
   const humanHand = mint(['Право вето', 'Шут']);
-  const botHand = mint(['Право вето', 'Рыцарь']);
+  const botHand = mint(['Право вето', 'Дуэлянт']);
   const deck = mint(['Вор', 'Казначей']);
   const plotCardId: CardId = actorHand[0].id;
   const botVetoId: CardId = botHand[0].id;
@@ -275,7 +276,7 @@ function lateBotVetoTimerFires(
 {
   const actorHand = mint(['Королевский приём', 'Наследник']);
   const humanHand = mint(['Шут', 'Казначей']);
-  const botHand = mint(['Вор', 'Рыцарь']);
+  const botHand = mint(['Вор', 'Дуэлянт']);
   const deck = mint(['Наследник', 'Казначей']);
   const plotCardId: CardId = actorHand[0].id;
   const allIds = [...actorHand, ...humanHand, ...botHand, ...deck].map(c => c.id);
@@ -380,3 +381,108 @@ function lateBotVetoTimerFires(
 }
 
 console.log('vetoWindow.check: ok');
+
+/* ==========================================================================
+   «Перенаправление» ветируется, и вето отменяет ПЕРЕВОД, а не нападение.
+
+   Дефект, ради которого это здесь: ветка перевода выставляла окно реакции
+   новой жертвы напрямую, минуя окно вето. «Перенаправление» было единственной
+   картой в игре, которую нельзя было отменить вовсе: нападающий смотрел, как
+   его удар уводят на соседа, держа «Право вето» на руках.
+   ========================================================================== */
+
+/** Атака «Вор» от `p1` по `p2`, готовая к переводу. */
+function redirectHarness(p2Hand: GameCard[], p3Hand: GameCard[] = []) {
+  const attackerHand = mint(['Вор', 'Шут']);
+  const action: Action = {
+    id: 'atk',
+    type: 'role',
+    name: 'Вор',
+    actorId: 'p1',
+    targetId: 'p2',
+    roleClaim: 'Вор',
+    stakedCardId: attackerHand[0].id,
+    costGold: 0,
+    costTokens: 1,
+    description: ''
+  };
+  return makeHarness({
+    turnPhase: 'TARGET_REACTION_WINDOW',
+    activePlayerId: 'p1',
+    pendingAction: action,
+    players: [
+      player({ id: 'p1', name: 'Нападающий', hand: attackerHand }),
+      player({ id: 'p2', name: 'Жертва', hand: mint(p2Hand) }),
+      player({ id: 'p3', name: 'Сосед', hand: mint(p3Hand) })
+    ]
+  });
+}
+
+// --- Перевод открывает окно вето, а не окно реакции ------------------------
+{
+  const { api, get, set } = redirectHarness(['Перенаправление', 'Шут']);
+  const redirectId = api.players[1].hand[0].id;
+
+  playInstant(get, set, 'p2', 'Перенаправление', redirectId, 'p3');
+
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'после перевода двор отвечает вето');
+  assert.equal(api.pendingAction!.targetId, 'p3', 'цель переведена');
+  assert.equal(api.pendingRedirectFromId, 'p2', 'прежняя цель запомнена');
+
+  // Никто не вмешался — перевод устоял, отвечает новая жертва.
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.turnPhase, 'TARGET_REACTION_WINDOW');
+  assert.equal(api.pendingAction!.targetId, 'p3', 'удар остался на новой цели');
+  assert.equal(api.pendingRedirectFromId, null, 'память о переводе снята');
+}
+
+// --- Вето возвращает удар на прежнюю цель, а не отменяет его ---------------
+{
+  const { api, get, set } = redirectHarness(['Перенаправление', 'Шут'], ['Право вето', 'Шут']);
+  const redirectId = api.players[1].hand[0].id;
+  const vetoId = api.players[2].hand[0].id;
+
+  playInstant(get, set, 'p2', 'Перенаправление', redirectId, 'p3');
+  assert.equal(api.turnPhase, 'VETO_WINDOW');
+
+  playInstant(get, set, 'p3', 'Право вето', vetoId);
+  assert.equal(api.isVetoed, true, 'вето сыграно');
+
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.pendingAction!.targetId, 'p2', 'удар вернулся на прежнюю цель');
+  assert.equal(
+    api.turnPhase,
+    'TARGET_REACTION_WINDOW',
+    'нападение живо: вето отменило перевод, а не атаку'
+  );
+  assert.equal(api.pendingRedirectFromId, null);
+  assert.equal(api.isVetoed, false, 'цепочка вето сброшена под новое действие');
+}
+
+// --- Переводы цепочкой: переведённый переводит обратно ---------------------
+{
+  const { api, get, set } = redirectHarness(
+    ['Перенаправление', 'Шут'],
+    ['Перенаправление', 'Шут']
+  );
+  const firstId = api.players[1].hand[0].id;
+
+  playInstant(get, set, 'p2', 'Перенаправление', firstId, 'p3');
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.pendingAction!.targetId, 'p3');
+
+  /* Теперь очередь `p3`: своя карта, свой перевод — и обратно на того, кто
+     перевёл на него. Перевод одноразовый, но право сыграть свой у новой
+     жертвы такое же. */
+  const secondId = api.players[2].hand.find(c => c.card === 'Перенаправление')!.id;
+  playInstant(get, set, 'p3', 'Перенаправление', secondId, 'p2');
+
+  assert.equal(api.turnPhase, 'VETO_WINDOW', 'у второго перевода своё окно вето');
+  assert.equal(api.pendingAction!.targetId, 'p2', 'удар переведён обратно');
+  assert.equal(api.pendingRedirectFromId, 'p3', 'возвращать теперь на p3');
+
+  proceedAfterVetoWindow(get, set);
+  assert.equal(api.pendingAction!.targetId, 'p2', 'второй перевод устоял');
+}
+
+console.log('vetoWindow.check.ts: вето над «Перенаправлением» — ok');

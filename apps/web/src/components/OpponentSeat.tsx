@@ -71,6 +71,8 @@ interface OpponentSeatProps {
   isActive: boolean;
   isTargetable?: boolean;
   isDimmed?: boolean;
+  /** Идёт ли круг коронации по этому игроку: карточка подсвечивается золотом. */
+  isCrowning?: boolean;
   onTarget?: () => void;
   /**
    * Vestigial: card inspection moved to the card layer along with the cards
@@ -181,6 +183,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
   isActive,
   isTargetable,
   isDimmed,
+  isCrowning = false,
   onTarget
 }) => {
   const floatingResourceEvents = useGameStore(s => s.floatingResourceEvents);
@@ -197,6 +200,10 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
         `seat--${side}`,
         isActive ? 'seat--active' : '',
         isTargetable ? 'seat--target' : '',
+        /* Ответ двора красит место целиком, а не только кольцо портрета:
+           за столом смотрят на карточки, а не на лица. */
+        reaction && reaction !== 'thinking' ? `seat--${reaction}` : '',
+        isCrowning ? 'seat--crowning' : '',
         isDimmed ? 'seat--dimmed' : ''
       ]
         .filter(Boolean)
@@ -251,7 +258,7 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
             />
 
             <div className="seat__body">
-              <CrownsTrack favor={player.favor} compact events={deltas} />
+              <CrownsTrack favor={player.favor} compact crowning={isCrowning} events={deltas} />
               <div className="seat__res">
                 <span className="delta-anchor">
                   <Res kind="gold" value={player.gold} />

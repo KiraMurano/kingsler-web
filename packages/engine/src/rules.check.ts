@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import {
   ALL_CARDS,
+  BLACKMAIL_PRICE_ON,
   DEFAULT_RULES,
   MIN_DECK_SIZE,
   deckSize,
@@ -25,7 +26,15 @@ import {
   assert.equal(DEFAULT_RULES.vetoOnVeto, false);
   assert.equal(DEFAULT_RULES.unmaskEnabled, false);
   assert.equal(DEFAULT_RULES.paidDoubtEnabled, false);
-  assert.equal(deckSize(DEFAULT_RULES), 51, 'дефолтная колода — сегодняшняя 51 карта');
+  /* Пять покупок за золото стоят одинаково — две монеты. Не совпадение: это
+     одна цена «жетона нет, плачу деньгами», и разъехавшиеся умолчания
+     заставляли бы игрока выравнивать их руками при каждой новой партии. */
+  assert.equal(DEFAULT_RULES.paidDoubtCost, 2, 'платная проверка — 2 🪙');
+  assert.equal(DEFAULT_RULES.unmaskCost, 2, 'срыв масок — 2 🪙');
+  assert.equal(DEFAULT_RULES.paidPlayCost, 2, 'розыгрыш за монеты — 2 🪙');
+  assert.equal(DEFAULT_RULES.paidDuelCost, 2, 'выкуп щита на дуэли — 2 🪙');
+  assert.equal(BLACKMAIL_PRICE_ON, 2, 'платный шантаж включается с 2 🪙');
+  assert.equal(deckSize(DEFAULT_RULES), 50, 'дефолтная колода — сегодняшние 50 карт');
 }
 
 // --- 2. Нормализация дефолтов идемпотентна ---
@@ -55,7 +64,7 @@ import {
   for (const junk of [null, 'нет', 42, [], { crownsToWin: 'пять' }, { deck: 'вся' }]) {
     const rules = normalizeRules(junk);
     assert.equal(rules.crownsToWin, DEFAULT_RULES.crownsToWin, `мусор ${JSON.stringify(junk)} даёт дефолт`);
-    assert.equal(deckSize(rules), 51);
+    assert.equal(deckSize(rules), 50);
   }
   const nan = normalizeRules({ crownsToWin: Number.NaN, feastCost: Number.POSITIVE_INFINITY });
   assert.equal(nan.crownsToWin, DEFAULT_RULES.crownsToWin, 'NaN не проходит');
@@ -83,7 +92,7 @@ import {
 {
   const noVeto = normalizeRules({ deck: { ...DEFAULT_RULES.deck, 'Право вето': 0 } });
   assert.equal(noVeto.deck['Право вето'], 0);
-  assert.equal(deckSize(noVeto), 51 - 5, 'пять вето ушли из колоды');
+  assert.equal(deckSize(noVeto), 50 - 5, 'пять вето ушли из колоды');
 
   const clamped = normalizeRules({ deck: { ...DEFAULT_RULES.deck, 'Наследник': 99, 'Шут': -3 } });
   assert.equal(clamped.deck['Наследник'], 10);

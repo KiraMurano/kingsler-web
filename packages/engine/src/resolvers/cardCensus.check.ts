@@ -90,7 +90,7 @@ export function allCardIds(state: CardCensusState): CardId[] {
       { id: 'p2', hand: [{ id: 'c2', card: 'Шут' }], activePlot: null }
     ],
     deck: [{ id: 'c3', card: 'Вор' }],
-    discardPile: [{ id: 'c4', card: 'Рыцарь' }],
+    discardPile: [{ id: 'c4', card: 'Дуэлянт' }],
     pendingAction: { stakedCardId: 'c0' }
   };
   assertCardCensus(healthy, ['c0', 'c1', 'c2', 'c3', 'c4'], 'healthy state');

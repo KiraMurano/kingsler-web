@@ -15,6 +15,7 @@ import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { chargeActiveConspiracies } from './plotResolver';
 import { discardProtectiveIntrigueOnBluff } from './crownLoss';
+import { duelShieldFor } from '../roles';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -31,8 +32,8 @@ type StateSetter = (
  *  - `duelCost` — надбавка золотом, независимая от всего: платится и вместе с
  *    жетоном, и вместо него.
  *  - `duelCostsToken` — нужен ли сверх надбавки жетон действия.
- *  - `paidDuelEnabled` — можно ли, когда жетона нет, заменить его золотом по
- *    цене платной проверки.
+ *  - `paidDuelEnabled` / `paidDuelCost` — можно ли, когда жетона нет, выкупить
+ *    его золотом и почём. Цена своя: щит и проверка — разные ходы.
  *
  * Жетон предпочтительнее золота там, где есть выбор: он восполняется в начале
  * хода, золото — нет. Выбор не предлагается игроку диалогом: это лишний клик в
@@ -53,7 +54,7 @@ export function duelPayment(
   }
 
   if (rules.paidDuelEnabled) {
-    const gold = rules.paidDoubtCost + surcharge;
+    const gold = rules.paidDuelCost + surcharge;
     return defender.gold >= gold ? { tokens: 0, gold } : null;
   }
 
@@ -87,7 +88,8 @@ export function targetDeclareDuel(
   const payment = duelPayment(rules, target);
   if (!payment) return;
 
-  const blockingRole = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+  const blockingRole = pendingAction.roleClaim ? duelShieldFor(pendingAction.roleClaim) : null;
+  if (!blockingRole) return;
   const staked = byId(target.hand, cardId) ?? target.hand[0];
   if (!staked) return;
 

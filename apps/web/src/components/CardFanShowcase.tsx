@@ -46,11 +46,11 @@ const CATEGORY_DATA: Record<
         tagline: 'Ночная кража золота из чужой казны'
       },
       {
-        id: 'knight',
-        name: 'Рыцарь',
+        id: 'duelist',
+        name: 'Дуэлянт',
         category: 'roles',
-        artImage: '/assets/cards/knight.webp',
-        tagline: 'Честная дуэль и несокрушимый щит'
+        artImage: '/assets/cards/duelist.webp',
+        tagline: 'Щит двора: и от вора, и от шантажиста'
       },
       {
         id: 'heir',

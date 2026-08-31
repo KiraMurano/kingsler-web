@@ -2,6 +2,7 @@ import type { CardInstance, Player, Role } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { botMemory } from './botMemory';
 import { useGameStore } from '../GameStore';
+import { isCoronationCandidate, type Coronation } from '../resolvers/coronation';
 
 export interface DoubtDecision {
   shouldDoubt: boolean;
@@ -17,7 +18,7 @@ export function evaluateBotDoubt(
   actor: Player,
   claimedRole: Role,
   _isTargetedDirectDoubt: boolean,
-  coronationCandidateId: string | null,
+  coronations: Coronation[],
   targetId: string | undefined,
   discardPile: CardInstance[],
   _allPlayers: Player[]
@@ -77,7 +78,7 @@ export function evaluateBotDoubt(
   }
 
   // Актёр находится на Круге Коронации
-  if (coronationCandidateId === actor.id) {
+  if (isCoronationCandidate(coronations, actor.id)) {
     tacticalBonus += 0.55;
   }
 

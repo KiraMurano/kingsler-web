@@ -16,6 +16,7 @@ import {
 } from './doubtResolver.ts';
 import { faces, idOf, mintDeck } from '../cardInstance.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 if (typeof (globalThis as { window?: unknown }).window === 'undefined') {
   (globalThis as { window: typeof globalThis }).window = globalThis;
@@ -58,8 +59,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     timerMaxSeconds: 0,
     isTimerPaused: false,
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     pendingAction: null as Action | null,
     pendingDoubtDoubterId: null as string | null,
     hasUsedNormalActionThisTurn: false,
@@ -78,6 +78,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     activeSpeechReactions: {} as Record<string, string>,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
     overlayInstant: null,
+    plotPulses: [] as GameState['plotPulses'],
     winnerId: null,
     history: [] as string[],
     ...overrides
@@ -125,7 +126,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         isBot: true,
         favor: 2,
         gold: 3,
-        hand: mintDeck(['Казначей', 'Рыцарь']),
+        hand: mintDeck(['Казначей', 'Дуэлянт']),
         activePlot: { id: 'pl1', cardId: 'plot-pl1', type: 'Королевский приём' }
       })
     ]
@@ -142,13 +143,49 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
   assert.equal(after.favor, 1);
   assert.equal(after.activePlot, null);
   assert.ok(faces(api.discardPile).includes('Королевский приём'));
+  assert.deepEqual(
+    api.plotPulses,
+    [{ cardId: 'plot-pl1', kind: 'disrupt' }],
+    'шантаж срывает приём ударом срыва, а не сработки'
+  );
 }
 
 {
   const { get, set, api } = makeHarness({
     players: [
       player({ id: 'p1', name: 'Анна', hand: mintDeck(['Вор', 'Шут']) }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 3, hand: mintDeck(['Казначей', 'Рыцарь']) }),
+      player({
+        id: 'p2',
+        name: 'Борис',
+        isBot: true,
+        gold: 3,
+        hand: mintDeck(['Казначей', 'Дуэлянт']),
+        activePlot: { id: 'pl1', cardId: 'plot-gold', type: 'Королевский приём' }
+      })
+    ]
+  });
+
+  resolveRoleActionEffect(get, set, action({
+    type: 'role',
+    name: 'Вор',
+    actorId: 'p1',
+    targetId: 'p2',
+    roleClaim: 'Вор'
+  }));
+  assert.equal(api.players.find(p => p.id === 'p2')!.activePlot, null);
+  assert.ok(faces(api.discardPile).includes('Королевский приём'));
+  assert.deepEqual(
+    api.plotPulses,
+    [{ cardId: 'plot-gold', kind: 'disrupt' }],
+    'кража золота срывает приём так же, как шантаж'
+  );
+}
+
+{
+  const { get, set, api } = makeHarness({
+    players: [
+      player({ id: 'p1', name: 'Анна', hand: mintDeck(['Вор', 'Шут']) }),
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 3, hand: mintDeck(['Казначей', 'Дуэлянт']) }),
       player({
         id: 'p3',
         name: 'Вера',
@@ -258,7 +295,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         name: 'Борис',
         isBot: true,
         actionTokens: 2,
-        hand: mintDeck(['Казначей', 'Рыцарь'])
+        hand: mintDeck(['Казначей', 'Дуэлянт'])
       })
     ]
   });
@@ -288,7 +325,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         name: 'Борис',
         isBot: true,
         actionTokens: 0,
-        hand: mintDeck(['Казначей', 'Рыцарь'])
+        hand: mintDeck(['Казначей', 'Дуэлянт'])
       })
     ]
   });
@@ -303,7 +340,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
     isPendingActionAfterTruthChallenge: true,
     players: [
       player({ id: 'p1', name: 'Анна', hand: mintDeck(['Наследник', 'Шут']) }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Право вето', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Право вето', 'Дуэлянт']) })
     ]
   });
   const rolePlay = action({
@@ -345,6 +382,11 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
   proceedAfterVetoWindow(get, set);
   assert.equal(api.players.find(p => p.id === 'p1')!.activePlot, null);
   assert.ok(faces(api.discardPile).includes('Королевский приём'));
+  assert.deepEqual(
+    api.plotPulses,
+    [{ cardId: 'plot-pl1', kind: 'disrupt' }],
+    'обыск сбрасывает интригу срывом, а не молча и не сработкой'
+  );
 }
 
 {
@@ -356,7 +398,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         actionTokens: 1,
         activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 0 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, hand: mintDeck(['Казначей', 'Дуэлянт']) })
     ]
   });
   chargeActiveConspiracies(get, set, 'проверку');
@@ -372,7 +414,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         actionTokens: 1,
         activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 4 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 2, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 2, hand: mintDeck(['Казначей', 'Дуэлянт']) })
     ]
   });
   applyConspiracyEffect(get, set, action({
@@ -396,7 +438,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
         actionTokens: 1,
         activePlot: { id: 'c1', cardId: 'plot-c1', type: 'Тайный заговор', charges: 4 }
       }),
-      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, favor: 3, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, gold: 5, favor: 3, hand: mintDeck(['Казначей', 'Дуэлянт']) })
     ]
   });
   applyConspiracyEffect(get, set, action({

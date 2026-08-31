@@ -134,7 +134,7 @@ export class BotMemoryEngine {
   }
 
   /**
-   * Проверяет, знает ли бот о наличии карты-блокера у цели (например, «Казначей» или «Рыцарь»).
+   * Проверяет, знает ли бот о наличии карты-блокера у цели (например, «Казначей» или «Дуэлянт»).
    */
   public isCounterCardKnown(botId: string, targetId: string, counterRole: Role): boolean {
     return this.knownCards.some(

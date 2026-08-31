@@ -74,7 +74,7 @@ useGameStore.getState().startGame();
 useGameStore.setState({
   players: [
     ...useGameStore.getState().players.filter(p => !p.isBot).map(p => ({ ...p, hand: mintDeck(['Наследник', 'Шут']), favor: 0 })),
-    bot('b1', ['Казначей', 'Рыцарь'])
+    bot('b1', ['Казначей', 'Дуэлянт'])
   ],
   activePlayerId: 'p1',
   opening: null

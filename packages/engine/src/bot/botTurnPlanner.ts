@@ -4,6 +4,7 @@ import { isPlot } from '../cards';
 import { faces, holds, idOf } from '../cardInstance';
 import { canBeTargetedByInstant } from '../targeting';
 import { getBotArchetype } from '../botsConfig';
+import { isCoronationCandidate } from '../resolvers/coronation';
 import {
   selectBestThiefTarget,
   selectBestBlackmailerTarget,
@@ -157,7 +158,7 @@ export function makeBotMove(botId: string): void {
     const target = selectBestConspiracyTarget(opponents, charges);
     if (
       target &&
-      shouldActivateConspiracyNow(bot, target, charges, state.coronationCandidateId)
+      shouldActivateConspiracyNow(bot, target, charges, state.coronations)
     ) {
       /* Корона (или сожжённая грамота) дороже трёх монет почти всегда:
          золото бьётся только по тому, у кого отнимать больше нечего. */
@@ -176,7 +177,7 @@ export function makeBotMove(botId: string): void {
       const plotId = bot.hand[plotIdx].id;
 
       if (plotCard === 'Королевский приём') {
-        if (bot.gold >= 2 || holds(bot.hand, 'Казначей') || holds(bot.hand, 'Рыцарь') || Math.random() < 0.7) {
+        if (bot.gold >= 2 || holds(bot.hand, 'Казначей') || holds(bot.hand, 'Дуэлянт') || Math.random() < 0.7) {
           useGameStore.getState().playPlotAction('Королевский приём', plotId);
           return;
         }
@@ -189,9 +190,6 @@ export function makeBotMove(botId: string): void {
         return;
       } else if (plotCard === 'Сеть информаторов') {
         useGameStore.getState().playPlotAction('Сеть информаторов', plotId);
-        return;
-      } else if (plotCard === 'Золотая булла') {
-        useGameStore.getState().playPlotAction('Золотая булла', plotId);
         return;
       } else if (plotCard === 'Охранная грамота') {
         /* Грамота — карта фаворита: она держит корону, но закрывает печати.
@@ -230,7 +228,7 @@ export function makeBotMove(botId: string): void {
         ? leader
         : [...targetable].sort((a, b) => b.favor - a.favor)[0];
 
-    if (target && (target.favor >= 2 || state.coronationCandidateId === target.id || Math.random() < 0.75)) {
+    if (target && (target.favor >= 2 || isCoronationCandidate(state.coronations, target.id) || Math.random() < 0.75)) {
       useGameStore.getState().playInstant(bot.id, 'Обвинение в измене', treasonId, target.id);
       return;
     }
@@ -247,7 +245,7 @@ export function makeBotMove(botId: string): void {
       shouldPlaySearchNow(bot, target, {
         players: state.players,
         activePlayerId: state.activePlayerId,
-        coronationCandidateId: state.coronationCandidateId
+        coronations: state.coronations
       })
     ) {
       useGameStore.getState().playInstant(bot.id, 'Обыск покоев', searchId, target.id);
@@ -416,18 +414,18 @@ export function makeBotMove(botId: string): void {
         return;
       }
 
-      if (holds(bot.hand, 'Рыцарь')) {
-        const handId = idOf(bot.hand, 'Рыцарь') ?? undefined;
+      if (holds(bot.hand, 'Дуэлянт')) {
+        const handId = idOf(bot.hand, 'Дуэлянт') ?? undefined;
         useGameStore.getState().performAction({
           type: 'role',
-          name: 'Рыцарь',
-          roleClaim: 'Рыцарь',
+          name: 'Дуэлянт',
+          roleClaim: 'Дуэлянт',
           actorId: bot.id,
           stakedCardId: handId,
           withVaBanque: withVB,
           costGold: 0,
           costTokens: vbTokens,
-          description: `Заявляет «Рыцарь»${withVB ? ' под Ва-банком' : ''} и получает +2 🪙.`
+          description: `Заявляет «Дуэлянт»${withVB ? ' под Ва-банком' : ''} и получает +1 ⚜️.`
         });
         return;
       }
@@ -438,7 +436,7 @@ export function makeBotMove(botId: string): void {
     if (mustAct || Math.random() < archetype.bluffRate) {
       const possibleBluffs: Role[] = [];
       if (bot.favor >= dangerous) possibleBluffs.push('Наследник');
-      if (bot.gold < 3) possibleBluffs.push('Казначей', 'Рыцарь', 'Шут');
+      if (bot.gold < 3) possibleBluffs.push('Казначей', 'Дуэлянт', 'Шут');
       if (leader && leader.favor > 0) possibleBluffs.push('Шантажист');
 
       const richest = selectBestThiefTarget(bot, opponents);

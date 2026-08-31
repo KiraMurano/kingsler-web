@@ -1,16 +1,25 @@
-import type { Action, GameRules, GameState, Player, RevealOutcome } from '../types';
+import type { Action, CardInstance, GameRules, GameState, Player, RevealOutcome } from '../types';
 import { isRole } from '../cards';
 import { byId, pluck } from '../cardInstance';
-import { accOf, verbCaught, verbDoubted } from '../utils/russianText';
+import { accOf, genOf, verbCaught, verbDoubted } from '../utils/russianText';
 import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { discardProtectiveIntrigueOnBluff } from './crownLoss';
-import { chargeActiveConspiracies, landPlot, applyConspiracyEffect, applyMorningPlotReward, discardMorningPlot } from './plotResolver';
+import {
+  chargeActiveConspiracies,
+  landPlot,
+  applyConspiracyEffect,
+  applyMorningPlotReward,
+  discardMorningPlot,
+  plotSpent,
+  plotsCharged,
+  INFORMANT_PAYOUTS
+} from './plotResolver';
 import { resolveInstantEffect } from './instantResolver';
 import { beginCoronationIfNeeded } from './coronation';
-import { vetoAnswerRequired, vetoPollAnswered, vetoTopActorId } from './vetoChain';
+import { vetoAnswerRequired, vetoPollAnswered, vetoReset, vetoTopActorId } from './vetoChain';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -125,19 +134,57 @@ export function doubtAction(
     false
   );
 
-  // Informant Network trigger: all OTHER holders (not the doubter) receive +1 🪙 for checks by other players!
-  const informantHolders = newPlayers.filter(p => p.activePlot?.type === 'Сеть информаторов' && p.id !== doubter.id);
+  /*
+   * «Сеть информаторов» платит за ЧУЖУЮ проверку — своя не в счёт.
+   *
+   * Круга у неё больше нет: сеть держится, пока не отработает свои
+   * `INFORMANT_PAYOUTS` монет. Это делает её понятной без часов на столе —
+   * видно, сколько осталось, — и заодно чинит старое: привязанная к кругу,
+   * она приносила то ноль монет, то пять, смотря какая партия попалась.
+   * Отдав последнюю монету, карта уходит обычным сбросом: бейдж монеты тот
+   * же, что на первой и второй, удара сработки нет.
+   */
+  const informantHolders = newPlayers.filter(
+    p => p.activePlot?.type === 'Сеть информаторов' && p.id !== doubter.id
+  );
+  const informantLogs: string[] = [];
+  const exhaustedInformants: CardInstance[] = [];
+  /** Все сети, которым эта проверка принесла монету — и оставшиеся, и
+   *  свернувшиеся. Кивок один и тот же. */
+  const paidInformants: string[] = [];
+
   if (informantHolders.length > 0) {
-    newPlayers = newPlayers.map(p => (p.activePlot?.type === 'Сеть информаторов' && p.id !== doubter.id) ? { ...p, gold: p.gold + 1 } : p);
-    informantHolders.forEach(p => {
-      triggerResourceFloat(set, p.id, '+1 🪙 Информаторы', true);
+    newPlayers = newPlayers.map(p => {
+      const plot = p.activePlot;
+      if (plot?.type !== 'Сеть информаторов' || p.id === doubter.id) return p;
+
+      const paid = (plot.charges ?? 0) + 1;
+      const exhausted = paid >= INFORMANT_PAYOUTS;
+      triggerResourceFloat(set, p.id, `+1 🪙 Информаторы (${paid}/${INFORMANT_PAYOUTS})`, true);
+      informantLogs.push(
+        exhausted
+          ? `👁️ «Сеть информаторов» ${genOf(p)} приносит последнюю, ${paid}-ю 🪙 за проверку от ${doubter.name} — и сворачивается.`
+          : `👁️ «Сеть информаторов» приносит +1 🪙 для ${p.name} за проверку при дворе от ${doubter.name} (${paid}/${INFORMANT_PAYOUTS}).`
+      );
+
+      paidInformants.push(plot.cardId);
+      if (!exhausted) {
+        return { ...p, gold: p.gold + 1, activePlot: { ...plot, charges: paid } };
+      }
+      /* Отработавших сетей на один спор может быть несколько, но карта в
+         сбросе нужна каждая: копим их отдельно от игроков. */
+      exhaustedInformants.push({ id: plot.cardId, card: 'Сеть информаторов' });
+      return { ...p, gold: p.gold + 1, activePlot: null };
     });
   }
 
-  const informantLogs = informantHolders.map(p => `👁️ «Сеть информаторов» приносит +1 🪙 для ${p.name} за проверку при дворе от ${doubter.name}!`);
-
   set(state => ({
     players: newPlayers,
+    discardPile:
+      exhaustedInformants.length > 0
+        ? [...state.discardPile, ...exhaustedInformants]
+        : state.discardPile,
+    ...plotsCharged(paidInformants),
     pendingDoubtDoubterId: doubter.id,
     activeSpeechReactions: {
       ...state.activeSpeechReactions,
@@ -150,8 +197,9 @@ export function doubtAction(
     ].slice(0, 50)
   }));
 
-  // Charge active conspiracies
-  chargeActiveConspiracies(get, set, `проверку от ${doubter.name}`);
+  /* Заряжаются чужие Заговоры, но не Заговор самого проверяющего: своей
+     проверкой Заговор не кормят (см. `chargeActiveConspiracies`). */
+  chargeActiveConspiracies(get, set, `проверку от ${doubter.name}`, doubter.id);
 
   timerManager.scheduleDelay(() => {
     get()._executeRevealOutcome(doubter.id);
@@ -255,7 +303,12 @@ export function executeRevealOutcome(
     // Failed check: Black Book is discarded without reward
     if (doubterPlot && doubterPlot.type === 'Чёрная книга') {
       newPlayers[doubterIdx] = { ...newPlayers[doubterIdx], activePlot: null };
-      set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
+      /* Догорает, а не улетает: книга сделала своё дело — просто дело вышло
+         неудачным. Со стола так уходит всякая отыгранная интрига. */
+      set(state => ({
+        discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }],
+        ...plotSpent(doubterPlot.cardId)
+      }));
     }
 
     if (claimedRole === 'Шут') {
@@ -297,7 +350,10 @@ export function executeRevealOutcome(
           activePlot: null
         };
       }
-      set(state => ({ discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }] }));
+      set(state => ({
+        discardPile: [...state.discardPile, { id: doubterPlot.cardId, card: 'Чёрная книга' as const }],
+        ...plotSpent(doubterPlot.cardId)
+      }));
 
       if (newPlayers[doubterIdx].favor >= crownsToWin) {
         beginCoronationIfNeeded(get, set, doubter.id);
@@ -598,6 +654,46 @@ export function proceedAfterVetoWindow(
   // while its instance also sat in the plot slot.
   if (turnPhase !== 'VETO_WINDOW') return;
   set({ turnPhase: 'IDLE' });
+
+  /*
+   * Окно было про «Перенаправление» — значит вето отменяет перевод, а не
+   * нападение.
+   *
+   * Обрабатывается до общей ветки намеренно: та отменила бы всё действие
+   * целиком, и одна карта защищающегося снимала бы чужую атаку. Здесь же удар
+   * состоится в любом случае — вопрос только в том, по кому.
+   */
+  /* Именно на непустоту, а не на `!== null`: поле означает «есть перевод, у
+     которого есть куда возвращаться», и пустая строка значит ровно то же, что
+     его отсутствие. */
+  const { pendingRedirectFromId } = get();
+  if (pendingRedirectFromId) {
+    const restored = isVetoed
+      ? { ...pendingAction, targetId: pendingRedirectFromId }
+      : pendingAction;
+    const victim = get().players.find(p => p.id === restored.targetId);
+
+    set(state => ({
+      pendingAction: restored,
+      pendingRedirectFromId: null,
+      overlayInstant: null,
+      ...vetoReset(),
+      /* Жертва отвечает заново: цель могла смениться, а её голос в опросе —
+         это и есть её ответ (см. `targetAcceptAttack`). */
+      turnPhase: 'TARGET_REACTION_WINDOW',
+      pendingDoubtPassedIds: [],
+      pendingDoubtActionId: restored.id,
+      timerSeconds: 0,
+      timerMaxSeconds: 0,
+      history: [
+        isVetoed
+          ? `🚫 Перевод отменён «Правом вето»! Удар возвращается на ${victim?.name ?? 'прежнюю цель'}.`
+          : `🔀 Перевод устоял: двор не стал его отменять.`,
+        ...state.history
+      ].slice(0, 50)
+    }));
+    return;
+  }
 
   if (isVetoed) {
     set(state => ({

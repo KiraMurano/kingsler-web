@@ -127,5 +127,19 @@ export function overlayCaption(
   if (overlay.card === 'Перенаправление') {
     return instantCaption('Перенаправление', actor, who(players, action?.targetId));
   }
+
+  /*
+   * «Ва-банк» сам по себе не действие, а надбавка к чужому розыгрышу, и без
+   * заявки под ним подпись не говорит главного. На столе в этот момент лежат
+   * две карты: открытый «Ва-банк» и закрытая заявка — и по подписи «Дима идёт
+   * ва-банк» понять, что именно он заявил, нельзя вовсе. Поэтому здесь
+   * дочитывается заявка из перебиваемого действия.
+   */
+  if (overlay.card === 'Ва-банк' && action?.roleClaim) {
+    const target = who(players, action.targetId);
+    const claim = `${actor} идёт ва-банк и заявляет ${roleAcc(action.roleClaim)}`;
+    return target ? `${claim} против ${genOf(target)}` : claim;
+  }
+
   return instantCaption(overlay.card as InstantType, actor, null);
 }

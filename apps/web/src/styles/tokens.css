@@ -90,6 +90,10 @@
   /* Mirrors of `motion/tokens.ts` — the same numbers, in milliseconds, for
      the handful of effects that stay on CSS. Change them in both places. */
   --dur-flip: 500ms;
+  /* Зеркала `dur.pulseSpent` и `dur.pulseCharge` из `motion/tokens.ts`. */
+  --dur-pulse-spent: 500ms;
+  --dur-pulse-charge: 340ms;
+  --dur-pulse-disrupt: 420ms;
   --dur-fade: 180ms;
   --dur-panel: 260ms;
 }

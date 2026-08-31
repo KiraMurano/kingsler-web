@@ -53,18 +53,30 @@
  * treatment from `styles/layout.css`.
  */
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { animate, motion, useAnimationFrame, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
+import { createPortal } from 'react-dom';
+import {
+  animate,
+  motion,
+  useAnimationFrame,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform
+} from 'motion/react';
 import type { MotionValue } from 'motion/react';
 import type { CardId } from '@kinglier/engine/cardInstance';
-import type { GameCard } from '@kinglier/engine/types';
+import type { GameCard, PlotPulseKind } from '@kinglier/engine/types';
 import { CARD_INFO } from '@kinglier/engine/cards';
 import { useAnchorRects } from './AnchorRegistry.tsx';
 import { designRect } from '../lib/uiScale.ts';
+import { DELTA_LIFT } from '../components/ui/Res.tsx';
 import { cardTilt } from '../lib/cardTilt.ts';
 import { cardArt, TABLE_ART_WIDTH } from '../lib/cardArt.ts';
 import { dur, spring, tilt } from './tokens.ts';
+import { cardLie } from '../lib/cardLie.ts';
 import { ZONE_PRECEDENCE, zoneKey } from './zones.ts';
 import type { PlacedCard, Zone, ZoneKind } from './zones.ts';
+import { strike } from './Sparks.tsx';
 
 /* Ширина копии — под самое крупное из состояний этого узла: карту в руке
    (154 px макета). Слот интриги и мини-карта у соседа мельче, но это тот же
@@ -238,24 +250,6 @@ function stackOrder(placed: PlacedCard): number {
   return ZONE_PRECEDENCE[placed.zone.kind];
 }
 
-/** Where a card lies at rest, by what it is doing. */
-function restingRotation(zone: Zone): number | null {
-  switch (zone.kind) {
-    case 'overlay':
-      return tilt.overlay;
-    case 'stake':
-      return tilt.stake;
-    case 'duel':
-      return zone.side === 'attacker' ? tilt.duelAttacker : tilt.duelDefender;
-    case 'discard':
-      /* Already fading into the corner — a straightening card on the way out
-         is motion nobody asked for. It keeps the tilt it was lying at. */
-      return null;
-    default:
-      return 0;
-  }
-}
-
 const ARC: SpringSpec = { stiffness: 350, damping: 32, mass: 1 };
 
 /** Context the catalog needs that the two zones do not carry themselves. */
@@ -276,17 +270,21 @@ interface LegContext {
  * going. Everything the table does to a card is one of these rows; nothing
  * anywhere else in the app writes a card animation.
  */
-function planFor(from: Zone, to: Zone, ctx: LegContext): Plan {
+function planFor(from: Zone, to: PlacedCard, ctx: LegContext): Plan {
+  /* Целиком, а не одна зона: угол посадки зависит и от того, что за карта
+     легла — вето и Ва-банк приходят в одну лунку под разными углами
+     (см. `lib/cardLie.ts`). */
+  const zone = to.zone;
   const base: Plan = {
     move: spring.flight,
     moveX: spring.flight,
     delayMs: 0,
-    rotate: restingRotation(to),
+    rotate: cardLie(to),
     flipDelayMs: 0,
-    fade: isCorner(from.kind) === isCorner(to.kind) ? 'none' : isCorner(to.kind) ? 'out' : 'in'
+    fade: isCorner(from.kind) === isCorner(zone.kind) ? 'none' : isCorner(zone.kind) ? 'out' : 'in'
   };
 
-  switch (to.kind) {
+  switch (zone.kind) {
     case 'hand': {
       /* Dealt out of the top-left corner: face-down, arcing across, turning
          over as it lands. Two cards drawn at once are separated by a beat. */
@@ -304,6 +302,21 @@ function planFor(from: Zone, to: Zone, ctx: LegContext): Plan {
     }
 
     case 'discard': {
+      /*
+       * Сработавшая или сорванная интрига уходит не сразу.
+       *
+       * Движок к этому моменту уже переложил её в сброс — и сработавшая, и
+       * сорванная, и просто сброшенная лежат в одной стопке, разводит их
+       * только `pulse` (см. `GameState.plotPulses`). Пауза здесь принадлежит
+       * столу, а не движку: он держит свой `ACTION_HOLD_MS` по своим причинам
+       * и о том, сколько длится удар, ничего не знает.
+       *
+       * Сеть после третьей монеты и замена интриги — обычный сброс: пульса
+       * `spent`/`disrupt` нет, карта улетает сразу.
+       */
+      if (to.pulse === 'spent' || to.pulse === 'disrupt') {
+        return { ...base, delayMs: dur.pulseHold * 1000 };
+      }
       /* An instant lying on top of the stake follows it out rather than
          leaving with it, so two cards departing the same point read as two. */
       if (from.kind === 'overlay') return { ...base, delayMs: dur.trail * 1000 };
@@ -330,6 +343,35 @@ function planFor(from: Zone, to: Zone, ctx: LegContext): Plan {
 /* -------------------------------------------------------------------------
    Helpers
    ------------------------------------------------------------------------- */
+
+function pulseCaption(kind: PlotPulseKind, known: GameCard | null): string {
+  switch (kind) {
+    case 'spent':
+    case 'disrupt':
+      return known ?? '';
+    case 'charge':
+      return known === 'Сеть информаторов' ? '+1 🪙' : '+1';
+    default: {
+      const _never: never = kind;
+      return _never;
+    }
+  }
+}
+
+function pulseTone(kind: PlotPulseKind): 'spent' | 'gain' | 'loss' {
+  switch (kind) {
+    case 'spent':
+      return 'spent';
+    case 'charge':
+      return 'gain';
+    case 'disrupt':
+      return 'loss';
+    default: {
+      const _never: never = kind;
+      return _never;
+    }
+  }
+}
 
 interface BaseSize {
   width: number;
@@ -431,12 +473,17 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const key = zoneKey(placed.zone);
   const slot = placed.zone.kind === 'hand' ? placed.zone.slot : 0;
 
+  /* Узел, по которому меряется точка удара искр и место капсулы. */
+  const hit = useRef<HTMLDivElement>(null);
+  /* Сама капсула: живёт порталом, а место ей ставит слой — см. эффект ниже. */
+  const gain = useRef<HTMLSpanElement>(null);
+
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const scale = useMotionValue(1);
   const opacity = useMotionValue(0);
   const zIndex = useMotionValue(stackOrder(placed));
-  const rotate = useMotionValue(restingRotation(placed.zone) ?? 0);
+  const rotate = useMotionValue(cardLie(placed) ?? 0);
   const rotateY = useMotionValue(placed.face.known !== null ? 180 : 0);
 
   /* The lean towards the cursor. Static spring configuration, so these two
@@ -446,7 +493,83 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
   const tiltX = useSpring(tiltXTarget, spring.hover);
   const tiltY = useSpring(tiltYTarget, spring.hover);
 
+  /*
+   * Рамка карты не должна худеть вместе с картой.
+   *
+   * Узел карты один на все зоны и подгоняется под свой слот через `scale`:
+   * в руке он полного размера, в слоте интриги — вдвое меньше, у соседа —
+   * втрое. Масштаб тянет за собой и рамку, и одна и та же карта на столе
+   * получала волосяную обводку вместо той, что была в руке.
+   *
+   * Ширина здесь делится на масштаб, то есть задаётся в экранных пикселях
+   * назло `scale`. Числа те же, что в CSS: `2px` у лица (`.cardframe`) и
+   * `1px` у рубашки.
+   */
+  const frontBorder = useTransform(scale, (s: number) => `${2 / Math.max(s, 0.05)}px`);
+  const backBorder = useTransform(scale, (s: number) => `${1 / Math.max(s, 0.05)}px`);
+
   const flipped = placed.face.known !== null;
+
+  /*
+   * Отклик карты на то, что с ней случилось (см. `GameState.plotPulses`).
+   *
+   * Класс приходит прямо из пропа, без промежуточного состояния: анимация не
+   * зациклена, проиграется один раз и замрёт на последнем кадре, а он совпадает
+   * с обычным видом карты. Держать ради этого таймер и лишний рендер незачем.
+   *
+   * Эффект делает то, чего CSS не умеет: ставит место вылетающей капсуле и
+   * перезапускает анимацию с нуля. Перезапуск нужен на случай, когда стол
+   * отзывается дважды подряд одним и тем же откликом: класс тогда не меняется,
+   * и сама по себе анимация второй раз не пойдёт.
+   */
+  const pulse = reduce ? undefined : placed.pulse;
+  const caption = pulse ? pulseCaption(pulse, placed.face.known) : '';
+  useLayoutEffect(() => {
+    if (!pulse) return;
+    const node = hit.current;
+    if (!node) return;
+    const box = designRect(node);
+
+    /*
+     * Капсула висит порталом в `body`, а место ей ставится здесь.
+     *
+     * Внутри карты ей нельзя: слой движения масштабирует карту под её лунку —
+     * в слоте интриги вдвое, у соседа втрое, — и капсула ужималась вместе с
+     * ней. Капсулы у мест игроков потому и порталятся, что так они одного
+     * размера всегда; эта обязана быть с ними в одном ряду.
+     *
+     * `useLayoutEffect`, а не обычный: узел портала появляется в том же
+     * коммите, и место ему надо дать ДО первого кадра — иначе он мигнёт в
+     * левом верхнем углу экрана.
+     */
+    if (gain.current) {
+      gain.current.style.left = `${box.left + box.width / 2}px`;
+      gain.current.style.top = `${box.top - DELTA_LIFT}px`;
+    }
+
+    /* Перезапускаем только отклик, а не всё, что на узле шевелится: рядом
+       живут наведение и подрагивание из слоя движения, и сбрасывать их с нуля
+       значит дёргать карту без повода. Имя анимации — единственное, чем они
+       здесь различаются. */
+    for (const animation of node.getAnimations({ subtree: true })) {
+      const name = (animation as { animationName?: string }).animationName;
+      if (name && name.startsWith('plotpulse')) {
+        animation.currentTime = 0;
+        animation.play();
+      }
+    }
+
+    /*
+     * Заряд «Тайного заговора» бьёт тем же снопом, что и дуэль — только из
+     * середины карты и слабее: слот интриги мельче стычки, полный удар
+     * залил бы место целиком. Сеть информаторов кивает монетой, не искрой.
+     */
+    if (pulse === 'charge' && placed.face.known === 'Тайный заговор') {
+      strike(box.left + box.width / 2, box.top + box.height / 2, { force: 0.7 });
+    }
+  }, [pulse, placed.charges, placed.face.known]);
+
+
 
   const flight = useRef<Flight>({
     pos: null,
@@ -459,7 +582,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       move: spring.flight,
       moveX: spring.flight,
       delayMs: 0,
-      rotate: restingRotation(placed.zone),
+      rotate: cardLie(placed),
       flipDelayMs: 0,
       fade: 'none'
     },
@@ -529,7 +652,7 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
     /* 4. A new zone is a new leg: pick its row out of the catalog. */
     if (key !== f.zone) {
       const previous = f.zoneValue ?? placed.zone;
-      const plan = planFor(previous, placed.zone, {
+      const plan = planFor(previous, placed, {
         slot,
         faceUpForMs: f.faceUpAt === null ? null : time - f.faceUpAt
       });
@@ -608,9 +731,10 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
 
   /* Under reduced motion the 3D turn is replaced by a crossfade of the two
      faces (see `frontStyle` below) and `rotateY` is pinned flat. */
+  const flat = reduce;
   useEffect(() => {
-    if (reduce) rotateY.set(0);
-  }, [reduce, rotateY]);
+    if (flat) rotateY.set(0);
+  }, [flat, rotateY]);
 
   /* Keep the last face we were allowed to see. The art is then already
      loaded and painted on the hidden side before a flip starts, and a card
@@ -712,12 +836,14 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
       <motion.div
         className={[
           'cardlayer__hit',
+          pulse ? `is-pulse-${pulse}` : '',
           playable ? 'is-playable' : 'is-idle',
           own ? 'is-own' : '',
           selected ? 'is-selected' : ''
         ]
           .filter(Boolean)
           .join(' ')}
+        ref={hit}
         style={{
           position: 'relative',
           width: '100%',
@@ -760,13 +886,23 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
         {/* `.flip` is pure art treatment now — perspective, radius, border,
             shadow and `backface-visibility`. Size, entrance and the turn all
             belong to this layer; see `styles/layout.css`. */}
-        <div className={`flip${flipped ? ' is-flipped' : ''}`}>
+        <div
+          className={[
+            'flip',
+            flipped ? 'is-flipped' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <motion.div
             className="flip__inner"
-            style={{ transformStyle: reduce ? 'flat' : 'preserve-3d', rotateY }}
+            style={{ transformStyle: flat ? 'flat' : 'preserve-3d', rotateY }}
           >
-            <div className="flip__face" style={{ backgroundImage: `url(${CARD_BACK})` }} />
-            <div
+            <motion.div
+              className="flip__face"
+              style={{ backgroundImage: `url(${CARD_BACK})`, borderWidth: backBorder }}
+            />
+            <motion.div
               className={[
                 'flip__face',
                 'flip__face--front',
@@ -776,8 +912,9 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
                 .filter(Boolean)
                 .join(' ')}
               style={{
+                borderWidth: frontBorder,
                 backgroundImage: info ? `url(${cardArt(info.artImage, TABLE_ART_WIDTH)})` : undefined,
-                ...(reduce
+                ...(flat
                   ? {
                       /* Crossfade instead of a turn: lie flat, on top of the
                          back, and fade in when the face becomes readable. */
@@ -798,12 +935,40 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
                   карт рисуется выше слота, и любая надпись под ним пряталась
                   за картой. */}
               {placed.charges !== undefined && (
-                <span className="chargetag">{placed.charges}</span>
+                <span
+                  className={`chargetag${
+                    /* У Сети это принесённые монеты, а не заряды: красная
+                       наклейка «сейчас рванёт» здесь врала бы. */
+                    placed.face.known === 'Сеть информаторов' ? ' chargetag--coin' : ''
+                  }`}
+                >
+                  {placed.charges}
+                </span>
               )}
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       </motion.div>
+      {/*
+        Отклик карты словом. Сработала — золотая капсула с именем интриги,
+        сорвана — красная с тем же именем, набрала — зелёная прибавка.
+        Все три вылетают из самой карты, а не всплывашкой у места: случилось
+        это с ней, ей и говорить.
+
+        Порталом — чтобы не ужиматься вместе с картой (слой движения жмёт её
+        под лунку); место капсуле ставит эффект выше.
+      */}
+      {pulse &&
+        caption &&
+        createPortal(
+          <span
+            ref={gain}
+            className={`deltapill delta delta--${pulseTone(pulse)}`}
+          >
+            {caption}
+          </span>,
+          document.body
+        )}
     </motion.div>
   );
 };

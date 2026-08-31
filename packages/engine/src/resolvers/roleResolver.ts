@@ -3,6 +3,7 @@ import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { loseCrowns } from './crownLoss';
+import { addSealsToPlayer } from './sealsResolver';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -43,7 +44,17 @@ export function resolveRoleActionEffect(
     timerManager.scheduleDelay(() => {
       get()._checkEndgameAndAdvanceTurn();
     }, ACTION_HOLD_MS);
-  } else if (role === 'Рыцарь' || role === 'Шут') {
+  } else if (role === 'Дуэлянт') {
+    /* Дуэлянт берёт печатью, а не золотом: две печати — корона, так что
+       обычный розыгрыш щита это половина шага к престолу. Ва-банк удваивает
+       её, как и всё остальное. */
+    const seals = isVB ? 2 : 1;
+    set({ players: newPlayers });
+    addSealsToPlayer(get, set, actor.id, seals);
+    timerManager.scheduleDelay(() => {
+      get()._checkEndgameAndAdvanceTurn();
+    }, ACTION_HOLD_MS);
+  } else if (role === 'Шут') {
     const gold = isVB ? 4 : 2;
     actor = { ...actor, gold: actor.gold + gold };
     newPlayers[actorIdx] = actor;

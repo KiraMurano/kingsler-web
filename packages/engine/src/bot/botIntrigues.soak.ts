@@ -117,7 +117,7 @@ useGameStore.setState({
   players: useGameStore.getState().players.map((p, i) => {
     const base = { ...p, isBot: true };
     if (i === 0) return { ...base, favor: 2, hand: mintDeck(['Охранная грамота', 'Наследник']) };
-    if (i === 1) return { ...base, gold: 5, hand: mintDeck(['Стража покоев', 'Рыцарь']) };
+    if (i === 1) return { ...base, gold: 5, hand: mintDeck(['Стража покоев', 'Дуэлянт']) };
     return base;
   })
 });

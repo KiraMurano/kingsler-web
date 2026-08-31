@@ -38,9 +38,9 @@ function seat(id: string, hand: GameCard[], isBot = false): Player {
 }
 
 useGameStore.getState().startGame();
-const deck = mintDeck(['Вор', 'Шут', 'Рыцарь', 'Казначей']).map(c => ({ ...c, id: `d-${c.id}` }));
+const deck = mintDeck(['Вор', 'Шут', 'Дуэлянт', 'Казначей']).map(c => ({ ...c, id: `d-${c.id}` }));
 useGameStore.setState({
-  players: [seat('p1', ['Наследник', 'Шантажист']), seat('p2', ['Рыцарь', 'Казначей'], true)],
+  players: [seat('p1', ['Наследник', 'Шантажист']), seat('p2', ['Дуэлянт', 'Казначей'], true)],
   deck,
   discardPile: [],
   activePlayerId: 'p1',

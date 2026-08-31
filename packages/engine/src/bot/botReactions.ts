@@ -1,11 +1,12 @@
 import { useGameStore } from '../GameStore';
-import type { GameState, Role } from '../types';
+import type { GameState } from '../types';
 import { getBotArchetype } from '../botsConfig';
 import { evaluateBotDoubt } from './botEvaluator';
 import { selectBestRedirectionTarget } from './botTargeting';
 import { holds, idOf } from '../cardInstance';
 import { vetoAnswerRequired, vetoTopActorId } from '../resolvers/vetoChain';
 import { duelPayment } from '../resolvers/duelResolver';
+import { duelShieldFor } from '../roles';
 import {
   ACTION_HOLD_MS,
   BOT_REACTION_MS,
@@ -38,7 +39,7 @@ const DOUBT_STAGGER_MS = 260;
  * никогда не ответит.
  */
 export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void {
-  const { pendingAction, players, discardPile, coronationCandidateId, pendingDoubtPassedIds } = state;
+  const { pendingAction, players, discardPile, coronations, pendingDoubtPassedIds } = state;
   if (!pendingAction || !pendingAction.roleClaim) return;
 
   const actor = players.find(p => p.id === pendingAction.actorId);
@@ -58,7 +59,7 @@ export function handleDoubtPhase(state: GameState, schedule: BotScheduler): void
             actor,
             pendingAction.roleClaim!,
             false,
-            coronationCandidateId,
+            coronations,
             pendingAction.targetId,
             discardPile,
             players
@@ -116,7 +117,8 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
   }
 
   const { rules } = useGameStore.getState();
-  const blockingRole: Role = pendingAction.roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+  const blockingRole = pendingAction.roleClaim ? duelShieldFor(pendingAction.roleClaim) : null;
+  if (!blockingRole) return;
   const hasCard = holds(target.hand, blockingRole);
   const archetype = getBotArchetype(target);
   const shieldId = (hasCard ? idOf(target.hand, blockingRole) : null) ?? target.hand[0]?.id;
@@ -126,7 +128,7 @@ export function handleTargetReactionPhase(state: GameState, schedule: BotSchedul
     attacker,
     pendingAction.roleClaim!,
     false,
-    null,
+    useGameStore.getState().coronations,
     pendingAction.targetId,
     discardPile,
     players

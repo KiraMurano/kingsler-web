@@ -12,7 +12,9 @@
  * пересоздаваться на каждое чужое действие — ровно тот дефект, ради которого
  * этот файл существует.
  */
-import { CARD_DESCRIPTIONS, isInstant, isPlot } from '@kinglier/engine/data/cardDescriptions';
+import { CARD_DESCRIPTIONS, isInstant, isPlot, isRole } from '@kinglier/engine/data/cardDescriptions';
+import { duelShieldFor } from '@kinglier/engine/roles';
+import { isCoronationCandidate, type Coronation } from '@kinglier/engine/resolvers/coronation';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
 import { holds } from '@kinglier/engine/cardInstance';
 import type {
@@ -27,6 +29,7 @@ import type {
 import { accOf, genOf } from '@kinglier/engine/utils/russianText';
 import { CONSPIRACY_FULL_CHARGE } from '@kinglier/engine/resolvers/plotResolver';
 import type { GameRules } from '@kinglier/engine/rules';
+import { paidPlayPrice, playPayment } from '@kinglier/engine/rules';
 import { doubtPayment } from '@kinglier/engine/resolvers/doubtResolver';
 import { duelPayment } from '@kinglier/engine/resolvers/duelResolver';
 import { vetoAnswerRequired, vetoTopActorId } from '@kinglier/engine/resolvers/vetoChain';
@@ -168,7 +171,6 @@ export interface TableViewInput {
   pendingDoubtPassedIds: string[];
   hasUsedNormalActionThisTurn: boolean;
   hasPlayedRoleThisTurn: boolean;
-  hasPlayedPlotThisTurn: boolean;
   isVetoed: boolean;
   /**
    * Идёт ли открытие партии. Пока идёт — стол ходов не принимает, и показывать
@@ -187,7 +189,7 @@ export interface TableViewInput {
   rules: GameRules;
   /** Взведён ли «Ва-банк» — переключатель в меню карты. Состояние интерфейса. */
   vaBanqueArmed: boolean;
-  coronationCandidateId: string | null;
+  coronations: Coronation[];
   revealOutcome: RevealOutcome | null;
   duelOutcome: DuelOutcome | null;
   /**
@@ -205,9 +207,15 @@ export interface TableViewInput {
 
 const ref = (p: Player): PlayerRef => ({ id: p.id, name: p.name, avatar: p.avatar });
 
-/** Роль-щит против конкретного нападения. Против Вора — Казначей, иначе Рыцарь. */
+/**
+ * Роль-щит против конкретного нападения.
+ *
+ * Своей развилки здесь больше нет: щит двора один, и решает это движок
+ * (`duelShieldFor`). Копия на экране разошлась бы с ним молча — подпись
+ * обещала бы один щит, а дуэль требовала другой.
+ */
 export function shieldRoleFor(roleClaim: string | undefined): Role {
-  return roleClaim === 'Вор' ? 'Казначей' : 'Рыцарь';
+  return (roleClaim && isRole(roleClaim as never) ? duelShieldFor(roleClaim as Role) : null) ?? 'Дуэлянт';
 }
 
 function inspectOption(): CardMenuOption {
@@ -269,8 +277,11 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
    * выбора «Разыграть» или «Блеф», и стоять он обязан там же — до них. Без
    * него сыграть роль по номиналу под Ва-банком было нельзя вовсе. */
   if (card !== 'Ва-банк' && holds(viewer.hand, 'Ва-банк')) {
-    const vbReason = !hasTokens
-      ? 'Нет жетонов действия.'
+    const vbPay = playPayment(input.rules, viewer);
+    const vbReason = !vbPay
+      ? !hasTokens && paidPlayPrice(input.rules) === null
+        ? 'Нет жетонов действия.'
+        : 'Не хватает золота.'
       : input.hasPlayedRoleThisTurn
         ? 'Роль уже была в этом ходу.'
         : undefined;
@@ -297,36 +308,72 @@ function ownTurnMenu(card: GameCard, viewer: Player, input: TableViewInput): Car
 
   if (playable) {
     const info = CARD_DESCRIPTIONS[card];
+    /*
+     * Жетоны кончились — но, если правила разрешают, карту можно доиграть за
+     * золото. Тогда кнопка не гаснет, а меняет подпись на цену: гасить её с
+     * «нет жетонов» там, где ход на самом деле есть, — значит прятать от
+     * игрока разрешённый правилами ход.
+     *
+     * Лимит на роль покупка не снимает, и порядок проверок это показывает:
+     * сперва «роль уже была», и только потом деньги.
+     *
+     * Цену считает `playPayment` — та же функция, что принимает ход в движке.
+     * Иначе кнопка обещала розыгрыш, которого резолвер не брал.
+     */
+    const extraGold = role ? info.cost : 0;
+    const price = paidPlayPrice(input.rules);
+    const buysPlay = !hasTokens && price !== null;
+    const payment = playPayment(input.rules, viewer, extraGold);
+
     let reason: string | undefined;
-    if (!hasTokens) reason = 'Нет жетонов действия.';
-    else if (plot && input.hasPlayedPlotThisTurn) reason = 'Интрига уже была в этом ходу.';
-    else if (role && input.hasPlayedRoleThisTurn) reason = 'Роль уже была в этом ходу.';
-    else if (role && viewer.gold < info.cost) reason = 'Не хватает золота.';
+    /*
+     * Лимита на число Интриг за ход нет — и не было в движке: он стоял только
+     * здесь, кнопкой. Играть вторую и правда незачем (она заменит первую, а
+     * первая уйдёт в сброс), но это довод для игрока, а не запрет: выложить
+     * вместо уже выложенной другую — законное решение, и передумать в свой
+     * ход можно. Абуза в этом нет — жетон списан, карта потрачена.
+     *
+     * Роль — другое дело: два заявления Казначея за ход выкачали бы казну, и
+     * этот лимит остаётся.
+     */
+    if (role && input.hasPlayedRoleThisTurn) reason = 'Роль уже была в этом ходу.';
+    else if (!payment) {
+      reason = buysPlay ? 'Не хватает золота.' : 'Нет жетонов действия.';
+    }
 
     options.push({
       kind: 'play',
-      hint: 'Сыграть карту тем, что она есть, — открыто и без блефа',
-      label: 'Разыграть',
+      hint: buysPlay
+        ? 'Жетонов нет — доиграть карту за золото'
+        : 'Сыграть карту тем, что она есть, — открыто и без блефа',
+      label: buysPlay ? `Разыграть за ${price} 🪙` : 'Разыграть',
       tone: 'calm',
       disabled: !!reason,
-      spendsToken: true,
+      spendsToken: !buysPlay,
       tokenBlocked: reason === 'Нет жетонов действия.',
       reason
     });
   }
 
-  const bluffReason = !hasTokens
-    ? 'Нет жетонов действия.'
-    : input.hasPlayedRoleThisTurn
-      ? 'Роль уже была в этом ходу.'
+  const bluffPrice = paidPlayPrice(input.rules);
+  const buysBluff = !hasTokens && bluffPrice !== null;
+  const bluffPay = playPayment(input.rules, viewer);
+  const bluffReason = input.hasPlayedRoleThisTurn
+    ? 'Роль уже была в этом ходу.'
+    : !bluffPay
+      ? buysBluff
+        ? 'Не хватает золота.'
+        : 'Нет жетонов действия.'
       : undefined;
   options.push({
     kind: 'bluff',
-    hint: 'Положить карту взакрытую и заявить любую роль двора',
-    label: 'Блеф',
+    hint: buysBluff
+      ? 'Жетонов нет — заявить роль за золото'
+      : 'Положить карту взакрытую и заявить любую роль двора',
+    label: buysBluff ? `Блеф за ${bluffPrice} 🪙` : 'Блеф',
     tone: 'danger',
     disabled: !!bluffReason,
-    spendsToken: true,
+    spendsToken: !buysBluff,
     tokenBlocked: bluffReason === 'Нет жетонов действия.',
     reason: bluffReason
   });
@@ -628,7 +675,7 @@ function phaseOf(input: TableViewInput, viewer: Player): PhaseKind {
    * не появлялась, и стол стоял до конца круга. Круг — это объявление, а не
    * фаза, отбирающая ход; предупреждение о нём переехало в `guidance`. */
   if (activePlayerId === viewer.id && turnPhase === 'IDLE' && !pendingAction) return 'turn';
-  if (input.coronationCandidateId) return 'coronation';
+  if (input.coronations.length > 0) return 'coronation';
   return 'waiting';
 }
 
@@ -675,14 +722,22 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
     case 'turn':
       /* Идущий круг коронации — самое важное, что игрок должен знать на своём
          ходу: это последний шанс сбить претендента. */
-      if (input.coronationCandidateId && input.coronationCandidateId !== viewer.id) {
-        const претендент = players.find(p => p.id === input.coronationCandidateId);
-        return претендент
-          ? `Круг коронации: сбейте влияние ${accOf(претендент)}, пока круг не замкнулся.`
-          : 'Круг коронации: сбейте влияние претендента, пока круг не замкнулся.';
-      }
-      if (input.coronationCandidateId === viewer.id) {
-        return 'Круг коронации идёт за вас — удержите короны до конца круга.';
+      /* Кругов может идти несколько; говорим о чужих, потому что своё
+         удержание игрок и так видит по своим коронам, а сбивать надо чужих. */
+      {
+        const чужие = input.coronations
+          .filter(c => c.candidateId !== viewer.id)
+          .map(c => players.find(p => p.id === c.candidateId))
+          .filter((p): p is Player => !!p);
+        if (чужие.length === 1) {
+          return `Круг коронации: сбейте влияние ${accOf(чужие[0])}, пока круг не замкнулся.`;
+        }
+        if (чужие.length > 1) {
+          return `Кругов коронации сразу ${чужие.length}: сбейте влияние претендентов, пока круги не замкнулись.`;
+        }
+        if (isCoronationCandidate(input.coronations, viewer.id)) {
+          return 'Круг коронации идёт за вас — удержите короны до конца круга.';
+        }
       }
       return 'Выберите действие двора или нажмите на карту, чтобы сыграть её.';
     case 'doubt':

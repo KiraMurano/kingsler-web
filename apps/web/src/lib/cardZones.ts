@@ -14,7 +14,8 @@
  * `ZONE_PRECEDENCE` settles those ties, and a card claimed by the higher rule
  * is never also emitted in the lower one.
  */
-import type { GameCard, GameState } from '@kinglier/engine/types';
+import type { GameCard, GameState, PlotPulseKind, PlotType } from '@kinglier/engine/types';
+import { initialCharges } from '@kinglier/engine/resolvers/plotResolver';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
 import { ZONE_PRECEDENCE } from '../motion/zones.ts';
 import type { Face, PlacedCard, Zone } from '../motion/zones.ts';
@@ -30,6 +31,9 @@ export type ZoneState = Pick<
   | 'pendingAction'
   | 'pendingDuelDefenderCardId'
   | 'overlayInstant'
+  | 'isVetoed'
+  | 'vetoChain'
+  | 'plotPulses'
   | 'revealOutcome'
   | 'duelOutcome'
   | 'turnPhase'
@@ -91,10 +95,33 @@ export function deriveCardZones(
     pendingAction,
     pendingDuelDefenderCardId,
     overlayInstant,
+    isVetoed,
+    vetoChain,
+    plotPulses,
     revealOutcome,
     duelOutcome,
     turnPhase
   } = state;
+
+  /**
+   * Действие отменено вето, и само вето уже убрано со стола.
+   *
+   * Ровно эти два условия вместе означают «карта, на которую наложили вето,
+   * больше не в игре»: `isVetoed` без `overlayInstant` не бывает, пока вето
+   * лежит и на него ещё могут ответить встречным. Как только круг закрылся и
+   * движок снял оверлей, отменённая карта перестаёт числиться на столе — и
+   * уходит туда, где её теперь ждут: интрига и открытый инстант в сброс,
+   * ставка обратно в руку.
+   *
+   * Без этого она оставалась лежать на месте весь `ACTION_HOLD_MS`, который
+   * движок держит после отмены: вето улетало в угол сразу, а перечёркнутая им
+   * карта — через две секунды, будто их ничто не связывает.
+   */
+  const cancelled = isVetoed && !overlayInstant;
+
+  /** Отозвался ли стол на эту карту прямо сейчас — и как. */
+  const pulseOf = (id: CardId): PlotPulseKind | undefined =>
+    plotPulses.find(p => p.cardId === id)?.kind;
 
   /* Every face the state knows about, whether or not the viewer may see it. */
   const faceIndex = new Map<CardId, GameCard | null>();
@@ -186,13 +213,15 @@ export function deriveCardZones(
     zone: Zone,
     face: Face,
     ownerId: string | null,
-    extra?: { charges?: number; underlay?: boolean }
+    extra?: { charges?: number; underlay?: boolean; vetoLink?: number; pulse?: PlotPulseKind }
   ): void {
     const previous = claimed.get(id);
     if (previous && ZONE_PRECEDENCE[previous.zone.kind] >= ZONE_PRECEDENCE[zone.kind]) return;
     const placed: PlacedCard = { id, zone, face, revealed: scrutinised.has(id), ownerId };
     if (verdicts.has(id)) placed.wasTruth = verdicts.get(id);
     if (extra?.charges !== undefined) placed.charges = extra.charges;
+    if (extra?.vetoLink !== undefined) placed.vetoLink = extra.vetoLink;
+    if (extra?.pulse) placed.pulse = extra.pulse;
     if (extra?.underlay) placed.underlay = true;
     claimed.set(id, placed);
   }
@@ -209,10 +238,19 @@ export function deriveCardZones(
     const overlay = { card: overlayInstant.card as GameCard, actorId: overlayInstant.actorId };
     claim(
       resolveOverlayCardId(state, overlay),
-      { kind: 'overlay' },
+      /* Поверх выкладки Интриги оверлею нечего перечёркивать: интрига в это
+         время уезжает в слот своего игрока, а посреди стола пусто. Он и
+         занимает эту пустую лунку — обычную, карточную, — вместо того чтобы
+         лечь наискось поверх ничего (см. `lib/cardLie.ts`). */
+      { kind: 'overlay', over: pendingAction?.type === 'plot' ? 'plot' : 'action' },
       { known: overlay.card },
       overlay.actorId,
-      { underlay: duelIsLive }
+      {
+        underlay: duelIsLive,
+        /* Номер звена нужен только вето: по нему слой карт кладёт встречное
+           вето накрест предыдущего. Остальным оверлеям он не значит ничего. */
+        vetoLink: overlay.card === 'Право вето' ? vetoChain : undefined
+      }
     );
   }
 
@@ -245,7 +283,7 @@ export function deriveCardZones(
      `hidden` is the point of the whole zone: once a card is staked it is
      lying face-down in front of the court, unreadable even by the player who
      staked it. Anything else and «не верю» has nothing left to turn over. */
-  if (pendingAction?.type === 'role' && pendingAction.stakedCardId) {
+  if (!cancelled && pendingAction?.type === 'role' && pendingAction.stakedCardId) {
     claim(
       pendingAction.stakedCardId,
       { kind: 'stake' },
@@ -256,7 +294,7 @@ export function deriveCardZones(
 
   /* 4. table — an instant lying openly in the middle while its window runs.
      It is already in the discard array; the table claim keeps it visible. */
-  if (pendingAction?.type === 'instant' && pendingAction.stakedCardId) {
+  if (!cancelled && pendingAction?.type === 'instant' && pendingAction.stakedCardId) {
     const laid = (pendingAction.instantType ?? pendingAction.name) as GameCard;
     claim(
       pendingAction.stakedCardId,
@@ -269,14 +307,17 @@ export function deriveCardZones(
   /* 5. plot — a plot goes straight from the hand to its owner's slot; between
      leaving the hand and landing in `activePlot` the action is the only thing
      that still names it. */
-  if (pendingAction?.type === 'plot' && pendingAction.stakedCardId) {
+  if (!cancelled && pendingAction?.type === 'plot' && pendingAction.stakedCardId) {
     const laid = (pendingAction.plotType ?? pendingAction.name) as GameCard;
     claim(
       pendingAction.stakedCardId,
       { kind: 'plot', playerId: pendingAction.actorId },
       { known: laid },
       pendingAction.actorId,
-      laid === 'Тайный заговор' ? { charges: 0 } : undefined
+      /* Накопитель показывается с первого кадра выкладки, а не со следующего
+         состояния: карта уже в слоте, и цифра — часть того, что на ней
+         напечатано. Какой интриге он положен, решает движок. */
+      { charges: initialCharges(laid as PlotType) }
     );
   }
   for (const p of players) {
@@ -286,7 +327,7 @@ export function deriveCardZones(
       { kind: 'plot', playerId: p.id },
       { known: p.activePlot.type },
       p.id,
-      { charges: p.activePlot.charges }
+      { charges: p.activePlot.charges, pulse: pulseOf(p.activePlot.cardId) }
     );
   }
 
@@ -306,7 +347,7 @@ export function deriveCardZones(
   /* 7. discard — the graveyard, owned by nobody. A card keeps the face it was
      shown with on the way in, and stays face-down if it was never shown. */
   for (const d of discardPile) {
-    claim(d.id, { kind: 'discard' }, faceFor(d.id), null);
+    claim(d.id, { kind: 'discard' }, faceFor(d.id), null, { pulse: pulseOf(d.id) });
   }
 
   /* 8. deck — included so a draw has somewhere to fly from. Face-down for

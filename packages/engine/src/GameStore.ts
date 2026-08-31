@@ -28,7 +28,7 @@ import { triggerResourceFloat } from './utils/visualEffects';
 
 // Domain Resolvers
 import { addSealsToPlayer } from './resolvers/sealsResolver';
-import { DEFAULT_RULES, normalizeRules } from './rules';
+import { DEFAULT_RULES, normalizeRules, playPayment } from './rules';
 import { canBeTargetedBy } from './targeting';
 import {
   disruptPlayerPlotsOnLoss,
@@ -90,8 +90,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   hasPlayedRoleThisTurn: false,
   hasPlayedPlotThisTurn: false,
 
-  coronationCandidateId: null,
-  coronationOriginId: null,
+  coronations: [],
   opening: null,
   pendingAction: null,
   pendingDoubtDoubterId: null,
@@ -99,6 +98,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   pendingDoubtActionId: null,
   pendingVetoPassedIds: [],
   pendingVetoActionId: null,
+  pendingRedirectFromId: null,
 
   isVaBanqueActive: false,
   ...vetoReset(),
@@ -114,6 +114,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   revealOutcome: null,
   informantPeekData: null,
+  plotPulses: [],
   conspiracyPrompt: null,
 
   activeSpeechReactions: {},
@@ -215,13 +216,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       hasUsedNormalActionThisTurn: false,
       hasPlayedRoleThisTurn: false,
       hasPlayedPlotThisTurn: false,
-      coronationCandidateId: null,
-      coronationOriginId: null,
+      coronations: [],
       pendingAction: null,
       pendingDoubtPassedIds: [],
       pendingDoubtActionId: null,
       pendingVetoPassedIds: [],
       pendingVetoActionId: null,
+  pendingRedirectFromId: null,
       overlayInstant: null,
       isVaBanqueActive: false,
       ...vetoReset(),
@@ -233,6 +234,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       timerMaxSeconds: 14,
       revealOutcome: null,
       informantPeekData: null,
+      plotPulses: [],
       activeSpeechReactions: {},
       floatingResourceEvents: [],
       winnerId: null,
@@ -442,16 +444,25 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const rules = get().rules;
     const withVaBanque = !!actionData.withVaBanque;
-    const tokensRequired = 1;
 
-    // Check action tokens
-    if (actor.actionTokens < tokensRequired) {
-      return;
-    }
-
-    if (actor.gold < actionData.costGold) {
-      return;
-    }
+    /*
+     * Жетоны кончились — но карту, возможно, ещё можно доиграть за золото.
+     *
+     * Это «розыгрыш за монеты»: он снимает только нехватку жетонов и ничего
+     * больше. Лимит «одна роль за ход» остаётся на месте — его держит
+     * `hasPlayedRoleThisTurn`, и покупка его не обходит: иначе за один ход
+     * можно было бы выкачать казну одним и тем же Казначеем, а это уже другая
+     * игра.
+     *
+     * Цена лежит в `playPayment` — та же функция, что рисует кнопку на карте:
+     * иначе меню обещало ход, которого резолвер не принимал.
+     */
+    const extraGold =
+      actionData.costGold + (actionData.roleClaim === 'Шантажист' ? rules.blackmailCost : 0);
+    /* Шантаж входит в extraGold: плата уходит при заявлении, и при блефе тоже.
+       Это и есть смысл настройки — заявка стоит денег сама по себе. */
+    const payment = playPayment(rules, actor, extraGold);
+    if (!payment) return;
 
     /* Цель приходит от клиента как есть: `KinglierRoom` стампует только
        `actorId`. Без этой проверки самописный клиент бил бы Вором по пустой
@@ -465,14 +476,6 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     /* Пиром нельзя купить победную корону: кап на единицу ниже порога. */
     if ((actionData.name.includes('Пир') || actionData.name.includes('пир')) && actor.favor >= rules.crownsToWin - 1) {
-      return;
-    }
-
-    /* Заявление «Шантажиста» стоит золота, если правила так велят. Плата
-       берётся здесь, при заявлении, — значит она уходит и при блефе, и при
-       вето, и при проигранной дуэли. Это и есть смысл настройки: заявка
-       Шантажиста должна стоить денег сама по себе, а не только успешная. */
-    if (actionData.roleClaim === 'Шантажист' && actor.gold < rules.blackmailCost) {
       return;
     }
 
@@ -498,8 +501,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const action: Action = {
       ...actionData,
       id: Math.random().toString(36).substring(7),
-      costTokens: tokensRequired,
-      costGold: actionData.costGold + (actionData.roleClaim === 'Шантажист' ? rules.blackmailCost : 0),
+      costTokens: payment.tokens,
+      costGold: payment.gold,
       stakedCardId,
       withVaBanque
     };
@@ -509,8 +512,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       players: state.players.map(p => p.id === actor.id ? {
         ...p,
         hand: actorHand,
-        actionTokens: p.actionTokens - tokensRequired,
-        gold: p.gold - action.costGold
+        actionTokens: p.actionTokens - payment.tokens,
+        gold: p.gold - payment.gold
       } : p),
       discardPile: newDiscard,
       turnSubPhase: 'CARD_PLAY_PHASE',
@@ -522,10 +525,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       isPendingActionAfterTruthChallenge: false
     }));
 
-    if (action.costGold > 0) {
-      triggerResourceFloat(set, actor.id, `-${action.costGold} 🪙`, false);
+    if (payment.gold > 0) {
+      triggerResourceFloat(set, actor.id, `-${payment.gold} 🪙`, false);
     }
-    triggerResourceFloat(set, actor.id, `-${tokensRequired} ⚡`, false);
+    if (payment.tokens > 0) {
+      triggerResourceFloat(set, actor.id, `-${payment.tokens} ⚡`, false);
+    }
     if (withVaBanque) {
       triggerResourceFloat(set, actor.id, '🎲 ВА-БАНК (x2)', true);
     }
@@ -546,7 +551,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set(state => ({
       activeSpeechReactions: { [actor.id]: speechText },
-      history: [`${actor.name} заявляет: ${roleName}${targetInfo}${stakeNotice}${vbNotice} (потрачено ${tokensRequired} ⚡).`, ...state.history].slice(0, 50)
+      history: [`${actor.name} заявляет: ${roleName}${targetInfo}${stakeNotice}${vbNotice} (${payment.tokens > 0 ? `потрачено ${payment.tokens} ⚡` : `потрачено ${payment.gold} 🪙`}).`, ...state.history].slice(0, 50)
     }));
 
     // 1. Normal actions execute after 1.5s

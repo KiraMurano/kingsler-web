@@ -14,16 +14,32 @@ import { PlotSlot } from './PlotSlot';
 export const CrownsTrack: React.FC<{
   favor: number;
   compact?: boolean;
+  /** Идёт ли по игроку круг коронации: подпись меняется на «На коронации». */
+  crowning?: boolean;
   events?: readonly DeltaEvent[];
-}> = ({ favor, compact, events = [] }) => {
+}> = ({ favor, compact, crowning = false, events = [] }) => {
   /* Дорожка обязана показывать порог ИМЕННО ЭТОЙ партии: он настраивается
      перед стартом, и зашитая шестёрка врала бы и цифрой, и числом делений. */
   const crownsToWin = useGameStore(s => s.rules.crownsToWin);
 
+  /* Порог взят — дорожка оживает. Это единственное состояние дорожки, о
+     котором стоит сообщать движением: полный набор корон запускает круг
+     коронации, то есть отсчёт до конца партии. */
+  const full = favor >= crownsToWin;
+
   return (
-    <div className={`crowns ${compact ? 'crowns--compact' : ''}`}>
+    <div
+      className={['crowns', compact ? 'crowns--compact' : '', full ? 'crowns--full' : '']
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="crowns__head">
-        <span className="eyebrow">До престола</span>
+        {/* Не `.eyebrow`: тот набран капителью, а имя состояния — обычная
+            подпись с заглавной. Капитель здесь читалась как ярлык рубрики, а
+            это ответ на вопрос «сколько осталось». */}
+        <span className="crowns__label">
+          {crowning ? 'На коронации' : 'До престола'}
+        </span>
         <span className="crowns__value delta-anchor">
           <UiIcon kind="crown" size="sm" /> <AnimatedNumber value={favor} />/{crownsToWin}
           <Deltas events={events} kind="crown" />
@@ -47,10 +63,17 @@ export const CrownsTrack: React.FC<{
 interface PlayerCrestProps {
   player: Player;
   isActive: boolean;
+  /** Идёт ли круг коронации по этому игроку: герб подсвечивается золотом. */
+  isCrowning?: boolean;
   onInspectCard?: (card: GameCard) => void;
 }
 
-export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onInspectCard }) => {
+export const PlayerCrest: React.FC<PlayerCrestProps> = ({
+  player,
+  isActive,
+  isCrowning = false,
+  onInspectCard
+}) => {
   const {
     floatingResourceEvents,
     turnPhase,
@@ -105,7 +128,16 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
             : 'ожидание';
 
   return (
-    <aside className={`crest ${isActive ? 'crest--active' : ''}`}>
+    <aside
+      className={[
+        'crest',
+        isActive ? 'crest--active' : '',
+        reaction && reaction !== 'thinking' ? `crest--${reaction}` : '',
+        isCrowning ? 'crest--crowning' : ''
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <Deltas events={deltas} kind="other" />
 
       <div className="crest__plot">
@@ -149,7 +181,7 @@ export const PlayerCrest: React.FC<PlayerCrestProps> = ({ player, isActive, onIn
         </div>
       </div>
 
-      <CrownsTrack favor={player.favor} events={deltas} />
+      <CrownsTrack favor={player.favor} crowning={isCrowning} events={deltas} />
 
       <div className="crest__res">
         <span className="delta-anchor">

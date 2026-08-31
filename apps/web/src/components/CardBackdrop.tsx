@@ -2,7 +2,7 @@ import { cardArt } from '../lib/cardArt.ts';
 const CARDS = [
   ['/assets/cards/back-dual-face.webp', '5%', '8%', '-24deg'],
   ['/assets/cards/intrigue-plot.webp', '22%', '72%', '17deg'],
-  ['/assets/cards/knight.webp', '39%', '-9%', '-8deg'],
+  ['/assets/cards/duelist.webp', '39%', '-9%', '-8deg'],
   ['/assets/cards/instant-veto.webp', '55%', '78%', '23deg'],
   ['/assets/cards/treasurer.webp', '73%', '5%', '12deg'],
   ['/assets/cards/back-dual-face.webp', '88%', '62%', '-18deg'],

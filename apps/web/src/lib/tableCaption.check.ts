@@ -123,3 +123,34 @@ assert.equal(
 assert.equal(tableCaption(null, players), null);
 
 console.log('tableCaption.check: ok');
+
+/* --- «Ва-банк» называет заявку, а не только сам себя --------------------- */
+{
+  const court: Named[] = [
+    { id: 'p1', name: 'Барон Дима', isBot: true },
+    { id: 'p2', name: 'Графиня Елена', isBot: true }
+  ];
+  const vabanque = { card: 'Ва-банк', actorId: 'p1' };
+
+  /* Без цели: «идёт ва-банк и заявляет Наследника». Одного «идёт ва-банк»
+     мало — на столе лежит закрытая карта, и что заявлено, видно только тут. */
+  assert.equal(
+    overlayCaption(vabanque, act({ type: 'role', name: 'Наследник', actorId: 'p1', roleClaim: 'Наследник' }), court),
+    'Барон Дима идёт ва-банк и заявляет Наследника'
+  );
+
+  /* С целью — с целью в родительном. */
+  assert.equal(
+    overlayCaption(
+      vabanque,
+      act({ type: 'role', name: 'Шантажист', actorId: 'p1', roleClaim: 'Шантажист', targetId: 'p2' }),
+      court
+    ),
+    'Барон Дима идёт ва-банк и заявляет Шантажиста против Графини Елены'
+  );
+
+  /* Заявки под ним нет — остаётся прежняя короткая подпись. */
+  assert.equal(overlayCaption(vabanque, null, court), 'Барон Дима идёт ва-банк');
+}
+
+console.log('tableCaption.check.ts: «Ва-банк» с заявкой — ok');

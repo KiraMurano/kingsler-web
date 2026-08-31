@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import type { GameCard } from '@kinglier/engine/types';
 import type { GameRules } from '@kinglier/engine/rules';
 import {
+  BLACKMAIL_PRICE_ON,
   DECK_COPIES_LIMIT,
   DEFAULT_RULES,
   RULE_LIMITS,
@@ -28,7 +29,8 @@ type BoolRule =
   | 'paidDuelEnabled'
   | 'vetoOnVeto'
   | 'unmaskEnabled'
-  | 'paidDoubtEnabled';
+  | 'paidDoubtEnabled'
+  | 'paidPlayEnabled';
 
 function Slider({
   label,
@@ -120,11 +122,11 @@ export function RulesEditor({
 }) {
   const [deckOpen, setDeckOpen] = useState(false);
 
-  /* «Платную дуэль» есть смысл включать только когда дуэль вообще стоит жетона
-     и когда проверку разрешено покупать: она заменяет первое ценой второго.
-     То же правило стоит в `normalizeRules` — здесь оно объясняет, а там
-     защищает: правила приходят от клиента-хоста, и верить им нельзя. */
-  const duelCanBePaid = rules.duelCostsToken && rules.paidDoubtEnabled;
+  /* «Платную дуэль» есть смысл включать только когда дуэль вообще стоит жетона:
+     выкупать нечего, если жетон и так не нужен. То же правило стоит в
+     `normalizeRules` — здесь оно объясняет, а там защищает: правила приходят от
+     клиента-хоста, и верить им нельзя. */
+  const duelCanBePaid = rules.duelCostsToken;
 
   const num = (key: NumericRule) => (value: number) => onChange({ ...rules, [key]: value });
   const flag = (key: BoolRule) => (value: boolean) => {
@@ -139,11 +141,10 @@ export function RulesEditor({
       onChange({ ...rules, unmaskEnabled: true, paidDoubtEnabled: false });
       return;
     }
-    /* «Платная дуэль» держится на двух соседях: выключили любого — гаснет и
-       она. Иначе в правилах осталась бы включённая настройка, которая ничего
+    /* «Платная дуэль» держится на соседе: выключили требование жетона — гаснет
+       и она. Иначе в правилах осталась бы включённая настройка, которая ничего
        не значит, и игрок бы этого не увидел. */
-    const dropsPaidDuel =
-      !value && (key === 'duelCostsToken' || key === 'paidDoubtEnabled');
+    const dropsPaidDuel = !value && key === 'duelCostsToken';
     onChange({
       ...rules,
       [key]: value,
@@ -152,6 +153,24 @@ export function RulesEditor({
   };
   const copies = (card: GameCard) => (value: number) =>
     onChange({ ...rules, deck: { ...rules.deck, [card]: value } });
+
+  /*
+   * «Платный шантаж» — это и есть `blackmailCost > 0`: отдельного флага в
+   * правилах нет, и заводить его значило бы держать два состояния у одного
+   * факта. Цена, с которой правило выключали, помнится на время открытого
+   * экрана — иначе передумавший игрок каждый раз получал бы обратно не своё
+   * число, а умолчание.
+   */
+  const blackmailPaid = rules.blackmailCost > 0;
+  const [rememberedBlackmailPrice, rememberBlackmailPrice] = useState(
+    () => rules.blackmailCost || BLACKMAIL_PRICE_ON
+  );
+  const setBlackmailPaid = (on: boolean) => {
+    /* Цену запоминаем в момент выключения — другого момента нет: в
+       выключенном состоянии в правилах лежит ноль, и вспоминать будет нечего. */
+    if (!on) rememberBlackmailPrice(rules.blackmailCost || BLACKMAIL_PRICE_ON);
+    onChange({ ...rules, blackmailCost: on ? rememberedBlackmailPrice : 0 });
+  };
 
   const size = deckSize(rules);
   const problems = rulesProblems(rules);
@@ -175,7 +194,7 @@ export function RulesEditor({
 
   return (
     <div className="ruleseditor">
-      <Section title="Победа">
+      <Section title="Партия">
         <Slider
           label="Корон для победы"
           hint={
@@ -198,7 +217,7 @@ export function RulesEditor({
         />
       </Section>
 
-      <Section title="Экономика">
+      <Section title="Экономика двора">
         <Slider
           label="Стоимость короны (пир)"
           value={rules.feastCost}
@@ -213,17 +232,26 @@ export function RulesEditor({
           max={RULE_LIMITS.rumorCost[1]}
           onChange={num('rumorCost')}
         />
-        <Slider
-          label="Стоимость шантажа"
-          hint="Платится при заявлении — и при блефе тоже. 0 — заявление бесплатно."
-          value={rules.blackmailCost}
-          min={RULE_LIMITS.blackmailCost[0]}
-          max={RULE_LIMITS.blackmailCost[1]}
-          onChange={num('blackmailCost')}
+        <Toggle
+          label="Платный шантаж"
+          hint="Заявление «Шантажиста» стоит золота — и при блефе тоже. Выключено — заявление бесплатно."
+          value={blackmailPaid}
+          onChange={setBlackmailPaid}
         />
+        {blackmailPaid && (
+          <Slider
+            label="Цена шантажа"
+            value={rules.blackmailCost}
+            /* Ползунок начинается с единицы: ноль — это не цена, а выключенное
+               правило, и распоряжается им тумблер выше. */
+            min={1}
+            max={RULE_LIMITS.blackmailCost[1]}
+            onChange={num('blackmailCost')}
+          />
+        )}
       </Section>
 
-      <Section title="Реакции и вето">
+      <Section title="Дуэль и вето">
         <Toggle
           label="Дуэль тратит жетон хода"
           hint="Выключено — щит на дуэли жетона не стоит."
@@ -244,6 +272,14 @@ export function RulesEditor({
           value={rules.vetoOnVeto}
           onChange={flag('vetoOnVeto')}
         />
+      </Section>
+
+      {/* Один раздел на все правила вида «жетона нет — заплати золотом». Они
+          читаются только друг против друга: что именно можно купить, почём и
+          что чего не переживает. Разнесённые по трём разделам, они выглядели
+          как три несвязанные настройки, хотя это один рычаг с четырьмя
+          положениями. */}
+      <Section title="Золото вместо жетона">
         <Toggle
           label="Платная проверка"
           hint="Любую проверку можно купить за золото, когда жетонов нет. Гасит «Срыв масок»."
@@ -280,29 +316,56 @@ export function RulesEditor({
             «Платная проверка» включает в себя «Срыв масок», поэтому второй тумблер погашен.
           </div>
         )}
-        {/* Платная дуэль — это замена жетона золотом, поэтому она требует обоих
-            соседей: без жетона в цене нечего заменять, без платной проверки
-            неоткуда взять цену. Пока их нет, тумблер погашен и объясняет себя,
-            а не прячется: спрятанная настройка выглядит как отсутствующая. */}
+        <Toggle
+          label="Разыгрывать карты за монеты"
+          hint="Кончились жетоны — карту можно доиграть за золото. Лимит «одна роль за ход» остаётся."
+          value={rules.paidPlayEnabled}
+          onChange={flag('paidPlayEnabled')}
+        />
+        {rules.paidPlayEnabled && (
+          /* Цена своя, а не взятая у платной проверки: это разные ходы — свой
+             против чужого, — и цениться они вправе по-разному. */
+          <Slider
+            label="Цена розыгрыша за монеты"
+            value={rules.paidPlayCost}
+            min={RULE_LIMITS.paidPlayCost[0]}
+            max={RULE_LIMITS.paidPlayCost[1]}
+            onChange={num('paidPlayCost')}
+          />
+        )}
+        {/* Платная дуэль — это выкуп жетона золотом, поэтому ей нужен сосед,
+            который жетон требует. Пока его нет, тумблер погашен и объясняет
+            себя, а не прячется: спрятанная настройка выглядит как
+            отсутствующая. */}
         <Toggle
           label="Платная дуэль"
-          hint="Без жетона щит можно поднять за золото — по цене платной проверки."
+          hint="Без жетона щит можно поднять за золото."
           value={rules.paidDuelEnabled}
           disabled={!duelCanBePaid}
           onChange={flag('paidDuelEnabled')}
         />
         {!duelCanBePaid && (
           <div className="rulenote">
-            «Платная дуэль» заменяет жетон золотом, поэтому нужны оба: «Дуэль тратит жетон
-            хода» и «Платная проверка» — она задаёт цену.
+            «Платная дуэль» выкупает жетон золотом, поэтому нужна настройка «Дуэль тратит
+            жетон хода»: без неё выкупать нечего.
           </div>
         )}
         {rules.paidDuelEnabled && (
+          /* Цена своя, а не взятая у платной проверки: щит и проверка — разные
+             ходы, и заимствование заставляло включать платную проверку ради
+             одной только дуэли. */
+          <Slider
+            label="Цена платной дуэли"
+            value={rules.paidDuelCost}
+            min={RULE_LIMITS.paidDuelCost[0]}
+            max={RULE_LIMITS.paidDuelCost[1]}
+            onChange={num('paidDuelCost')}
+          />
+        )}
+        {rules.paidDuelEnabled && rules.duelCost > 0 && (
           <div className="rulenote">
-            Вызов без жетона обойдётся в {rules.paidDoubtCost + rules.duelCost} 🪙
-            {rules.duelCost > 0
-              ? ` — цена проверки (${rules.paidDoubtCost}) плюс стоимость дуэли (${rules.duelCost}).`
-              : '.'}
+            Вызов без жетона обойдётся в {rules.paidDuelCost + rules.duelCost} 🪙 — выкуп
+            ({rules.paidDuelCost}) плюс надбавка за дуэль ({rules.duelCost}).
           </div>
         )}
       </Section>

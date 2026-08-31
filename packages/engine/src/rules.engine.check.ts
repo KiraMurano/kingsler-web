@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import type { GameCard, Player } from './types.ts';
 import { useGameStore } from './GameStore.ts';
-import { resolveCoronationAtTurnStart, fallenCoronationPatch } from './resolvers/coronation.ts';
+import { resolveCoronationsAtTurnStart, survivingCoronations } from './resolvers/coronation.ts';
 import { addSealsToPlayer } from './resolvers/sealsResolver.ts';
 import { mintDeck } from './cardInstance.ts';
 import { timerManager } from './utils/timerManager.ts';
@@ -46,18 +46,19 @@ function hand(cards: GameCard[]) {
   const players: Player[] = [
     { id: 'p1', name: 'p1', avatar: '', seatNumber: 1, isBot: false, gold: 0, favor: 3, seals: 0, actionTokens: 2, hand: [], activePlot: null }
   ];
-  assert.equal(resolveCoronationAtTurnStart('p1', players, 'p1', 'p1', 3).kind, 'win', 'на пороге 3 трёх корон хватает');
-  assert.equal(resolveCoronationAtTurnStart('p1', players, 'p1', 'p1', 4).kind, 'abort', 'на пороге 4 — нет');
+  const circle = [{ candidateId: 'p1', originId: 'p1' }];
+  assert.equal(resolveCoronationsAtTurnStart('p1', players, circle, 3).verdict.kind, 'win', 'на пороге 3 трёх корон хватает');
+  assert.equal(resolveCoronationsAtTurnStart('p1', players, circle, 4).verdict.kind, 'abort', 'на пороге 4 — нет');
 
-  assert.deepEqual(fallenCoronationPatch('p1', 'p1', 2, 3), { coronationCandidateId: null, coronationOriginId: null });
-  assert.deepEqual(fallenCoronationPatch('p1', 'p1', 3, 3), {}, 'на пороге круг держится');
+  assert.deepEqual(survivingCoronations(circle, 'p1', 2, 3), [], 'ниже порога круг снят');
+  assert.deepEqual(survivingCoronations(circle, 'p1', 3, 3), circle, 'на пороге круг держится');
 }
 
 // --- Круг коронации открывается на пороге из правил ---
 for (const crownsToWin of [1, 5, 10]) {
   const meId = table({ crownsToWin });
   patch(meId, { favor: crownsToWin - 1, actionTokens: 2, hand: hand(['Наследник', 'Шут']) });
-  useGameStore.setState({ coronationCandidateId: null, coronationOriginId: null });
+  useGameStore.setState({ coronations: [] });
 
   // Прямое начисление короны через печати: 2 ⚜️ = 1 👑.
   patch(meId, { seals: 1 });
@@ -66,7 +67,11 @@ for (const crownsToWin of [1, 5, 10]) {
   const after = useGameStore.getState();
   const me = after.players.find(p => p.id === meId)!;
   assert.equal(me.favor, crownsToWin, `порог ${crownsToWin}: корона добрана`);
-  assert.equal(after.coronationCandidateId, meId, `порог ${crownsToWin}: круг коронации открыт`);
+  assert.deepEqual(
+    after.coronations.map(c => c.candidateId),
+    [meId],
+    `порог ${crownsToWin}: круг коронации открыт`
+  );
   timerManager.clearAll();
 }
 
@@ -85,12 +90,12 @@ for (const crownsToWin of [1, 5, 10]) {
   const meId = table({ crownsToWin: 4 });
   const victim = useGameStore.getState().players[1].id;
   patch(victim, { favor: 4 });
-  useGameStore.setState({ coronationCandidateId: victim, coronationOriginId: meId });
+  useGameStore.setState({ coronations: [{ candidateId: victim, originId: meId }] });
 
   // Прямая потеря короны через тот же путь, что и все атаки.
   const { loseCrowns } = await import('./resolvers/crownLoss.ts');
   loseCrowns(useGameStore.getState, useGameStore.setState, victim, 1, 'проверки');
-  assert.equal(useGameStore.getState().coronationCandidateId, null, 'круг сорван падением ниже порога');
+  assert.deepEqual(useGameStore.getState().coronations, [], 'круг сорван падением ниже порога');
   timerManager.clearAll();
 }
 
@@ -112,9 +117,12 @@ for (const actionTokens of [1, 2, 5]) {
   const nextId = state.players[1].id;
   patch(nextId, { actionTokens: 0 });
 
-  const { checkEndgameAndAdvanceTurn } = await import('./resolvers/turnResolver.ts');
+  /* Ход передаётся нажатием, а не сам: истраченные жетоны его больше не
+     заканчивают (см. `resolvers/turnHandover.check.ts`). Здесь проверяется
+     восполнение на входе в следующий ход, а не то, чем предыдущий кончился, —
+     поэтому ход отдаётся тем же способом, что и в игре. */
   patch(meId, { actionTokens: 0 });
-  checkEndgameAndAdvanceTurn(useGameStore.getState, useGameStore.setState);
+  useGameStore.getState().endTurnManually();
 
   const active = useGameStore.getState().players.find(
     p => p.id === useGameStore.getState().activePlayerId
@@ -244,7 +252,7 @@ async function underAttack(rules: object) {
   const meId = table(rules);
   const victim = useGameStore.getState().players[1].id;
   patch(meId, { gold: 9, hand: hand(['Шантажист', 'Шут']) });
-  patch(victim, { favor: 3, activePlot: null, hand: hand(['Рыцарь', 'Шут']) });
+  patch(victim, { favor: 3, activePlot: null, hand: hand(['Дуэлянт', 'Шут']) });
 
   const staked = useGameStore.getState().players.find(p => p.id === meId)!.hand[0].id;
   useGameStore.getState().performAction({
@@ -324,27 +332,32 @@ assert.deepEqual(
   'без надбавки всё как раньше: один жетон'
 );
 
-/* Платная дуэль: жетона нет, его заменяет золото по цене платной проверки —
-   и надбавка платится сверх неё. */
-const paidDuel = {
-  duelCostsToken: true, paidDoubtEnabled: true, paidDoubtCost: 2,
-  paidDuelEnabled: true, duelCost: 1
-};
+/* Платная дуэль: жетона нет, его выкупает золото по СВОЕЙ цене — и надбавка
+   платится сверх неё. Раньше цену занимала «Платная проверка», и включить
+   выкуп щита нельзя было, не разрешив заодно покупать проверки. */
+const paidDuel = { duelCostsToken: true, paidDuelEnabled: true, paidDuelCost: 2, duelCost: 1 };
 assert.deepEqual(price(paidDuel, 1, 5), { tokens: 1, gold: 1 }, 'жетон есть — платит им');
-assert.deepEqual(price(paidDuel, 0, 5), { tokens: 0, gold: 3 }, 'жетона нет — 2 за проверку + 1 надбавка');
+assert.deepEqual(price(paidDuel, 0, 5), { tokens: 0, gold: 3 }, 'жетона нет — 2 за выкуп + 1 надбавка');
 assert.equal(price(paidDuel, 0, 2), null, 'на выкуп не хватает — дуэли нет');
 
-/* Зависимости «Платной дуэли» держит `normalizeRules`, а не экран: правила
-   приходят от клиента-хоста, и верить им нельзя. */
+/* Цена выкупа своя и на цену проверки не смотрит вовсе. */
+assert.deepEqual(
+  price({ ...paidDuel, paidDoubtEnabled: true, paidDoubtCost: 9 }, 0, 5),
+  { tokens: 0, gold: 3 },
+  'дорогая проверка выкуп щита не удорожает'
+);
+
+/* Зависимость у «Платной дуэли» осталась одна, и держит её `normalizeRules`,
+   а не экран: правила приходят от клиента-хоста, и верить им нельзя. */
 assert.equal(
   normalizeRules({ ...paidDuel, duelCostsToken: false }).paidDuelEnabled,
   false,
-  'без требования жетона заменять в цене нечего'
+  'без требования жетона выкупать нечего'
 );
 assert.equal(
   normalizeRules({ ...paidDuel, paidDoubtEnabled: false }).paidDuelEnabled,
-  false,
-  'без платной проверки неоткуда взять цену'
+  true,
+  'а вот платная проверка ей больше не нужна: у выкупа своя цена'
 );
 assert.equal(normalizeRules({}).duelCost, 0, 'по умолчанию дуэль золота не стоит');
 
@@ -357,7 +370,7 @@ assert.equal(normalizeRules({}).duelCost, 0, 'по умолчанию дуэль
 
   const after = useGameStore.getState();
   assert.equal(after.turnPhase, 'DUEL_CLASH', 'платная дуэль поднимает щит без жетона');
-  assert.equal(after.players.find(p => p.id === victim)!.gold, 3, 'списаны 2 + 1 монеты');
+  assert.equal(after.players.find(p => p.id === victim)!.gold, 3, 'списаны 2 за выкуп + 1 надбавка');
   timerManager.clearAll();
 }
 

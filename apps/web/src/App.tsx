@@ -10,6 +10,7 @@ import { SeatsRow } from './components/SeatsRow';
 import { Arena } from './components/Arena';
 import { CardPiles } from './components/CardPiles';
 import { DuelClash } from './components/DuelClash';
+import { SparkLayer } from './motion/Sparks';
 import { Hand } from './components/Hand';
 import { CardMenu } from './components/CardMenu';
 import { PlayerCrest } from './components/PlayerCrest';
@@ -42,6 +43,8 @@ import type { PendingTargetAction } from './components/targeting';
 import type { Account } from './auth/AuthClient';
 import { InspectCardContext } from './lib/inspectCardContext';
 import './styles/rules.css';
+import { isCoronationCandidate } from '@kinglier/engine/resolvers/coronation';
+import { CoronationBoard } from './components/CoronationBoard';
 
 export default function App({
   mode,
@@ -67,7 +70,7 @@ export default function App({
     overlayInstant,
     revealOutcome,
     duelOutcome,
-    coronationCandidateId,
+    coronations,
     opening,
     viewerId,
     startGame,
@@ -85,9 +88,9 @@ export default function App({
     pendingDoubtPassedIds,
     hasUsedNormalActionThisTurn,
     hasPlayedRoleThisTurn,
-    hasPlayedPlotThisTurn,
     isVetoed,
     vetoChain,
+    plotPulses,
     pendingVetoPassedIds,
     rules,
     endTurnManually,
@@ -105,7 +108,7 @@ export default function App({
       overlayInstant: s.overlayInstant,
       revealOutcome: s.revealOutcome,
       duelOutcome: s.duelOutcome,
-      coronationCandidateId: s.coronationCandidateId,
+      coronations: s.coronations,
       opening: s.opening,
       viewerId: s.viewerId,
       startGame: s.startGame,
@@ -123,9 +126,9 @@ export default function App({
       pendingDoubtPassedIds: s.pendingDoubtPassedIds,
       hasUsedNormalActionThisTurn: s.hasUsedNormalActionThisTurn,
       hasPlayedRoleThisTurn: s.hasPlayedRoleThisTurn,
-      hasPlayedPlotThisTurn: s.hasPlayedPlotThisTurn,
       isVetoed: s.isVetoed,
       vetoChain: s.vetoChain,
+      plotPulses: s.plotPulses,
       pendingVetoPassedIds: s.pendingVetoPassedIds,
       rules: s.rules,
       endTurnManually: s.endTurnManually,
@@ -229,6 +232,9 @@ export default function App({
           pendingAction,
           pendingDuelDefenderCardId,
           overlayInstant,
+          isVetoed,
+          vetoChain,
+          plotPulses,
           revealOutcome,
           duelOutcome,
           turnPhase
@@ -249,6 +255,9 @@ export default function App({
       pendingAction,
       pendingDuelDefenderCardId,
       overlayInstant,
+      isVetoed,
+      vetoChain,
+      plotPulses,
       revealOutcome,
       duelOutcome,
       turnPhase,
@@ -271,7 +280,6 @@ export default function App({
           pendingDoubtPassedIds,
           hasUsedNormalActionThisTurn,
           hasPlayedRoleThisTurn,
-          hasPlayedPlotThisTurn,
           isVetoed,
           opening,
           vetoChain,
@@ -280,7 +288,7 @@ export default function App({
           vetoOnVeto: rules.vetoOnVeto,
           rules,
           vaBanqueArmed,
-          coronationCandidateId,
+          coronations,
           revealOutcome,
           duelOutcome,
           exchangePick
@@ -297,7 +305,6 @@ export default function App({
       pendingDoubtPassedIds,
       hasUsedNormalActionThisTurn,
       hasPlayedRoleThisTurn,
-      hasPlayedPlotThisTurn,
       isVetoed,
       opening,
       vetoChain,
@@ -305,7 +312,7 @@ export default function App({
       overlayInstant,
       rules,
       vaBanqueArmed,
-      coronationCandidateId,
+      coronations,
       revealOutcome,
       duelOutcome,
       exchangePick,
@@ -649,6 +656,9 @@ export default function App({
       <AnchorProvider>
         <CardInteractionProvider value={cardInteraction}>
           <main className="app__stage" onPointerDown={() => setOpenMenuCardId(null)}>
+            {/* Слева и поверх стола: круги коронации — объявление на всю
+                партию, а не часть чьего-то места. */}
+            <CoronationBoard />
             <div className="table">
               <div className="table__rim" />
               <SeatsRow
@@ -681,6 +691,7 @@ export default function App({
                 /* Пока идёт открытие, активного места нет: подсветка выдала бы
                    победителя жребия до самого броска. См. `SeatsRow`. */
                 isActive={!opening && activePlayerId === human.id}
+                isCrowning={isCoronationCandidate(coronations, human.id)}
                 onInspectCard={handleInspectCard}
               />
 
@@ -718,8 +729,10 @@ export default function App({
 
             <CardLayer cards={placedCards} />
 
-            {/* Искры стычки. Сами себя порталят поверх карт и молчат, пока
-                дуэльные карты не сойдутся. */}
+            {/* Искры. Холст один на всё, что на этом столе бьёт: и сходящиеся
+                дуэльные карты, и сработавшая интрига. Порталится поверх карт
+                и молчит, пока никто не ударил. */}
+            <SparkLayer />
             <DuelClash />
           </main>
         </CardInteractionProvider>

@@ -6,6 +6,7 @@ import { botMemory } from './botMemory';
 import { canBeTargetedBy } from '../targeting';
 import { useGameStore } from '../GameStore';
 import { CONSPIRACY_FULL_CHARGE, CONSPIRACY_GOLD_HIT } from '../resolvers/plotResolver';
+import { isCoronationCandidate, type Coronation } from '../resolvers/coronation';
 
 /**
  * Пороги «уже опасен» и «на пороге победы» считаются от правил партии, а не от
@@ -66,11 +67,12 @@ export function selectBestBlackmailerTarget(bot: Player, opponents: Player[]): P
     let scoreA = (a.favor * 3.0 * archetype.targetAggression) + (a.gold * 0.5);
     let scoreB = (b.favor * 3.0 * archetype.targetAggression) + (b.gold * 0.5);
 
-    // Память ботов: если известно, что у цели есть «Рыцарь» (щит против Шантажиста), избегаем блокировки
-    if (botMemory.isCounterCardKnown(bot.id, a.id, 'Рыцарь')) {
+    /* Память ботов: у цели видели «Дуэлянта» — щит и от Вора, и от
+       Шантажиста, — значит, бить по ней рискованно. */
+    if (botMemory.isCounterCardKnown(bot.id, a.id, 'Дуэлянт')) {
       scoreA -= 8.0;
     }
-    if (botMemory.isCounterCardKnown(bot.id, b.id, 'Рыцарь')) {
+    if (botMemory.isCounterCardKnown(bot.id, b.id, 'Дуэлянт')) {
       scoreB -= 8.0;
     }
 
@@ -98,7 +100,6 @@ export function selectBestSearchTarget(_bot: Player, opponents: Player[]): Playe
       let s = p.favor * 2;
       if (plot.type === 'Тайный заговор') s += 8 + (plot.charges ?? 0) * 3;
       else if (plot.type === 'Королевский приём') s += 6;
-      else if (plot.type === 'Золотая булла') s += 5;
       else s += 3;
       return s;
     };
@@ -126,7 +127,7 @@ export function shouldPlaySearchNow(
   ctx: {
     players: Player[];
     activePlayerId: string;
-    coronationCandidateId: string | null;
+    coronations: Coronation[];
   },
   rng: () => number = Math.random
 ): boolean {
@@ -137,11 +138,11 @@ export function shouldPlaySearchNow(
   if (bot.favor >= thresholds().nearWin) return false;
 
   const nextId = nextPlayerId(ctx.players, ctx.activePlayerId);
-  const morningPlot = plot.type === 'Королевский приём' || plot.type === 'Золотая булла';
+  const morningPlot = plot.type === 'Королевский приём';
   const urgent =
     (plot.type === 'Тайный заговор' && (plot.charges ?? 0) >= 2) ||
     target.favor >= thresholds().nearWin ||
-    ctx.coronationCandidateId === target.id ||
+    isCoronationCandidate(ctx.coronations, target.id) ||
     (target.id === nextId && morningPlot);
   if (urgent) return true;
 
@@ -196,7 +197,7 @@ export function shouldActivateConspiracyNow(
   bot: Player,
   target: Player,
   charges: number,
-  coronationCandidateId: string | null,
+  coronations: Coronation[],
   rng: () => number = Math.random
 ): boolean {
   /* Копить больше нечего: Заговор разряжается только на 4 зарядах, частичных
@@ -211,7 +212,7 @@ export function shouldActivateConspiracyNow(
   const hasAnyRole = faces(bot.hand).some(isRole);
 
   // Срыв коронации и снос лидера — бить немедленно.
-  if (canCrown && (target.favor >= thresholds().nearWin || coronationCandidateId === target.id)) return true;
+  if (canCrown && (target.favor >= thresholds().nearWin || isCoronationCandidate(coronations, target.id))) return true;
 
   // Заряженный Заговор — приз для чужого «Обыска покоев». Держать его дольше
   // нужного невыгодно, поэтому бьём, как только удар осмыслен.

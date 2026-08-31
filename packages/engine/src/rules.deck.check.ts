@@ -14,7 +14,7 @@ import { timerManager } from './utils/timerManager.ts';
 // --- 1. Без аргумента — сегодняшний состав ---
 {
   const deck = createInitialDeck();
-  assert.equal(deck.length, 51);
+  assert.equal(deck.length, 50);
   for (const card of ALL_CARDS) {
     assert.equal(
       deck.filter(c => c.card === card).length,
@@ -28,7 +28,7 @@ import { timerManager } from './utils/timerManager.ts';
 {
   const deck = createInitialDeck(DEFAULT_RULES.deck);
   assert.equal(deck.length, deckSize(DEFAULT_RULES));
-  assert.equal(deck.length, 51);
+  assert.equal(deck.length, 50);
 }
 
 // --- 3. Ноль копий убирает карту целиком ---
@@ -37,7 +37,7 @@ import { timerManager } from './utils/timerManager.ts';
   const deck = createInitialDeck(rules.deck);
   assert.equal(deck.filter(c => c.card === 'Право вето').length, 0, 'вето вычищено');
   assert.equal(deck.filter(c => c.card === 'Досье').length, 0, 'досье вычищено');
-  assert.equal(deck.length, 51 - 5 - 2);
+  assert.equal(deck.length, 50 - 5 - 2);
 }
 
 // --- 4. Кастомный состав собирается ровно как заказан ---

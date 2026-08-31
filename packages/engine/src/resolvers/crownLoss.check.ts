@@ -8,6 +8,7 @@ import type { CardInstance, GameState, Player } from '../types.ts';
 import { burnCharter, discardProtectiveIntrigueOnBluff, loseCrowns } from './crownLoss.ts';
 import { disruptPlayerPlotsOnLoss } from './plotResolver.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 /** Порог победы задаётся правилами — тесты считают от него, а не от числа. */
 const WIN = DEFAULT_RULES.crownsToWin;
@@ -33,8 +34,7 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
     players,
     discardPile: [] as CardInstance[],
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
     history: [] as string[],
     ...overrides
@@ -82,11 +82,10 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
 {
   const { api, get, set } = makeHarness(
     [player({ id: 'p1', favor: WIN })],
-    { coronationCandidateId: 'p1', coronationOriginId: 'p2' }
+    { coronations: [{ candidateId: 'p1', originId: 'p2' }] }
   );
   loseCrowns(get, set, 'p1', 1, 'обвинения в измене');
-  assert.equal(api.coronationCandidateId, null, 'круг коронации снят');
-  assert.equal(api.coronationOriginId, null, 'источник круга снят вместе с ним');
+  assert.deepEqual(api.coronations, [], 'круг коронации снят вместе с зачинателем');
 }
 
 // --- 5. Потеря сжигает «Королевский приём» жертвы ---
@@ -102,6 +101,11 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   assert.equal(api.players[0].activePlot, null, '«Королевский приём» сорван потерей');
   assert.equal(api.discardPile.length, 1, 'сорванная интрига ушла в сброс');
   assert.equal(api.discardPile[0].id, 'c1', 'в сброс ушёл тот же экземпляр карты');
+  assert.deepEqual(
+    api.plotPulses,
+    [{ cardId: 'c1', kind: 'disrupt' }],
+    'срыв — не сработка: стол обязан показать, что приём сорвали, а не что он состоялся'
+  );
 }
 
 // --- 6. Без потери «Королевский приём» цел ---
@@ -156,10 +160,14 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
       favor: WIN,
       activePlot: { id: 'x', cardId: 'c1', type: 'Охранная грамота' }
     })],
-    { coronationCandidateId: 'p1', coronationOriginId: 'p2' }
+    { coronations: [{ candidateId: 'p1', originId: 'p2' }] }
   );
   loseCrowns(get, set, 'p1', 1, 'обвинения в измене');
-  assert.equal(api.coronationCandidateId, 'p1', 'круг коронации не сорван');
+  assert.deepEqual(
+    api.coronations,
+    [{ candidateId: 'p1', originId: 'p2' }],
+    'круг коронации не сорван'
+  );
   assert.equal(api.players[0].favor, WIN);
 }
 
@@ -264,6 +272,11 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   assert.equal(api.players[0].activePlot, null, 'Стража сгорела');
   assert.equal(api.discardPile[0].card, 'Стража покоев');
   assert.equal(api.discardPile[0].id, 'c1', 'в сброс ушёл тот же экземпляр');
+  assert.deepEqual(
+    api.plotPulses,
+    [{ cardId: 'c1', kind: 'disrupt' }],
+    'стража сорвана блефом — удар сработки врал бы, что она защитила'
+  );
 }
 
 // --- 15. Уличённый в блефе теряет Охранную грамоту ---
@@ -280,6 +293,11 @@ function makeHarness(players: Player[], overrides: Partial<GameState> = {}) {
   assert.equal(api.players[0].activePlot, null, 'грамота сгорела');
   assert.equal(api.players[0].favor, 5, 'сама по себе потеря карты корон не отнимает');
   assert.equal(api.discardPile[0].card, 'Охранная грамота');
+  assert.deepEqual(
+    api.plotPulses,
+    [{ cardId: 'c2', kind: 'disrupt' }],
+    'грамота сорвана блефом — это срыв, не сработка'
+  );
 }
 
 // --- 16. Прочие интриги блефом не сжигаются ---

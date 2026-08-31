@@ -26,7 +26,7 @@ for (const card of ['Стража покоев', 'Охранная грамот�
   assert.equal(CARD_COPIES_MAP[card], 2, `«${card}» должна идти в 2 копиях`);
 }
 
-assert.equal(TOTAL_DECK_SIZE, 51, 'колода 47 + 4 новые карты = 51');
+assert.equal(TOTAL_DECK_SIZE, 50, 'колода: 19 ролей + 15 интриг + 16 инстантов = 50');
 
 const deck = createInitialDeck();
 assert.equal(deck.length, TOTAL_DECK_SIZE, 'createInitialDeck расходится с TOTAL_DECK_SIZE');

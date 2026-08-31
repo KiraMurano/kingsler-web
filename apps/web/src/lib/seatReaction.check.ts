@@ -29,6 +29,7 @@ const at = (over: Partial<SeatReactionInput>) =>
     /* По умолчанию опроса вето не было: он начинается только когда окно
        действительно открылось по ЭТОЙ заявке. */
     pendingVetoActionId: null,
+    pendingRedirectFromId: null,
     overlayInstant: null,
     revealOutcome: null,
     playerId: 'p2',

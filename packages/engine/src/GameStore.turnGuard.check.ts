@@ -34,7 +34,7 @@ function seat(id: string, isBot: boolean, hand: GameCard[]): Player {
 function table() {
   useGameStore.setState({
     players: [
-      seat('p1', false, ['Шантажист', 'Рыцарь']),
+      seat('p1', false, ['Шантажист', 'Дуэлянт']),
       seat('p2', true, ['Вор', 'Шут']),
       seat('p3', true, ['Казначей', 'Наследник'])
     ],
@@ -49,6 +49,7 @@ function table() {
     vetoChain: 0,
     pendingVetoPassedIds: [],
     pendingVetoActionId: null,
+    pendingRedirectFromId: null,
     history: []
   });
 }

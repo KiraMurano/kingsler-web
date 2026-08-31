@@ -22,7 +22,14 @@ export interface GameRules {
   feastCost: number;
   /** Цена базового действия «Распустить слух» (-1 👑 цели). */
   rumorCost: number;
-  /** Цена заявления роли «Шантажист». Списывается даже при блефе. */
+  /**
+   * Цена заявления роли «Шантажист». Списывается даже при блефе.
+   *
+   * **0 — это не цена, а выключенное правило**: тумблер «Платный шантаж» на
+   * экране правил и есть проверка `blackmailCost > 0`. Отдельного флага нет
+   * намеренно — он был бы вторым состоянием у одного и того же факта, и первый
+   * же рассинхрон («флаг включён, цена ноль») пришлось бы чинить в трёх местах.
+   */
   blackmailCost: number;
   /** Стоит ли вызов на дуэль жетона действия. */
   duelCostsToken: boolean;
@@ -32,11 +39,18 @@ export interface GameRules {
    */
   duelCost: number;
   /**
-   * «Платная дуэль»: без жетона щит можно поднять за золото, по цене платной
-   * проверки. Имеет смысл только когда дуэль вообще стоит жетона и когда
-   * проверку разрешено покупать, — `normalizeRules` это и гарантирует.
+   * «Платная дуэль»: без жетона щит можно поднять за золото. Имеет смысл
+   * только когда дуэль вообще стоит жетона — иначе заменять в цене нечего, — и
+   * это `normalizeRules` и гарантирует.
    */
   paidDuelEnabled: boolean;
+  /**
+   * Цена выкупа жетона на дуэли. Своя, а не взятая у платной проверки: щит и
+   * проверка — разные ходы, и заимствование связывало руки на ровном месте,
+   * заодно заставляя включать платную проверку ради одной только дуэли.
+   * Надбавка `duelCost` платится сверх этой цены.
+   */
+  paidDuelCost: number;
   /** Можно ли отменить «Право вето» другим «Правом вето». */
   vetoOnVeto: boolean;
   /** «Срыв масок»: жертва атаки Вора/Шантажиста может купить проверку. */
@@ -45,12 +59,35 @@ export interface GameRules {
   /** «Платная проверка»: любую проверку можно купить за золото. */
   paidDoubtEnabled: boolean;
   paidDoubtCost: number;
+  /**
+   * «Розыгрыш за монеты»: кончились жетоны — карту можно доиграть за золото.
+   * Ограничение «одна роль за ход» при этом остаётся: покупка снимает нехватку
+   * жетонов, а не лимит на заявление роли.
+   */
+  paidPlayEnabled: boolean;
+  /**
+   * Цена такого розыгрыша. Своя и независимая: раньше её перебивала цена
+   * «Платной проверки», и два разных правила нельзя было развести по деньгам —
+   * дешёвая проверка автоматически делала дешёвым и розыгрыш. Это разные ходы
+   * (свой против чужого), и цениться они вправе по-разному.
+   */
+  paidPlayCost: number;
   /** Сколько копий каждой карты замешано в колоду. 0 — карта выключена. */
   deck: Record<GameCard, number>;
 }
 
 /** 4 игрока по 2 карты в стартовую руку. Меньше — партию не раздать. */
 export const MIN_DECK_SIZE = 8;
+
+/**
+ * Цена, с которой включается «Платный шантаж».
+ *
+ * У шантажа `0` означает не «бесплатно», а «правило выключено» — отдельного
+ * флага у него нет, — поэтому цену по умолчанию в `DEFAULT_RULES` не положить:
+ * там лежит ноль. Стоит здесь, рядом с остальными покупками за золото, чтобы
+ * все четыре двойки были видны разом.
+ */
+export const BLACKMAIL_PRICE_ON = 2;
 
 const LIMITS = {
   crownsToWin: [1, 10],
@@ -59,8 +96,10 @@ const LIMITS = {
   rumorCost: [1, 10],
   blackmailCost: [0, 10],
   duelCost: [0, 10],
+  paidDuelCost: [1, 10],
   unmaskCost: [1, 10],
-  paidDoubtCost: [1, 10]
+  paidDoubtCost: [1, 10],
+  paidPlayCost: [1, 10]
 } as const satisfies Record<string, readonly [number, number]>;
 
 export const RULE_LIMITS: Record<keyof typeof LIMITS, readonly [number, number]> = LIMITS;
@@ -85,11 +124,20 @@ export const DEFAULT_RULES: GameRules = {
   duelCostsToken: true,
   duelCost: 0,
   paidDuelEnabled: false,
+  paidDuelCost: 2,
   vetoOnVeto: false,
   unmaskEnabled: false,
-  unmaskCost: 3,
+  unmaskCost: 2,
   paidDoubtEnabled: false,
-  paidDoubtCost: 3,
+  /* Все пять покупок за золото стоят одинаково — две монеты: платная проверка,
+     срыв масок, розыгрыш карты, выкуп щита на дуэли и (через
+     `BLACKMAIL_PRICE_ON`) платный шантаж. Это одна и та же цена «жетона нет,
+     плачу деньгами», и разъехавшиеся умолчания игрок выравнивал бы руками
+     каждую партию. Ползунки при этом независимые: развести цены можно, просто
+     начинать с разных незачем. */
+  paidDoubtCost: 2,
+  paidPlayEnabled: false,
+  paidPlayCost: 2,
   deck: defaultDeck()
 };
 
@@ -130,14 +178,15 @@ export function normalizeRules(raw: unknown): GameRules {
     blackmailCost: clampInt(src.blackmailCost, DEFAULT_RULES.blackmailCost, LIMITS.blackmailCost),
     duelCostsToken,
     duelCost: clampInt(src.duelCost, DEFAULT_RULES.duelCost, LIMITS.duelCost),
-    /* «Платная дуэль» — это замена жетона золотом по цене платной проверки.
-       Без жетона в цене заменять нечего, а без платной проверки неоткуда взять
-       цену. Обе зависимости проверяются здесь, а не на экране: правила
-       приходят от клиента, и верить им нельзя. */
-    paidDuelEnabled:
-      duelCostsToken && paidDoubtEnabled
-        ? bool(src.paidDuelEnabled, DEFAULT_RULES.paidDuelEnabled)
-        : false,
+    /* «Платная дуэль» — это замена жетона золотом: без требования жетона
+       заменять в цене нечего. Единственная зависимость, и проверяется она
+       здесь, а не на экране: правила приходят от клиента, и верить им нельзя.
+       Второй зависимости — от платной проверки — больше нет: у выкупа своя
+       цена. */
+    paidDuelEnabled: duelCostsToken
+      ? bool(src.paidDuelEnabled, DEFAULT_RULES.paidDuelEnabled)
+      : false,
+    paidDuelCost: clampInt(src.paidDuelCost, DEFAULT_RULES.paidDuelCost, LIMITS.paidDuelCost),
     vetoOnVeto: bool(src.vetoOnVeto, DEFAULT_RULES.vetoOnVeto),
     /* Взаимоисключение: «Платная проверка» — надмножество «Срыва масок».
        Держать оба включёнными нечего, и решать это должен один код, а не
@@ -146,6 +195,8 @@ export function normalizeRules(raw: unknown): GameRules {
     unmaskCost: clampInt(src.unmaskCost, DEFAULT_RULES.unmaskCost, LIMITS.unmaskCost),
     paidDoubtEnabled,
     paidDoubtCost: clampInt(src.paidDoubtCost, DEFAULT_RULES.paidDoubtCost, LIMITS.paidDoubtCost),
+    paidPlayEnabled: bool(src.paidPlayEnabled, DEFAULT_RULES.paidPlayEnabled),
+    paidPlayCost: clampInt(src.paidPlayCost, DEFAULT_RULES.paidPlayCost, LIMITS.paidPlayCost),
     deck
   };
 }
@@ -169,4 +220,47 @@ export function rulesProblems(rules: GameRules): string[] {
     );
   }
   return problems;
+}
+
+/**
+ * Во сколько золота обходится розыгрыш карты без жетона.
+ *
+ * Цена своя и ни от чего больше не зависит. Раньше её перебивала «Платная
+ * проверка» — по образцу платной дуэли, — но там заимствование осмысленно:
+ * платная дуэль это и есть купленная проверка, только со щитом. Розыгрыш в
+ * свой ход к проверкам отношения не имеет, и общая цена лишь мешала развести
+ * два правила по деньгам.
+ *
+ * Функция остаётся одна на движок и на экран: разъехавшаяся цена это либо
+ * неоплаченный розыгрыш, либо кнопка, которая гаснет не по той причине.
+ *
+ * `null` — покупать нельзя вовсе.
+ */
+export function paidPlayPrice(rules: GameRules): number | null {
+  return rules.paidPlayEnabled ? rules.paidPlayCost : null;
+}
+
+/**
+ * Чем игрок платит за розыгрыш карты — и может ли вообще.
+ *
+ * Жетон приоритетнее золота: он восполняется в начале хода, золото — нет.
+ * Золотая оплата открывается только `paidPlayEnabled` и только когда жетона
+ * нет. `extraGold` — надбавка самой карты (шантаж); выкуп жетона складывается
+ * с ней, а не вместо неё.
+ *
+ * Функция одна на движок и на экран: иначе кнопка «Разыграть за 2 🪙»
+ * показывала ход, которого резолвер не принимал, и карта падала обратно в руку.
+ */
+export function playPayment(
+  rules: GameRules,
+  actor: { actionTokens: number; gold: number },
+  extraGold = 0
+): { tokens: number; gold: number } | null {
+  if (actor.actionTokens >= 1) {
+    return actor.gold >= extraGold ? { tokens: 1, gold: extraGold } : null;
+  }
+  const price = paidPlayPrice(rules);
+  if (price === null) return null;
+  const gold = price + extraGold;
+  return actor.gold >= gold ? { tokens: 0, gold } : null;
 }

@@ -15,6 +15,7 @@ import { checkEndgameAndAdvanceTurn } from './turnResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { allCardIds, assertCardCensus, type CardCensusState } from './cardCensus.check.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 /** Like `mintDeck`, but ids stay unique across hands — two seats both holding
  *  `c0` would make the whole-state card census meaningless. */
@@ -47,8 +48,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     turnPhase: 'IDLE' as GameState['turnPhase'],
     turnSubPhase: 'CARD_PLAY_PHASE' as GameState['turnSubPhase'],
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     pendingAction: null as Action | null,
     pendingDuelDefenderCardId: null as CardId | null,
     isVaBanqueActive: false,
@@ -94,7 +94,7 @@ function handOf(api: { players: Player[] }, playerId: string): CardId[] {
   const { get, set, api, census } = makeHarness({
     players: [
       player({ id: 'p1', name: 'Анна', hand }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Дуэлянт']) })
     ]
   });
   const ids = allCardIds(census);

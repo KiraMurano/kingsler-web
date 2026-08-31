@@ -58,6 +58,9 @@ function makeState(over: Partial<ZoneState> & Pick<ZoneState, 'players'>): ZoneS
     pendingAction: null,
     pendingDuelDefenderCardId: null,
     overlayInstant: null,
+    isVetoed: false,
+    vetoChain: 0,
+    plotPulses: [],
     revealOutcome: null,
     duelOutcome: null,
     turnPhase: 'IDLE',
@@ -110,7 +113,8 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     { kind: 'duel', side: 'attacker' },
     { kind: 'duel', side: 'defender' },
     { kind: 'table' },
-    { kind: 'overlay' },
+    { kind: 'overlay', over: 'action' },
+    { kind: 'overlay', over: 'plot' },
     { kind: 'plot', playerId: 'p3' },
     { kind: 'discard' }
   ];
@@ -124,6 +128,11 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   assert.equal(zoneKey({ kind: 'hand', playerId: 'p1', slot: 1 }), 'hand:p1:1');
   assert.equal(zoneKey({ kind: 'plot', playerId: 'p3' }), 'plot:p3');
   assert.equal(zoneKey({ kind: 'duel', side: 'attacker' }), 'duel:attacker');
+  /* Две лунки, а не одна: оверлей поверх действия лежит сбоку и наискось,
+     оверлей поверх выкладки Интриги — в обычном карточном месте. Под общим
+     ключом слой карт гнался бы за тем якорем, который случайно смонтирован. */
+  assert.equal(zoneKey({ kind: 'overlay', over: 'action' }), 'overlay:action');
+  assert.equal(zoneKey({ kind: 'overlay', over: 'plot' }), 'overlay:plot');
   assert.equal(zoneKey({ kind: 'discard' }), 'discard');
 
   // Precedence is a strict ordering — the derivation leans on it.
@@ -252,7 +261,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 /* ------------------------------------------------------------------ */
 {
   const hand = pile(['Наследник', 'Шут']);
-  const drawn = pile(['Рыцарь']);
+  const drawn = pile(['Дуэлянт']);
   const [left, right] = hand;
 
   /* Turn start: both cards in hand, left in slot 0, right in slot 1. */
@@ -333,7 +342,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   const placed = deriveCardZones(state, 'p1');
   assertUnique(placed, 'overlay');
 
-  assert.equal(keyAt(placed, veto.id, 'overlay'), 'overlay', 'the played veto is the overlay card');
+  assert.equal(keyAt(placed, veto.id, 'overlay'), 'overlay:action', 'the played veto is the overlay card');
   assert.equal(
     placed.filter(c => c.id === veto.id && c.zone.kind === 'discard').length,
     0,
@@ -354,7 +363,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   assertUnique(ghosted, 'overlay/orphan');
   assert.equal(ghosted.length, 1);
   assert.equal(ghosted[0].id, 'overlay:p2:Право вето', 'placeholder id is stable across renders');
-  assert.equal(zoneKey(ghosted[0].zone), 'overlay');
+  assert.equal(zoneKey(ghosted[0].zone), 'overlay:action');
 
   // A card still in hand is also acceptable as the overlay instance.
   const heldVeto = pile(['Право вето']);
@@ -364,7 +373,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   });
   const heldPlaced = deriveCardZones(held, 'p2');
   assertUnique(heldPlaced, 'overlay/held');
-  assert.equal(keyAt(heldPlaced, heldVeto[0].id, 'overlay/held'), 'overlay', 'overlay outranks hand');
+  assert.equal(keyAt(heldPlaced, heldVeto[0].id, 'overlay/held'), 'overlay:action', 'overlay outranks hand');
 }
 
 /* ------------------------------------------------------------------ */
@@ -372,7 +381,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 /* ------------------------------------------------------------------ */
 {
   const hand = pile(['Шут', 'Вор']);
-  const dead: CardInstance = { id: 'd1', card: 'Рыцарь' };
+  const dead: CardInstance = { id: 'd1', card: 'Дуэлянт' };
   const state = makeState({
     players: [player({ id: 'p1', hand })],
     discardPile: [dead]
@@ -391,10 +400,10 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     null,
     'nothing said this card was ever shown, so it lies face-down'
   );
-  const afterShowing = deriveCardZones(state, 'p1', {}, { [dead.id]: 'Рыцарь' });
+  const afterShowing = deriveCardZones(state, 'p1', {}, { [dead.id]: 'Дуэлянт' });
   assert.equal(
     at(afterShowing, dead.id, 'discard').face.known,
-    'Рыцарь',
+    'Дуэлянт',
     'shown once, it keeps its face all the way to the corner'
   );
   assert.equal(at(placed, dead.id, 'discard').ownerId, null, 'the discard belongs to nobody');
@@ -405,7 +414,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 /* 5. A duel pulls both stakes out of their hands.                     */
 /* ------------------------------------------------------------------ */
 {
-  const attackerHand = pile(['Рыцарь', 'Шут']);
+  const attackerHand = pile(['Дуэлянт', 'Шут']);
   const defenderHand = pile(['Казначей', 'Вор']);
   const attackStakeId = attackerHand[0].id;
   const defendStakeId = defenderHand[1].id;
@@ -465,7 +474,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
       defenderId: 'p2',
       attackerClaim: 'Вор',
       defenderClaim: 'Казначей',
-      attackerRevealedRole: 'Рыцарь',
+      attackerRevealedRole: 'Дуэлянт',
       defenderRevealedRole: 'Вор',
       attackerWasTruth: false,
       defenderWasTruth: false,
@@ -493,7 +502,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 /* ------------------------------------------------------------------ */
 {
   const mine = pile(['Наследник', 'Шут']);
-  const theirs = pile(['Вор', 'Рыцарь']);
+  const theirs = pile(['Вор', 'Дуэлянт']);
   const state = makeState({
     players: [
       player({ id: 'p1', hand: mine }),
@@ -590,7 +599,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 /* 8. Deck cards exist so a draw has an origin, always face-down.      */
 /* ------------------------------------------------------------------ */
 {
-  const deck = pile(['Шут', 'Вор', 'Рыцарь']);
+  const deck = pile(['Шут', 'Вор', 'Дуэлянт']);
   const state = makeState({ players: [player({ id: 'p1', hand: [] })], deck });
   const placed = deriveCardZones(state, 'p1');
   assertUnique(placed, 'deck');
@@ -677,11 +686,11 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 /* ------------------------------------------------------------------ */
 {
   const p1Hand = pile(['Наследник', 'Шут']);
-  const p2Hand = pile(['Вор', 'Рыцарь']);
+  const p2Hand = pile(['Вор', 'Дуэлянт']);
   const p3Hand = pile(['Казначей', 'Казначей']);
   const deck = pile(['Шут', 'Вор']);
   const graveyard: CardInstance[] = [
-    { id: 'g1', card: 'Рыцарь' },
+    { id: 'g1', card: 'Дуэлянт' },
     { id: 'g2', card: 'Право вето' }
   ];
 
@@ -717,7 +726,7 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
 
   assert.equal(keyAt(placed, p1Hand[0].id, 'crowded'), 'duel:attacker');
   assert.equal(keyAt(placed, p2Hand[0].id, 'crowded'), 'duel:defender');
-  assert.equal(keyAt(placed, 'g2', 'crowded'), 'overlay', 'the veto instance is lifted out of the discard');
+  assert.equal(keyAt(placed, 'g2', 'crowded'), 'overlay:action', 'the veto instance is lifted out of the discard');
   assert.equal(keyAt(placed, 'g1', 'crowded'), 'discard');
   assert.equal(keyAt(placed, 'g3', 'crowded'), 'plot:p2');
   assert.equal(keyAt(placed, p3Hand[1].id, 'crowded'), 'hand:p3:1');
@@ -764,6 +773,176 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     c => c.id === dumped.id
   )!;
   assert.equal(seen.face.known, 'Вор', 'однажды показанная карта не переворачивается в полёте');
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. Заветированная карта уходит вместе с вето.                      */
+/* ------------------------------------------------------------------ */
+{
+  const veto: CardInstance = { id: 'w1', card: 'Право вето' };
+  const plotCard: CardInstance = { id: 'w2', card: 'Досье' };
+  const plotAction: Action = {
+    id: 'a9',
+    type: 'plot',
+    name: 'Досье',
+    plotType: 'Досье',
+    actorId: 'p1',
+    stakedCardId: plotCard.id,
+    costGold: 0,
+    costTokens: 1,
+    description: ''
+  };
+
+  /* Пока вето лежит на столе, круг ещё идёт: его могут снять встречным вето,
+     и выложенная интрига обязана оставаться на своём месте. */
+  const during = makeState({
+    players: [player({ id: 'p1' }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [veto],
+    pendingAction: plotAction,
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  assertUnique(deriveCardZones(during, 'p1'), 'vetoed/during');
+  assert.equal(
+    keyAt(deriveCardZones(during, 'p1'), plotCard.id, 'vetoed/during'),
+    'plot:p1',
+    'пока вето лежит, отменённая интрига ещё на столе'
+  );
+  assert.equal(
+    keyAt(deriveCardZones(during, 'p1'), veto.id, 'vetoed/during'),
+    'overlay:plot',
+    'вето на выкладку Интриги занимает обычную карточную лунку'
+  );
+
+  /* Круг закрылся: движок снял оверлей и толкнул интригу в сброс, но
+     `pendingAction` держится ещё `ACTION_HOLD_MS`. Обе карты обязаны улететь
+     разом — иначе вето уходит в угол, а перечёркнутая им карта лежит на столе
+     ещё две секунды. */
+  const after = makeState({
+    players: [player({ id: 'p1' }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [veto, plotCard],
+    pendingAction: plotAction,
+    overlayInstant: null,
+    isVetoed: true,
+    turnPhase: 'IDLE'
+  });
+  const gone = deriveCardZones(after, 'p1');
+  assertUnique(gone, 'vetoed/after');
+  assert.equal(keyAt(gone, plotCard.id, 'vetoed/after'), 'discard');
+  assert.equal(keyAt(gone, veto.id, 'vetoed/after'), 'discard');
+
+  /* Ставка роли в сброс не идёт — её никто не вскрывал, — и возвращается
+     туда, откуда её взяли: в руку заявившего. */
+  const staked = pile(['Наследник']);
+  const roleCancelled = makeState({
+    players: [player({ id: 'p1', hand: staked }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [veto],
+    pendingAction: roleAction({ actorId: 'p1', stakedCardId: staked[0].id }),
+    overlayInstant: null,
+    isVetoed: true,
+    turnPhase: 'IDLE'
+  });
+  const home = deriveCardZones(roleCancelled, 'p1');
+  assertUnique(home, 'vetoed/role');
+  assert.equal(keyAt(home, staked[0].id, 'vetoed/role'), 'hand:p1:0');
+  assert.equal(keyAt(home, veto.id, 'vetoed/role'), 'discard');
+}
+
+/* ------------------------------------------------------------------ */
+/* 11. Отклик карты: сработала ударом, набрала — кивком.               */
+/* ------------------------------------------------------------------ */
+{
+  const spent: CardInstance = { id: 'b1', card: 'Королевский приём' };
+  const dumped: CardInstance = { id: 'b2', card: 'Досье' };
+
+  /* Обе карты лежат в одной стопке и в одной зоне — разводит их только отклик,
+     и приходит он из движка: в сбросе они неотличимы (см. `plotPulses`). */
+  const state = makeState({
+    players: [player({ id: 'p1' })],
+    discardPile: [spent, dumped],
+    plotPulses: [{ cardId: spent.id, kind: 'spent' }]
+  });
+  const placed = deriveCardZones(state, 'p1');
+  assertUnique(placed, 'pulse');
+
+  assert.equal(keyAt(placed, spent.id, 'pulse'), 'discard');
+  assert.equal(keyAt(placed, dumped.id, 'pulse'), 'discard');
+  assert.equal(at(placed, spent.id, 'pulse').pulse, 'spent', 'сработавшая уходит ударом');
+  assert.equal(
+    at(placed, dumped.id, 'pulse').pulse,
+    undefined,
+    'вытесненная просто улетает в сброс'
+  );
+
+  /* Срыв — третий отклик: карта тоже в сбросе, но это не сработка. */
+  const ripped: CardInstance = { id: 'b3', card: 'Стража покоев' };
+  const disrupted = deriveCardZones(makeState({
+    players: [player({ id: 'p1' })],
+    discardPile: [ripped],
+    plotPulses: [{ cardId: ripped.id, kind: 'disrupt' }]
+  }), 'p1');
+  assert.equal(at(disrupted, ripped.id, 'disrupt').pulse, 'disrupt');
+  assert.equal(keyAt(disrupted, ripped.id, 'disrupt'), 'discard');
+
+  /* Последняя монета сети: кивок на карте, которая уже уходит в сброс. */
+  const net: CardInstance = { id: 'n1', card: 'Сеть информаторов' };
+  const lastCoin = deriveCardZones(makeState({
+    players: [player({ id: 'p1' })],
+    discardPile: [net],
+    plotPulses: [{ cardId: net.id, kind: 'charge' }]
+  }), 'p1');
+  assert.equal(at(lastCoin, net.id, 'last-coin').pulse, 'charge');
+  assert.equal(keyAt(lastCoin, net.id, 'last-coin'), 'discard', 'и уходит обычным сбросом');
+
+  /* Кивок достаётся карте, которая ОСТАЛАСЬ на столе. */
+  const charged = deriveCardZones(makeState({
+    players: [player({
+      id: 'p1',
+      activePlot: { id: 'k', cardId: 'k1', type: 'Тайный заговор', charges: 2 }
+    })],
+    plotPulses: [{ cardId: 'k1', kind: 'charge' }]
+  }), 'p1');
+  assert.equal(at(charged, 'k1', 'charge').pulse, 'charge');
+  assert.equal(keyAt(charged, 'k1', 'charge'), 'plot:p1', 'и она никуда не уходит');
+
+  /* Без события отклика нет ни у кого. */
+  const calm = deriveCardZones(makeState({
+    players: [player({ id: 'p1' })],
+    discardPile: [spent, dumped]
+  }), 'p1');
+  assert.ok(calm.every(c => c.pulse === undefined), 'откликов без причины не бывает');
+}
+
+/* ------------------------------------------------------------------ */
+/* 12. Счётчик выкладываемой интриги — по типу карты.                  */
+/* ------------------------------------------------------------------ */
+{
+  const meter = (plotType: 'Тайный заговор' | 'Сеть информаторов' | 'Досье') => {
+    const card: CardInstance = { id: `m-${plotType}`, card: plotType };
+    const state = makeState({
+      players: [player({ id: 'p1', hand: [card] })],
+      pendingAction: {
+        id: 'a2',
+        type: 'plot',
+        name: plotType,
+        plotType,
+        actorId: 'p1',
+        stakedCardId: card.id,
+        costGold: 0,
+        costTokens: 1,
+        description: ''
+      },
+      turnPhase: 'VETO_WINDOW'
+    });
+    return at(deriveCardZones(state, 'p1'), card.id, `meter/${plotType}`).charges;
+  };
+
+  /* Счётчик виден с первого кадра выкладки: карта уже в слоте, и цифра — часть
+     того, что на ней напечатано. */
+  assert.equal(meter('Тайный заговор'), 0, 'Заговор выкладывается с нулём зарядов');
+  assert.equal(meter('Сеть информаторов'), 0, 'Сеть — с нулём принесённых монет');
+  assert.equal(meter('Досье'), undefined, 'у остальных интриг счётчика нет вовсе');
 }
 
 /* A face that no rule can read is simply unknown, never invented. */

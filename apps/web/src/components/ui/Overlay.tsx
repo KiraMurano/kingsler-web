@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ArrowLeft } from 'lucide-react';
 
 interface OverlayHeadProps {
@@ -31,6 +32,23 @@ const OverlayHead: React.FC<OverlayHeadProps> = ({ title, description, onClose, 
     </button>
   </div>
 );
+
+/**
+ * Куда портировать оверлей — или `null`, если портировать некуда.
+ *
+ * `null` бывает не только в теории: проверки в `*.check.ts` рендерят диалоги
+ * в строку под Node, где `document` не существует вовсе. Там оверлей рисуется
+ * на своём месте в дереве — разметка та же, а портал в разметке и не виден.
+ */
+function portalTarget(): HTMLElement | null {
+  return typeof document === 'undefined' ? null : document.body;
+}
+
+/** Портал, если есть куда, иначе узел как есть. */
+function portal(node: React.ReactElement): React.ReactElement {
+  const target = portalTarget();
+  return target ? createPortal(node, target) : node;
+}
 
 function useEscape(open: boolean, onClose: () => void) {
   useEffect(() => {
@@ -67,7 +85,20 @@ export const Sheet: React.FC<SheetProps> = ({
   useEscape(open, onClose);
   if (!open) return null;
 
-  return (
+  /*
+   * Порталом в `body`, а не на своём месте в дереве.
+   *
+   * У `.scrim` есть `backdrop-filter`, а он в Chromium размывает не «всё, что
+   * позади», а содержимое ближайшего предка, который завёл свой слой —
+   * `filter`, `opacity` меньше единицы, `will-change`, `transform`. Стол ими
+   * усыпан (места, карты, слой карт), и оверлей, живущий внутри стола, мог
+   * получить в подложку пустоту: размытие как бы есть, а размывать нечего.
+   * Из `body` подложка — вся страница, и от чужих слоёв это больше не зависит.
+   *
+   * Заодно уходит вторая зависимость того же рода: `position: fixed` внутри
+   * трансформированного предка считается от него, а не от окна.
+   */
+  return portal(
     <div className={`scrim sheet sheet--${side}`} onClick={onClose}>
       <div
         className="sheet__panel"
@@ -105,7 +136,8 @@ export const Dialog: React.FC<DialogProps> = ({
   useEscape(open, onClose);
   if (!open) return null;
 
-  return (
+  /* Порталом по той же причине, что и `Sheet` выше. */
+  return portal(
     <div className="scrim dialog" onClick={onClose}>
       <div
         className={['dialog__panel', className].filter(Boolean).join(' ')}

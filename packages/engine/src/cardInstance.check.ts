@@ -7,9 +7,9 @@ assert.deepEqual(faces(deck), ['Шут', 'Шут', 'Казначей']);
 
 // Duplicate faces must stay distinguishable — this is the whole point.
 assert.equal(idOf(deck, 'Шут'), 'c0', 'idOf returns the first instance');
-assert.equal(idOf(deck, 'Рыцарь'), null);
+assert.equal(idOf(deck, 'Дуэлянт'), null);
 assert.equal(holds(deck, 'Казначей'), true);
-assert.equal(holds(deck, 'Рыцарь'), false);
+assert.equal(holds(deck, 'Дуэлянт'), false);
 assert.equal(byId(deck, 'c1')?.card, 'Шут');
 assert.equal(byId(deck, 'nope'), null);
 assert.equal(byId(deck, undefined), null);

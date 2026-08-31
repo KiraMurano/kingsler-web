@@ -62,7 +62,7 @@ const charter = { id: 'y', cardId: 'c2', type: 'Охранная грамота'
   const guarded = player({ id: 'p1', activePlot: guard });
   assert.equal(canBeTargetedBy(guarded, 'Наследник'), true);
   assert.equal(canBeTargetedBy(guarded, 'Казначей'), true);
-  assert.equal(canBeTargetedBy(guarded, 'Рыцарь'), true);
+  assert.equal(canBeTargetedBy(guarded, 'Дуэлянт'), true);
   assert.equal(canBeTargetedBy(guarded, 'Шут'), true);
 }
 

@@ -1,8 +1,8 @@
 /**
  * Модалка настроек и диалог сохранения набора: структура, а не вёрстка.
  * Держит то, что легко сломать при перестановке — кнопки старта и загрузки на
- * месте в ОБЕИХ модалках, пустой список объясняет себя, сводка набора
- * показывает те правила, которые сохраняют.
+ * месте в ОБЕИХ модалках, вложенной прокрутки нет, пустой список объясняет
+ * себя, сводка набора показывает те правила, которые сохраняют.
  * Run: npx tsx apps/web/src/rules/RulesDialog.check.ts
  */
 import assert from 'node:assert/strict';
@@ -33,7 +33,11 @@ import { LobbyRulesDialog } from '../online/LobbyRulesDialog.tsx';
   assert.ok(html.includes('Корон для победы'), 'редактор правил внутри');
   assert.ok(html.includes('Начать игру'), 'кнопка старта на месте');
   assert.ok(html.includes('Загрузить настройки'), 'кнопка загрузки на месте');
-  assert.ok(html.includes('ruleswrap__foot'), 'подвал вынесен из прокрутки');
+  assert.ok(html.includes('ruleswrap__foot'), 'кнопки собраны в один блок');
+  /* Вложенного скроллера у списка правил нет: он обрезал содержимое по краю
+     внутреннего отступа, с зазором от рамки. Крутится диалог целиком —
+     `.overlay__body` со своим отступом внутри прокрутки. */
+  assert.ok(!html.includes('ruleswrap__scroll'), 'вложенной прокрутки не осталось');
 }
 
 // --- 3. Диалог сохранения: поле, сводка и кнопка ---
@@ -80,6 +84,7 @@ import { LobbyRulesDialog } from '../online/LobbyRulesDialog.tsx';
   assert.ok(html.includes('Корон для победы'), 'и сам редактор правил');
   assert.ok(html.includes('Готово'), 'кнопка закрывает, а не стартует партию');
   assert.ok(!html.includes('Начать игру'), 'старт живёт в лобби, а не в настройках');
+  assert.ok(!html.includes('ruleswrap__scroll'), 'и здесь вложенной прокрутки нет');
 }
 
 console.log('RulesDialog.check: ok');

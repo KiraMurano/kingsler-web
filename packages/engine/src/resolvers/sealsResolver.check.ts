@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import type { CardInstance, GameState, Player } from '../types.ts';
 import { addSealsToPlayer } from './sealsResolver.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
   return {
@@ -30,8 +31,7 @@ function makeHarness(players: Player[]) {
     players,
     discardPile: [] as CardInstance[],
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     activePlayerId: players[0].id,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
     history: [] as string[]

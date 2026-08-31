@@ -40,13 +40,8 @@ export function addSealsToPlayer(
   const newFavor = player.favor + gainedCrowns;
   const remainderSeals = newFavor >= crownsToWin ? 0 : (totalSeals % 2);
 
-  // Royal Bulla trigger: +1 🪙 from treasury when gaining seals!
-  const hasRoyalCharter = player.activePlot?.type === 'Золотая булла';
-  const charterBonusGold = hasRoyalCharter ? 1 : 0;
-
   const updatedPlayer: Player = {
     ...player,
-    gold: player.gold + charterBonusGold,
     seals: remainderSeals,
     favor: Math.min(crownsToWin, newFavor)
   };
@@ -55,25 +50,19 @@ export function addSealsToPlayer(
   newPlayers[pIdx] = updatedPlayer;
 
   triggerResourceFloat(set, playerId, `+${count} ⚜️`, true);
-  if (hasRoyalCharter) {
-    setTimeout(() => {
-      triggerResourceFloat(set, playerId, '+1 🪙 Булла', true);
-    }, 250);
-  }
   if (gainedCrowns > 0) {
     setTimeout(() => {
       triggerResourceFloat(set, playerId, `+${gainedCrowns} 👑`, true);
     }, 450);
   }
 
-  const charterNotice = hasRoyalCharter ? ' 📜 «Золотая булла» приносит +1 🪙!' : '';
   const conversionNotice = gainedCrowns > 0
     ? ` ⚜️ 2 печати трансформировались в +${gainedCrowns} 👑 для ${player.name}!`
     : '';
 
   set(state => ({
     players: newPlayers,
-    history: [`⚜️ ${player.name} получает +${count} ⚜️ Королевскую печать.${charterNotice}${conversionNotice}`, ...state.history].slice(0, 50)
+    history: [`⚜️ ${player.name} получает +${count} ⚜️ Королевскую печать.${conversionNotice}`, ...state.history].slice(0, 50)
   }));
 
   if (updatedPlayer.favor >= crownsToWin) {

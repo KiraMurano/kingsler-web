@@ -70,6 +70,7 @@ function tableInVetoWindow(botHands: GameCard[][], targetId?: string) {
     pendingDoubtPassedIds: [],
     pendingVetoPassedIds: [],
     pendingVetoActionId: 'a1',
+    pendingRedirectFromId: null,
     overlayInstant: null,
     isVetoed: false,
     vetoChain: 0,
@@ -83,7 +84,7 @@ const now = (_key: string, cb: () => void) => cb();
 
 // --- Каждый спрашиваемый бот отвечает, и с картой, и без ---
 {
-  tableInVetoWindow([['Шут', 'Шут'], ['Казначей', 'Рыцарь']]);
+  tableInVetoWindow([['Шут', 'Шут'], ['Казначей', 'Дуэлянт']]);
   handleVetoPhase(useGameStore.getState(), now);
 
   const after = useGameStore.getState();

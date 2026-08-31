@@ -1,6 +1,7 @@
-import type { Action, CardId, GameState, PlotType, Player, CardInstance } from '../types';
+import type { Action, CardId, GameState, PlotPulse, PlotType, Player, CardInstance } from '../types';
 import { pluck } from '../cardInstance';
 import { CARD_INFO } from '../cards';
+import { playPayment } from '../rules';
 import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
@@ -8,12 +9,66 @@ import { ACTION_HOLD_MS } from '../timing';
 import { beginCoronationIfNeeded } from './coronation';
 import { burnCharter, loseCrowns } from './crownLoss';
 import { vetoReset } from './vetoChain';
+import { isCoronationCandidate, type Coronation } from './coronation';
 
 /** Заговор разряжается только полностью заряженным. */
 export const CONSPIRACY_FULL_CHARGE = 4;
 
 /** Сколько золота сбрасывает разряженный Заговор. */
 export const CONSPIRACY_GOLD_HIT = 3;
+
+/** Сколько монет приносит «Сеть информаторов», прежде чем истощится. */
+export const INFORMANT_PAYOUTS = 3;
+
+/** Интриги, у которых есть накопитель, и его потолок. */
+const PLOT_METER: Partial<Record<PlotType, number>> = {
+  'Тайный заговор': CONSPIRACY_FULL_CHARGE,
+  'Сеть информаторов': INFORMANT_PAYOUTS
+};
+
+/** С чего начинается накопитель интриги — или `undefined`, если его нет. */
+export function initialCharges(plotType: PlotType): number | undefined {
+  return PLOT_METER[plotType] === undefined ? undefined : 0;
+}
+
+/**
+ * Интрига сработала: карта уходит со стола ударом, а не молча.
+ *
+ * Возвращает заплатку, а не пишет в состояние сам, — ровно как `vetoReset`:
+ * срабатывание всегда происходит вместе с чем-то ещё (наградой, ударом,
+ * сбросом карты), и разносить одно событие по двум `set` значит дать
+ * подписчикам увидеть его наполовину. Подробности — у `GameState.plotPulses`.
+ */
+export function plotSpent(cardId: CardId): { plotPulses: PlotPulse[] } {
+  return { plotPulses: [{ cardId, kind: 'spent' }] };
+}
+
+/**
+ * Интригу сорвали: кража, шантаж, обыск, блеф при страже.
+ *
+ * Не путать со `spent`: там карта сделала своё, здесь её сняли. `prior` —
+ * уже висящие пульсы того же `set`: удар Заговора и срыв приёма у цели
+ * случаются подряд, и второй не должен затирать первый.
+ */
+export function plotDisrupted(
+  cardId: CardId,
+  prior: PlotPulse[] = []
+): { plotPulses: PlotPulse[] } {
+  return {
+    plotPulses: [...prior.filter(p => p.cardId !== cardId), { cardId, kind: 'disrupt' }]
+  };
+}
+
+/**
+ * Интриги что-то получили: Заговор — заряд, Сеть — монету.
+ *
+ * Списком, потому что одна проверка кормит все Заговоры на столе разом, и
+ * кивнуть надо каждому. Сеть кивает и на последней монете: карта после этого
+ * уходит обычным сбросом, без удара сработки.
+ */
+export function plotsCharged(cardIds: CardId[]): { plotPulses: PlotPulse[] } {
+  return { plotPulses: cardIds.map(cardId => ({ cardId, kind: 'charge' as const })) };
+}
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -38,6 +93,7 @@ export function disruptPlayerPlotsOnLoss(
     set(state => ({
       players: newPlayers,
       discardPile: [...state.discardPile, burned],
+      ...plotDisrupted(burned.id, state.plotPulses),
       history: [`💥 «Королевский приём» ${genOf(victim)} сорван из-за ${reason}! Интрига сгорела.`, ...state.history].slice(0, 50)
     }));
     triggerResourceFloat(set, victim.id, '💥 Интрига сорвана', false);
@@ -52,20 +108,38 @@ export function playPlotAction(
   targetPlayerId?: string
 ): void {
   timerManager.clearAll();
-  const { players, activePlayerId } = get();
+  const { players, activePlayerId, rules } = get();
   const actor = players.find(p => p.id === activePlayerId);
-  if (!actor || actor.actionTokens < 1) return;
+  if (!actor) return;
+  const payment = playPayment(rules, actor);
+  if (!payment) return;
 
   const { taken: playedCard, rest: newHand } = pluck(actor.hand, cardId);
   if (playedCard?.card !== plotType) return;
 
+  /*
+   * Старая интрига уходит в сброс ЗДЕСЬ — в тот же миг, когда новая ложится
+   * на стол, а не после того, как новая переживёт вето.
+   *
+   * Раньше старую снимал `landPlot`, то есть уже после окна вето. Всё окно
+   * две интриги стояли в одном слоте друг поверх друга — новая уезжала под
+   * старую по z, и читалось это как сбой раскладки, а не как ход. Теперь порядок
+   * один и без исключений: старая в сброс → новая на стол → круг вето. Заветированная
+   * новая уйдёт туда же, и старая не вернётся: место освобождено самой выкладкой,
+   * а вето отменяет только то, что на него положили.
+   */
+  const displaced = actor.activePlot;
+
   const newPlayers = players.map(p => p.id === actor.id ? {
     ...p,
-    actionTokens: p.actionTokens - 1,
-    hand: newHand
+    actionTokens: p.actionTokens - payment.tokens,
+    gold: p.gold - payment.gold,
+    hand: newHand,
+    activePlot: null
   } : p);
 
-  triggerResourceFloat(set, actor.id, '-1 ⚡', false);
+  if (payment.gold > 0) triggerResourceFloat(set, actor.id, `-${payment.gold} 🪙`, false);
+  if (payment.tokens > 0) triggerResourceFloat(set, actor.id, '-1 ⚡', false);
 
   const target = targetPlayerId ? players.find(p => p.id === targetPlayerId) : null;
   const targetText = target ? ` (цель: ${target.name})` : '';
@@ -78,27 +152,43 @@ export function playPlotAction(
     actorId: actor.id,
     targetId: targetPlayerId,
     stakedCardId: playedCard.id,
-    costGold: 0,
-    costTokens: 1,
+    costGold: payment.gold,
+    costTokens: payment.tokens,
     description: CARD_INFO[plotType]?.shortDescription ?? ''
   };
 
   set(state => ({
     players: newPlayers,
+    discardPile: displaced
+      ? [...state.discardPile, { id: displaced.cardId, card: displaced.type }]
+      : state.discardPile,
     pendingAction: action,
     hasPlayedPlotThisTurn: true,
     ...vetoReset(),
     overlayInstant: null,
     isPendingActionAfterTruthChallenge: false,
     turnSubPhase: 'CARD_PLAY_PHASE',
-    history: [`🎴 ${actor.name} разыгрывает Интригу «${plotType}»${targetText} (потрачен 1 ⚡).`, ...state.history].slice(0, 50)
+    history: [
+      `🎴 ${actor.name} разыгрывает Интригу «${plotType}»${targetText} (${payment.tokens > 0 ? 'потрачен 1 ⚡' : `потрачено ${payment.gold} 🪙`}).`,
+      ...(displaced
+        ? [`🗑️ Прежняя интрига «${displaced.type}» ${genOf(actor)} уходит в сброс: слот освобождён под новую.`]
+        : []),
+      ...state.history
+    ].slice(0, 50)
   }));
 
   get()._triggerVetoWindowOrResolveEffect(action, false);
 }
 
+/**
+ * Интрига устояла перед вето — садится в свой слот.
+ *
+ * Слот к этому моменту уже пуст: прежнюю интригу сбросила сама выкладка
+ * (см. `playPlotAction`), и сюда дело доходит только тогда, когда двор новую не
+ * отменил.
+ */
 export function landPlot(get: StateGetter, set: StateSetter, action: Action): void {
-  const { players, discardPile } = get();
+  const { players } = get();
   const actor = players.find(p => p.id === action.actorId);
   const plotType = action.plotType;
   if (!actor || !plotType) {
@@ -106,21 +196,16 @@ export function landPlot(get: StateGetter, set: StateSetter, action: Action): vo
     return;
   }
 
-  const oldPlot = actor.activePlot;
-  const updatedDiscard = oldPlot
-    ? [...discardPile, { id: oldPlot.cardId, card: oldPlot.type }]
-    : discardPile;
   const newPlotData = {
     id: action.id,
     cardId: action.stakedCardId ?? action.id,
     type: plotType,
     targetPlayerId: action.targetId,
-    charges: plotType === 'Тайный заговор' ? 0 : undefined
+    charges: initialCharges(plotType)
   };
 
   set(state => ({
-    players: state.players.map(p => p.id === actor.id ? { ...p, activePlot: newPlotData } : p),
-    discardPile: updatedDiscard
+    players: state.players.map(p => p.id === actor.id ? { ...p, activePlot: newPlotData } : p)
   }));
 
   timerManager.scheduleDelay(() => {
@@ -129,19 +214,33 @@ export function landPlot(get: StateGetter, set: StateSetter, action: Action): vo
 }
 
 /**
- * Заряжает активные «Тайные заговоры» только от проверок («НЕ ВЕРЮ!») и дуэлей.
+ * Заряжает активные «Тайные заговоры» от чужих проверок («НЕ ВЕРЮ!») и от
+ * любой объявленной дуэли.
+ *
+ * `exceptId` — тот, чей Заговор от этого события не заряжается. Смысл в нём
+ * только один: **своей проверкой Заговор не кормят.** Иначе держатель, у
+ * которого и так есть жетоны на проверки, разгонял бы себе заряды сам, ни с
+ * кем не считаясь, — а Заговор задуман как счётчик чужой возни при дворе.
+ * Ровно та же оговорка стоит у «Сети информаторов»: она тоже платит за чужие
+ * проверки, а не за свои.
+ *
+ * У дуэли исключений нет: её объявляют двое, и считается сам факт вызова.
  */
 export function chargeActiveConspiracies(
   get: StateGetter,
   set: StateSetter,
-  reason: string
+  reason: string,
+  exceptId?: string
 ): void {
+  const charging = (p: Player) =>
+    p.id !== exceptId && p.activePlot?.type === 'Тайный заговор' && (p.activePlot.charges ?? 0) < 4;
+
   const { players } = get();
-  const conspiracyHolders = players.filter(p => p.activePlot?.type === 'Тайный заговор' && (p.activePlot.charges ?? 0) < 4);
+  const conspiracyHolders = players.filter(charging);
   if (conspiracyHolders.length === 0) return;
 
   const newPlayers = players.map(p => {
-    if (p.activePlot?.type === 'Тайный заговор' && (p.activePlot.charges ?? 0) < 4) {
+    if (charging(p) && p.activePlot) {
       const nextCharges = Math.min(4, (p.activePlot.charges ?? 0) + 1);
       return {
         ...p,
@@ -166,6 +265,7 @@ export function chargeActiveConspiracies(
 
   set(state => ({
     players: newPlayers,
+    ...plotsCharged(conspiracyHolders.map(p => p.activePlot!.cardId)),
     history: [...logs, ...state.history].slice(0, 50)
   }));
 }
@@ -284,9 +384,12 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
   }
 
   const effect = action.conspiracyEffect ?? 'gold';
+  /* Разряженный Заговор отыгран, а не сброшен: карта уходит ударом.
+     Идентификатор снимаем здесь, пока слот ещё не опустел. */
+  const spentCardId = player.activePlot.cardId;
   const newDiscard: CardInstance[] = [
     ...discardPile,
-    { id: player.activePlot.cardId, card: 'Тайный заговор' }
+    { id: spentCardId, card: 'Тайный заговор' }
   ];
 
   if (effect === 'gold') {
@@ -300,6 +403,7 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
       players: newPlayers,
       discardPile: newDiscard,
       conspiracyPrompt: null,
+      ...plotSpent(spentCardId),
       history: [
         `⚔️ «Тайный заговор»: ${target.name} теряет ${goldLoss} 🪙 в казну!`,
         ...state.history
@@ -321,6 +425,7 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
       players: newPlayers,
       discardPile: newDiscard,
       conspiracyPrompt: null,
+      ...plotSpent(spentCardId),
       history: state.history
     }));
 
@@ -347,11 +452,11 @@ export function applyConspiracyEffect(get: StateGetter, set: StateSetter, action
 }
 
 export function applyMorningPlotReward(get: StateGetter, set: StateSetter, action: Action): void {
-  const { players, discardPile, coronationCandidateId } = get();
+  const { players, discardPile, coronations } = get();
   const idx = players.findIndex(p => p.id === action.actorId);
   const player = idx >= 0 ? players[idx] : null;
   const plotType = player?.activePlot?.type;
-  if (!player || (plotType !== 'Королевский приём' && plotType !== 'Золотая булла')) {
+  if (!player || plotType !== 'Королевский приём') {
     set({
       pendingAction: null,
       turnPhase: 'IDLE',
@@ -364,13 +469,14 @@ export function applyMorningPlotReward(get: StateGetter, set: StateSetter, actio
     [...players],
     idx,
     discardPile,
-    coronationCandidateId,
+    coronations,
     set,
     get().rules.crownsToWin
   );
   set({
     players: result.updatedPlayers,
     discardPile: result.curDiscard,
+    ...(result.spentPlotId ? plotSpent(result.spentPlotId) : { plotPulses: [] }),
     pendingAction: null,
     turnPhase: 'IDLE',
     turnSubPhase: 'NORMAL_ACTION_PHASE'
@@ -403,7 +509,7 @@ export function resolveMorningPlots(
   updatedPlayers: Player[],
   nextIndex: number,
   curDiscard: CardInstance[],
-  coronationCandidateId: string | null,
+  coronations: Coronation[],
   set: StateSetter,
   crownsToWin: number
 ): {
@@ -411,13 +517,17 @@ export function resolveMorningPlots(
   curDiscard: CardInstance[];
   coronationTriggeredByReception: boolean;
   nextPlayerUpdated: Player;
+  /** Карта состоявшегося «Приёма» — она уходит ударом, а не молча. */
+  spentPlotId: CardId | null;
 } {
   let nextPlayerUpdated = updatedPlayers[nextIndex];
   let coronationTriggeredByReception = false;
   let newDiscard = [...curDiscard];
+  let spentPlotId: CardId | null = null;
 
   if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Королевский приём') {
     const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Королевский приём' };
+    spentPlotId = spentPlot.id;
     const newFavor = Math.min(crownsToWin, nextPlayerUpdated.favor + 1);
     nextPlayerUpdated = {
       ...nextPlayerUpdated,
@@ -432,56 +542,19 @@ export function resolveMorningPlots(
       history: [`👑 Королевский приём ${genOf(nextPlayerUpdated)} успешно состоялся! Получено +1 👑!`, ...state.history].slice(0, 50)
     }));
 
-    if (newFavor >= crownsToWin && !coronationCandidateId) {
+    /* Круг заводится, если по этому игроку его ещё нет. Чужие идущие круги
+       тут ни при чём: раньше проверялось «есть ли круг вообще», и приём,
+       выведший на порог второго претендента, круга ему не давал. */
+    if (newFavor >= crownsToWin && !isCoronationCandidate(coronations, nextPlayerUpdated.id)) {
       coronationTriggeredByReception = true;
     }
-  } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Золотая булла') {
-    const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Золотая булла' };
-    const totalSeals = nextPlayerUpdated.seals + 1;
-    const gainedCrowns = Math.floor(totalSeals / 2);
-    const newFavor = Math.min(crownsToWin, nextPlayerUpdated.favor + gainedCrowns);
-    const remainderSeals = newFavor >= crownsToWin ? 0 : (totalSeals % 2);
-
-    nextPlayerUpdated = {
-      ...nextPlayerUpdated,
-      seals: remainderSeals,
-      favor: newFavor,
-      activePlot: null
-    };
-    updatedPlayers[nextIndex] = nextPlayerUpdated;
-    triggerResourceFloat(set, nextPlayerUpdated.id, '+1 ⚜️ Булла!', true);
-    if (gainedCrowns > 0) {
-      setTimeout(() => {
-        triggerResourceFloat(set, nextPlayerUpdated.id, `+${gainedCrowns} 👑`, true);
-      }, 350);
-    }
-
-    newDiscard = [...newDiscard, spentPlot];
-    const convNotice = gainedCrowns > 0 ? ` (2 печати дали +${gainedCrowns} 👑)` : '';
-    set(state => ({
-      history: [`📜 «Золотая булла» ${genOf(nextPlayerUpdated)} принесла +1 ⚜️ печать${convNotice}!`, ...state.history].slice(0, 50)
-    }));
-
-    if (newFavor >= crownsToWin && !coronationCandidateId) {
-      coronationTriggeredByReception = true;
-    }
-  } else if (nextPlayerUpdated.activePlot && nextPlayerUpdated.activePlot.type === 'Сеть информаторов') {
-    const spentPlot: CardInstance = { id: nextPlayerUpdated.activePlot.cardId, card: 'Сеть информаторов' };
-    nextPlayerUpdated = {
-      ...nextPlayerUpdated,
-      activePlot: null
-    };
-    updatedPlayers[nextIndex] = nextPlayerUpdated;
-    newDiscard = [...newDiscard, spentPlot];
-    set(state => ({
-      history: [`👁️ Действие «Сети информаторов» ${genOf(nextPlayerUpdated)} завершилось после полного круга.`, ...state.history].slice(0, 50)
-    }));
   }
 
   return {
     updatedPlayers,
     curDiscard: newDiscard,
     coronationTriggeredByReception,
-    nextPlayerUpdated
+    nextPlayerUpdated,
+    spentPlotId
   };
 }

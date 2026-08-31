@@ -9,8 +9,9 @@
  */
 import type { CardInstance, GameState } from '../types';
 import { genOf } from '../utils/russianText';
+import { plotDisrupted, plotSpent } from './plotResolver';
 import { triggerResourceFloat } from '../utils/visualEffects';
-import { fallenCoronationPatch } from './coronation';
+import { isCoronationCandidate, survivingCoronations } from './coronation';
 
 type StateGetter = () => GameState;
 type StateSetter = (
@@ -66,9 +67,9 @@ export function loseCrowns(
 
   set(state => ({
     players: newPlayers,
-    ...fallenCoronationPatch(state.coronationCandidateId, victimId, newFavor, rules.crownsToWin),
+    coronations: survivingCoronations(state.coronations, victimId, newFavor, rules.crownsToWin),
     history: [
-      ...(state.coronationCandidateId === victimId && newFavor < rules.crownsToWin
+      ...(isCoronationCandidate(state.coronations, victimId) && newFavor < rules.crownsToWin
         ? [`⚖️ Коронация ${victim.name} сорвана: ${reason}. Влияние упало ниже ${rules.crownsToWin} 👑!`]
         : []),
       ...state.history
@@ -113,6 +114,9 @@ export function burnCharter(
   set(state => ({
     players: newPlayers,
     discardPile: [...state.discardPile, burned],
+    /* Грамота отработала — приняла удар на себя. На столе это и показывается
+       ударом, а не молчаливым полётом в сброс (см. `GameState.plotPulses`). */
+    ...plotSpent(burned.id),
     history: [
       `📜 «Охранная грамота» ${genOf(victim)} не выдержала ${reason}: корона цела, но грамота сгорела.`,
       ...state.history
@@ -155,6 +159,7 @@ export function discardProtectiveIntrigueOnBluff(
   set(state => ({
     players: newPlayers,
     discardPile: [...state.discardPile, burned],
+    ...plotDisrupted(burned.id, state.plotPulses),
     history: [
       `💥 «${plot.type}» ${genOf(victim)} сгорает: ${victim.name} уличён(а) в блефе.`,
       ...state.history

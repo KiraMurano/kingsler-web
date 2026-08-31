@@ -5,7 +5,7 @@
  * shared vocabulary between `lib/cardZones.ts` (which derives zones from game
  * state) and `motion/` (which draws them).
  */
-import type { GameCard } from '@kinglier/engine/types';
+import type { GameCard, PlotPulseKind } from '@kinglier/engine/types';
 import type { CardId } from '@kinglier/engine/cardInstance';
 
 export type Zone =
@@ -19,8 +19,18 @@ export type Zone =
   | { kind: 'duel'; side: 'attacker' | 'defender' }
   /** An instant laid openly in the middle of the table. */
   | { kind: 'table' }
-  /** An instant laid on top of the current action: veto, redirect. */
-  | { kind: 'overlay' }
+  /**
+   * An instant laid on top of the current action: veto, redirect.
+   *
+   * `over` says what it is laid on, because that changes where the hole is.
+   * Across an action the overlay sits off to one side and leans, so the card
+   * underneath stays readable and reachable. Over a plot there is nothing
+   * underneath — the intrigue is away in its owner's slot — so the overlay
+   * takes the table's ordinary card hole and lies square in it. Registering
+   * them under one key would make the layer chase whichever anchor happened
+   * to be mounted.
+   */
+  | { kind: 'overlay'; over: 'action' | 'plot' }
   /** A plot card resting in a seat's plot slot. */
   | { kind: 'plot'; playerId: string }
   /** Face-up graveyard: the top-right corner of the table. */
@@ -61,6 +71,28 @@ export interface PlacedCard {
   /** Whose card this is, when that is meaningful (hand, plot, duel side). */
   ownerId: string | null;
   /**
+   * Что случилось с этой картой прямо сейчас — и, значит, чем стол должен
+   * отозваться (см. `GameState.plotPulses`).
+   *
+   * `spent` — интрига сработала и уходит: удар с искрами.
+   * `disrupt` — её сорвали: карта дёргается и тоже уходит, но это не праздник.
+   * `charge` — интрига что-то получила: короткий кивок. На последней монете
+   * сети карта уже в сбросе — кивок есть, задержки перед улётом нет: это
+   * обычный сброс, как при замене интриги.
+   */
+  pulse?: PlotPulseKind;
+
+  /**
+   * Какое это по счёту вето в цепочке (`vetoChain`) — только для «Права вето»,
+   * лежащего оверлеем.
+   *
+   * Нужно ровно для одного: развести по углу вето, наложенное на вето. Оба
+   * приходят в одну лунку и оба показывают одно лицо, так что больше их
+   * различить нечем (см. `lib/cardLie.ts`).
+   */
+  vetoLink?: number;
+
+  /**
    * Заряды «Тайного заговора», когда карта лежит в слоте интриги.
    *
    * Живут здесь, а не на подписи под слотом: слой карт рисуется выше слота, и
@@ -79,6 +111,8 @@ export function zoneKey(zone: Zone): string {
       return `plot:${zone.playerId}`;
     case 'duel':
       return `duel:${zone.side}`;
+    case 'overlay':
+      return `overlay:${zone.over}`;
     default:
       return zone.kind;
   }

@@ -32,7 +32,7 @@ function player(id: string, over: Partial<Player> = {}): Player {
     favor: 0,
     seals: 0,
     actionTokens: 2,
-    hand: hand('Наследник', 'Рыцарь'),
+    hand: hand('Наследник', 'Дуэлянт'),
     activePlot: null,
     ...over
   };
@@ -49,7 +49,6 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     pendingDoubtPassedIds: [],
     hasUsedNormalActionThisTurn: false,
     hasPlayedRoleThisTurn: false,
-    hasPlayedPlotThisTurn: false,
     isVetoed: false,
     opening: null,
     vetoChain: 0,
@@ -58,7 +57,7 @@ function input(over: Partial<TableViewInput> = {}): TableViewInput {
     vetoOnVeto: false,
     rules: DEFAULT_RULES,
     vaBanqueArmed: false,
-    coronationCandidateId: null,
+    coronations: [],
     revealOutcome: null,
     duelOutcome: null,
     exchangePick: null,
@@ -141,7 +140,8 @@ function action(over: Partial<Action> = {}): Action {
     turnPhase: 'TARGET_REACTION_WINDOW',
     pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' }),
     players: [
-      player('p1', { hand: hand('Казначей', 'Перенаправление') }),
+      /* Щит двора — «Дуэлянт»: он и против Вора, и против Шантажиста. */
+      player('p1', { hand: hand('Дуэлянт', 'Перенаправление') }),
       player('p2'),
       player('p3')
     ]
@@ -177,7 +177,7 @@ function action(over: Partial<Action> = {}): Action {
         pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' }),
         rules,
         players: [
-          player('p1', { hand: hand('Казначей', 'Шут'), actionTokens: 0, gold: 0, ...over }),
+          player('p1', { hand: hand('Дуэлянт', 'Шут'), actionTokens: 0, gold: 0, ...over }),
           player('p2'),
           player('p3')
         ]
@@ -256,7 +256,7 @@ function action(over: Partial<Action> = {}): Action {
     activePlayerId: 'p2',
     turnPhase: 'TARGET_REACTION_WINDOW',
     pendingAction: action({ roleClaim: 'Шантажист', targetId: 'p1' }),
-    players: [player('p1', { hand: hand('Шут', 'Рыцарь') }), player('p2'), player('p3')]
+    players: [player('p1', { hand: hand('Шут', 'Дуэлянт') }), player('p2'), player('p3')]
   });
   const view = deriveTableView(attacked, 'p1');
   const [jester, knight] = view.viewerHandIds;
@@ -264,7 +264,7 @@ function action(over: Partial<Action> = {}): Action {
   assert.deepEqual(
     view.menus[knight].map(o => o.kind),
     ['duel-shield', 'inspect'],
-    'против Шантажиста щит — Рыцарь'
+    'против Шантажиста щит — Дуэлянт'
   );
 }
 
@@ -288,7 +288,7 @@ function action(over: Partial<Action> = {}): Action {
      Его спрашивают ровно так же, и жать «Пропустить» он обязан сам — иначе
      закрывшееся само окно означало бы «вето ни у кого нет». */
   const безКарты = deriveTableView(
-    { ...открыто, players: [player('p1', { hand: hand('Шут', 'Рыцарь') }), player('p2'), player('p3')] },
+    { ...открыто, players: [player('p1', { hand: hand('Шут', 'Дуэлянт') }), player('p2'), player('p3')] },
     'p1'
   );
   assert.equal(безКарты.phase, 'veto', 'без вето на руках игрока всё равно спрашивают');
@@ -560,7 +560,7 @@ function action(over: Partial<Action> = {}): Action {
 // вместо кнопок табличку «сбейте влияние претендента». Сбивать было нечем —
 // панель действий не появлялась, и стол стоял до конца круга.
 {
-  const view = deriveTableView(input({ activePlayerId: 'p1', coronationCandidateId: 'p2' }), 'p1');
+  const view = deriveTableView(input({ activePlayerId: 'p1', coronations: [{ candidateId: 'p2', originId: 'p2' }] }), 'p1');
   assert.equal(view.phase, 'turn', 'на своём ходу игрок ходит, а не смотрит на объявление');
   assert.ok(view.bar.length > 0, 'кнопки действий на месте');
   assert.ok(
@@ -571,13 +571,13 @@ function action(over: Partial<Action> = {}): Action {
 
 // Чужой ход во время круга — по-прежнему объявление.
 {
-  const view = deriveTableView(input({ activePlayerId: 'p2', coronationCandidateId: 'p2' }), 'p1');
+  const view = deriveTableView(input({ activePlayerId: 'p2', coronations: [{ candidateId: 'p2', originId: 'p2' }] }), 'p1');
   assert.equal(view.phase, 'coronation', 'вне своего хода круг остаётся объявлением');
 }
 
 // Круг за самого зрителя читается иначе: ему нечего сбивать.
 {
-  const view = deriveTableView(input({ activePlayerId: 'p1', coronationCandidateId: 'p1' }), 'p1');
+  const view = deriveTableView(input({ activePlayerId: 'p1', coronations: [{ candidateId: 'p1', originId: 'p1' }] }), 'p1');
   assert.equal(view.phase, 'turn');
   assert.ok(view.guidance.includes('за вас'), 'претенденту сказано, что круг идёт за него');
 }
@@ -587,7 +587,7 @@ function action(over: Partial<Action> = {}): Action {
   const view = deriveTableView(
     input({
       activePlayerId: 'p1',
-      coronationCandidateId: 'p2',
+      coronations: [{ candidateId: 'p2', originId: 'p2' }],
       turnPhase: 'VETO_WINDOW',
       pendingAction: action()
     }),
@@ -621,7 +621,7 @@ function action(over: Partial<Action> = {}): Action {
 
 // Без Ва-банка в руке переключателя нет.
 {
-  const me = player('p1', { hand: hand('Наследник', 'Рыцарь') });
+  const me = player('p1', { hand: hand('Наследник', 'Дуэлянт') });
   const view = deriveTableView(input({ players: [me, player('p2'), player('p3')] }), 'p1');
   assert.ok(
     !view.menus[me.hand[0].id].map(o => o.kind).includes('vabanque'),
@@ -706,6 +706,126 @@ for (const charges of [0, 1, 2, 3]) {
   /* А как только открытие кончилось — ход начинается как обычно. */
   const после = deriveTableView(input({ activePlayerId: 'p1' }), 'p1');
   assert.equal(после.phase, 'turn');
+}
+
+/* --- Интриг за ход сколько угодно, ролей — одна. ---
+ *
+ * Лимит на Интриги стоял здесь, кнопкой, и в движке его не было вовсе. Играть
+ * вторую и правда незачем — она заменит первую, а первая уйдёт в сброс, — но
+ * это довод, а не запрет: передумать в свой ход игроку не запрещено, и абуза
+ * тут никакого. Роль — другое дело: два Казначея за ход выкачали бы казну. */
+{
+  const рука = hand('Досье', 'Наследник');
+  const [интрига, роль] = рука.map(c => c.id);
+  const свой = (over: Partial<TableViewInput>) =>
+    deriveTableView(
+      input({
+        players: [player('p1', { hand: рука }), player('p2'), player('p3')],
+        turnSubPhase: 'CARD_PLAY_PHASE',
+        ...over
+      }),
+      'p1'
+    );
+
+  const первая = свой({});
+  assert.ok(
+    !первая.menus[интрига].find(o => o.kind === 'play')!.disabled,
+    'первая интрига за ход разыгрывается'
+  );
+
+  /* Флага `hasPlayedPlotThisTurn` в раскладке больше нет — и в этом весь смысл:
+     сыгранная интрига на вторую никак не влияет. */
+  const вторая = свой({});
+  assert.ok(
+    !вторая.menus[интрига].find(o => o.kind === 'play')!.disabled,
+    'вторая интрига за ход тоже разыгрывается'
+  );
+
+  const послеРоли = свой({ hasPlayedRoleThisTurn: true });
+  const кнопкаРоли = послеРоли.menus[роль].find(o => o.kind === 'play')!;
+  assert.ok(кнопкаРоли.disabled, 'вторая роль за ход не разыгрывается');
+  assert.equal(кнопкаРоли.reason, 'Роль уже была в этом ходу.');
+  assert.ok(
+    !послеРоли.menus[интрига].find(o => o.kind === 'play')!.disabled,
+    'заявленная роль интригу не запирает'
+  );
+}
+
+/* --- Розыгрыш за монеты открывает и «Разыграть», и «Блеф». ---
+ *
+ * Меню уже умело менять подпись «Разыграть» на цену. «Блеф» при этом оставался
+ * глухим с «нет жетонов» — хотя это тот же розыгрыш карты, только взакрытую,
+ * и правило про него тоже. Без жетона и с золотом оба хода должны быть. */
+{
+  const рука = hand('Охранная грамота', 'Наследник');
+  const [интрига, роль] = рука.map(c => c.id);
+  const paid = normalizeRules({ paidPlayEnabled: true, paidPlayCost: 2 });
+  const меню = (over: { gold?: number }) =>
+    deriveTableView(
+      input({
+        players: [
+          player('p1', { hand: рука, actionTokens: 0, gold: 2, ...over }),
+          player('p2'),
+          player('p3')
+        ],
+        rules: paid,
+        turnSubPhase: 'CARD_PLAY_PHASE'
+      }),
+      'p1'
+    );
+
+  const естьЗолото = меню({});
+  const разыграть = естьЗолото.menus[интрига].find(o => o.kind === 'play')!;
+  assert.equal(разыграть.disabled, false, 'интригу без жетона покупают золотом');
+  assert.match(разыграть.label, /2/, 'на кнопке цена, а не глухое «Разыграть»');
+  assert.equal(разыграть.spendsToken, false, 'жетона нет — молнию не рисуем');
+
+  const блеф = естьЗолото.menus[интрига].find(o => o.kind === 'bluff')!;
+  assert.equal(блеф.disabled, false, 'блеф без жетона тоже покупается');
+  assert.equal(блеф.spendsToken, false);
+  assert.match(блеф.label, /2/, 'и на блефе видна цена');
+
+  const рольБлеф = естьЗолото.menus[роль].find(o => o.kind === 'bluff')!;
+  assert.equal(рольБлеф.disabled, false, 'заявить роль за золото тоже можно');
+
+  const нетЗолота = меню({ gold: 1 });
+  assert.equal(
+    нетЗолота.menus[интрига].find(o => o.kind === 'play')!.reason,
+    'Не хватает золота.',
+    'мало золота — не «нет жетонов»: жетоны тут ни при чём'
+  );
+  assert.equal(
+    нетЗолота.menus[интрига].find(o => o.kind === 'bluff')!.reason,
+    'Не хватает золота.'
+  );
+
+  const рольУжеБыла = deriveTableView(
+    input({
+      players: [player('p1', { hand: рука, actionTokens: 0, gold: 2 }), player('p2'), player('p3')],
+      rules: paid,
+      hasPlayedRoleThisTurn: true,
+      turnSubPhase: 'CARD_PLAY_PHASE'
+    }),
+    'p1'
+  );
+  assert.equal(
+    рольУжеБыла.menus[роль].find(o => o.kind === 'bluff')!.reason,
+    'Роль уже была в этом ходу.',
+    'покупка лимит на роль не снимает'
+  );
+
+  const безПравила = deriveTableView(
+    input({
+      players: [player('p1', { hand: рука, actionTokens: 0, gold: 4 }), player('p2'), player('p3')],
+      turnSubPhase: 'CARD_PLAY_PHASE'
+    }),
+    'p1'
+  );
+  assert.equal(
+    безПравила.menus[интрига].find(o => o.kind === 'bluff')!.reason,
+    'Нет жетонов действия.',
+    'без правила золото блеф не открывает'
+  );
 }
 
 console.log('tableView.check: ok');

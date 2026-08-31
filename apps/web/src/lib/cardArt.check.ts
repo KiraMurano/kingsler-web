@@ -5,7 +5,7 @@ import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { cardArt, TABLE_ART_WIDTH, type CardArtWidth } from './cardArt.ts';
 
 /* --- сама подстановка ---------------------------------------------------- */
-assert.equal(cardArt('/assets/cards/knight.webp', 512), '/assets/cards/knight-512.webp');
+assert.equal(cardArt('/assets/cards/duelist.webp', 512), '/assets/cards/duelist-512.webp');
 /* Не арт карты — не трогаем: у аватаров и картинок интерфейса копий нет. */
 assert.equal(cardArt('/avatars/anton.webp', 512), '/avatars/anton.webp');
 assert.equal(cardArt('/assets/ui/coin-500.webp', 512), '/assets/ui/coin-500.webp');

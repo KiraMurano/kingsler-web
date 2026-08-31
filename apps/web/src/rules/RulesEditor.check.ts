@@ -25,7 +25,7 @@ const render = (rules = DEFAULT_RULES) =>
     'Жетонов хода',
     'Стоимость короны (пир)',
     'Стоимость роспуска слуха',
-    'Стоимость шантажа',
+    'Платный шантаж',
     'Дуэль тратит жетон хода',
     'Стоимость дуэли',
     'Платная дуэль',
@@ -40,7 +40,7 @@ const render = (rules = DEFAULT_RULES) =>
 
 // --- 2. Счётчик карт живой ---
 {
-  assert.ok(render().includes('51 карт'), 'счётчик показывает размер колоды');
+  assert.ok(render().includes('50 карт'), 'счётчик показывает размер колоды');
 
   const empty = {} as Record<string, number>;
   for (const card of ALL_CARDS) empty[card] = 0;
@@ -74,6 +74,47 @@ const render = (rules = DEFAULT_RULES) =>
   );
 }
 
+/* --- 4а. У розыгрыша за монеты цена СВОЯ ---
+ *
+ * Раньше её перебивала «Платная проверка» — по образцу платной дуэли, — и два
+ * разных правила нельзя было развести по деньгам: дешёвая проверка делала
+ * дешёвым и розыгрыш. Заимствование там осмысленно (платная дуэль это и есть
+ * купленная проверка, только со щитом), здесь — нет. */
+{
+  assert.ok(!render().includes('Цена розыгрыша за монеты'), 'выключено — цены нет');
+
+  const alone = render(normalizeRules({ paidPlayEnabled: true }));
+  assert.ok(alone.includes('Цена розыгрыша за монеты'), 'включено — цена своя');
+
+  const withDoubt = render(normalizeRules({ paidPlayEnabled: true, paidDoubtEnabled: true }));
+  assert.ok(
+    withDoubt.includes('Цена розыгрыша за монеты'),
+    'включённая платная проверка своей цены розыгрыша не отменяет'
+  );
+  assert.ok(
+    withDoubt.includes('Цена платной проверки'),
+    'и обе цены стоят рядом, каждая своим ползунком'
+  );
+}
+
+/* --- 4б. «Платный шантаж» — это цена больше нуля, а не отдельный флаг ---
+ *
+ * Ноль в `blackmailCost` означает выключенное правило, и тумблер читает ровно
+ * его. Второе состояние у одного факта («флаг включён, цена ноль») чинить
+ * пришлось бы в трёх местах. */
+{
+  const free = render(normalizeRules({ blackmailCost: 0 }));
+  assert.ok(free.includes('Платный шантаж'), 'тумблер виден всегда');
+  assert.ok(!free.includes('Цена шантажа'), 'бесплатный шантаж цены не показывает');
+
+  const paid = render(normalizeRules({ blackmailCost: 4 }));
+  assert.ok(paid.includes('Цена шантажа'), 'платный — показывает');
+  assert.ok(
+    paid.includes('aria-checked="true"'),
+    'и тумблер при этом включён'
+  );
+}
+
 // --- 5. Взаимоисключение объяснено, а не просто погашено ---
 {
   const html = render(normalizeRules({ paidDoubtEnabled: true }));
@@ -98,22 +139,30 @@ const render = (rules = DEFAULT_RULES) =>
   assert.ok(render().includes('Сбросить к умолчаниям'), 'правила можно вернуть к дефолтным');
 }
 
-/* --- 8. «Платная дуэль» держится на двух соседях ---
+/* --- 8. «Платная дуэль»: свой ползунок и один сосед ---
  *
- * Она заменяет жетон золотом по цене платной проверки: без требования жетона
- * заменять в цене нечего, без платной проверки неоткуда взять цену. Тумблер
- * при этом не прячется, а гаснет и объясняет себя: спрятанная настройка
- * выглядит как отсутствующая. */
+ * Она выкупает жетон золотом по СВОЕЙ цене. Раньше цену занимала «Платная
+ * проверка», и выкуп щита нельзя было включить, не разрешив заодно покупать
+ * проверки; теперь зависимость осталась одна — требование жетона, без него
+ * выкупать нечего. Тумблер при этом не прячется, а гаснет и объясняет себя:
+ * спрятанная настройка выглядит как отсутствующая. */
 {
-  const off = render();
-  assert.ok(off.includes('Платная дуэль'), 'тумблер виден всегда');
-  assert.ok(off.includes('нужны оба'), 'и объясняет, чего ему не хватает');
+  const noToken = render(normalizeRules({ duelCostsToken: false }));
+  assert.ok(noToken.includes('Платная дуэль'), 'тумблер виден всегда');
+  assert.ok(noToken.includes('выкупать нечего'), 'и объясняет, чего ему не хватает');
 
-  const ready = render(
-    normalizeRules({ duelCostsToken: true, paidDoubtEnabled: true, paidDuelEnabled: true, paidDoubtCost: 2, duelCost: 1 })
+  /* Платной проверки нет — и она больше не нужна. */
+  const own = render(
+    normalizeRules({ duelCostsToken: true, paidDuelEnabled: true, paidDuelCost: 2, duelCost: 1 })
   );
-  assert.ok(!ready.includes('нужны оба'), 'зависимости на месте — объяснять нечего');
-  assert.ok(ready.includes('3 🪙'), 'названа итоговая цена вызова без жетона');
+  assert.ok(!own.includes('выкупать нечего'), 'зависимость на месте — объяснять нечего');
+  assert.ok(own.includes('Цена платной дуэли'), 'у выкупа свой ползунок');
+  assert.ok(own.includes('3 🪙'), 'названа итоговая цена вызова без жетона');
+
+  /* Без надбавки складывать нечего — и пояснения нет. */
+  const plain = render(normalizeRules({ duelCostsToken: true, paidDuelEnabled: true }));
+  assert.ok(plain.includes('Цена платной дуэли'), 'ползунок всё равно есть');
+  assert.ok(!plain.includes('плюс надбавка'), 'а складывать нечего — пояснение молчит');
 }
 
 console.log('RulesEditor.check: ok');

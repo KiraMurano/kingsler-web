@@ -22,12 +22,13 @@ import { UiIcon, renderWithIcons } from './ui/Icon';
 import { startTargeting } from './targeting';
 import { pickViewer } from '../lib/viewer';
 import { byId, holds } from '@kinglier/engine/cardInstance';
+import { playPayment, paidPlayPrice } from '@kinglier/engine/rules';
 import { cardArt } from '../lib/cardArt.ts';
 
 const VA_BANQUE_EFFECT: Record<string, string> = {
   Наследник: '+2 👑 при успешной проверке',
   Казначей: '+6 🪙 при успешной проверке',
-  Рыцарь: '+4 🪙 при успешной проверке',
+  Дуэлянт: '+2 ⚜️ при успешной проверке',
   Шут: '+4 🪙 и +1 👑 при проверке',
   Вор: 'кража до 4 🪙 при проверке',
   Шантажист: 'кража 2 👑 при проверке'
@@ -57,7 +58,8 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({
   const human = pickViewer(players, viewerId);
 
   const hasVaBanque = !!human && holds(human.hand, 'Ва-банк');
-  const canUseVaBanque = hasVaBanque && (human?.actionTokens ?? 0) >= 1 && !hasPlayedRoleThisTurn;
+  const canPlay = !!human && playPayment(rules, human) !== null && !hasPlayedRoleThisTurn;
+  const canUseVaBanque = hasVaBanque && canPlay;
   /* Взвели «Ва-банк» ещё в меню карты — диалог открывается уже с ним. */
   const [withVaBanque, setWithVaBanque] = useState(armedVaBanque);
 
@@ -67,7 +69,6 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({
   if (!staked) return null;
 
   const card = staked.card;
-  const hasTokens = human.actionTokens >= 1;
 
   const claimRole = (role: Role) => {
     const roleInfo = CARD_DESCRIPTIONS[role];
@@ -143,8 +144,11 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({
              заявитель, а не только тот, кому поверили. Плитка обязана
              показывать эту цену и гаснуть, когда денег нет: иначе клик уйдёт
              в движок и молча отклонится. */
-          const cost = info.cost + (role === 'Шантажист' ? rules.blackmailCost : 0);
-          const affordable = human.gold >= cost && hasTokens && !hasPlayedRoleThisTurn;
+          const extra = info.cost + (role === 'Шантажист' ? rules.blackmailCost : 0);
+          const payment = playPayment(rules, human, extra);
+          const listedGold =
+            extra + (human.actionTokens >= 1 ? 0 : (paidPlayPrice(rules) ?? 0));
+          const affordable = payment !== null && !hasPlayedRoleThisTurn;
           const truthful = role === card;
           return (
             <Tile
@@ -153,7 +157,7 @@ export const BluffDialog: React.FC<BluffDialogProps> = ({
               name={role}
               tone={withVaBanque ? 'arcane' : 'gold'}
               badge={<Tag tone={truthful ? 'truth' : 'bluff'}>{truthful ? 'Правда' : 'Блеф'}</Tag>}
-              meta={cost > 0 ? <>{cost} <UiIcon kind="coin" size="xs" /></> : undefined}
+              meta={listedGold > 0 ? <>{listedGold} <UiIcon kind="coin" size="xs" /></> : undefined}
               desc={renderWithIcons(withVaBanque ? VA_BANQUE_EFFECT[role] : info.shortDescription)}
               disabled={!affordable}
               onClick={() => claimRole(role)}

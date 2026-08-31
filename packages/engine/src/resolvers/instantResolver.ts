@@ -1,12 +1,14 @@
 import type { Action, GameState, InstantType, CardId } from '../types';
 import { CARD_INFO, drawCardsFromDeck } from '../cards';
 import { pluck } from '../cardInstance';
+import { playPayment } from '../rules';
 import { botMemory } from '../Bot';
 import { genOf } from '../utils/russianText';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
 import { ACTION_HOLD_MS } from '../timing';
 import { loseCrowns } from './crownLoss';
+import { plotDisrupted } from './plotResolver';
 import { canBeTargetedBy, canBeTargetedByInstant } from '../targeting';
 import { vetoPlayed, vetoReset, vetoPollAnswered, vetoTopActorId } from './vetoChain';
 
@@ -20,6 +22,7 @@ function instantAction(
   instantType: InstantType,
   targetPlayerId: string | undefined,
   tokenCost: number,
+  goldCost: number,
   cardId: CardId
 ): Action {
   return {
@@ -30,7 +33,7 @@ function instantAction(
     actorId,
     targetId: targetPlayerId,
     stakedCardId: cardId,
-    costGold: 0,
+    costGold: goldCost,
     costTokens: tokenCost,
     description: CARD_INFO[instantType]?.shortDescription ?? ''
   };
@@ -44,7 +47,7 @@ export function playInstant(
   cardId: CardId,
   targetPlayerId?: string
 ): void {
-  const { players, pendingAction, discardPile } = get();
+  const { players, pendingAction, discardPile, rules } = get();
   const actor = players.find(p => p.id === playerId);
   if (!actor) return;
 
@@ -99,29 +102,34 @@ export function playInstant(
      не стоит. «Перенаправление» переводит нападение на соседа — это ход, а не
      защита, и он оплачивается жетоном, как любой другой. */
   const isFreeInstant = instantType === 'Право вето';
-  if (!isFreeInstant && actor.actionTokens < 1) return;
+  const payment = isFreeInstant ? { tokens: 0, gold: 0 } : playPayment(rules, actor);
+  if (!payment) return;
 
   const { taken: card, rest: newHand } = pluck(actor.hand, cardId);
   if (card?.card !== instantType) return;
 
   const updatedDiscard = [...discardPile, card];
 
-  const tokenCost = isFreeInstant ? 0 : 1;
   const updatedPlayers = players.map(p =>
     p.id === actor.id
       ? {
           ...p,
-          actionTokens: p.actionTokens - tokenCost,
+          actionTokens: p.actionTokens - payment.tokens,
+          gold: p.gold - payment.gold,
           hand: newHand
         }
       : p
   );
-  if (tokenCost > 0) {
+  if (payment.gold > 0) {
+    triggerResourceFloat(set, actor.id, `-${payment.gold} 🪙`, false);
+  }
+  if (payment.tokens > 0) {
     triggerResourceFloat(set, actor.id, '-1 ⚡', false);
   }
 
-  const laid = instantAction(actor.id, instantType, targetPlayerId, tokenCost, card.id);
+  const laid = instantAction(actor.id, instantType, targetPlayerId, payment.tokens, payment.gold, card.id);
   const speech = `«${instantType}!»`;
+  const spent = payment.tokens > 0 ? 'потрачен 1 ⚡' : payment.gold > 0 ? `потрачено ${payment.gold} 🪙` : 'бесплатно';
 
   if (instantType === 'Ва-банк') {
     set(state => ({
@@ -132,7 +140,7 @@ export function playInstant(
       overlayInstant: null,
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `🎲 ${actor.name} играет инстант ⚡ «ВА-БАНК» (потрачен 1 ⚡)! Награда за этот спор удваивается (2 ⚜️ = 1 👑)!`,
+        `🎲 ${actor.name} играет инстант ⚡ «ВА-БАНК» (${spent})! Награда за этот спор удваивается (2 ⚜️ = 1 👑)!`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -200,20 +208,50 @@ export function playInstant(
   } else if (instantType === 'Перенаправление' && pendingAction && targetPlayerId) {
     const newTarget = players.find(p => p.id === targetPlayerId)!;
     const updatedAction = { ...pendingAction, targetId: targetPlayerId };
+
+    /*
+     * Перевод — такой же ход, как любой другой, и двор отвечает на него вето.
+     *
+     * Раньше эта ветка выставляла окно реакции новой жертвы напрямую, минуя
+     * окно вето: «Перенаправление» было единственной картой в игре, которую
+     * нельзя было отменить вовсе. Нападающий смотрел, как его удар уводят на
+     * соседа, с «Правом вето» на руках и без единой возможности его сыграть.
+     *
+     * Ветируется именно перевод, а не нападение: вето вернёт цель на прежнюю,
+     * и удар состоится — по тому, на кого его и направляли. Ради этого
+     * запоминается прежняя цель.
+     */
     set(state => ({
       players: updatedPlayers,
       discardPile: updatedDiscard,
       pendingAction: updatedAction,
       overlayInstant: { card: 'Перенаправление', actorId: actor.id },
-      turnPhase: 'TARGET_REACTION_WINDOW',
+      pendingRedirectFromId: pendingAction.targetId ?? null,
+      ...vetoReset(),
+      turnPhase: 'VETO_WINDOW',
+      pendingVetoPassedIds: [],
+      pendingVetoActionId: updatedAction.id,
       timerSeconds: 0,
       timerMaxSeconds: 0,
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ» (потрачен 1 ⚡)! Новая цель атаки: ${newTarget.name}!`,
+        `🔀 ${actor.name} играет инстант ⚡ «ПЕРЕНАПРАВЛЕНИЕ» (${spent})! Новая цель атаки: ${newTarget.name}. Двор может отменить перевод «Правом вето».`,
         ...state.history
       ].slice(0, 50)
     }));
+
+    /* Спрашивать может быть некого: наверху лежит карта переведшего, и его не
+       спрашивают, а больше за столом никого не осталось. */
+    const after = get();
+    if (
+      vetoPollAnswered(
+        after.players,
+        vetoTopActorId(updatedAction.actorId, after.overlayInstant),
+        []
+      )
+    ) {
+      get().proceedAfterVetoWindow();
+    }
   } else if (instantType === 'Дворцовый переполох' && targetPlayerId) {
     set(state => ({
       players: updatedPlayers,
@@ -225,7 +263,7 @@ export function playInstant(
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `⚡ ${actor.name} разыгрывает инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (потрачен 1 ⚡)! Двор может наложить Вето до смены руки ${(() => { const t = players.find(p => p.id === targetPlayerId); return t ? genOf(t) : 'цели'; })()}.`,
+        `⚡ ${actor.name} разыгрывает инстант «ДВОРЦОВЫЙ ПЕРЕПОЛОХ» (${spent})! Двор может наложить Вето до смены руки ${(() => { const t = players.find(p => p.id === targetPlayerId); return t ? genOf(t) : 'цели'; })()}.`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -241,7 +279,7 @@ export function playInstant(
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `🔍 ${actor.name} разыгрывает инстант ⚡ «ОБЫСК ПОКОЕВ» (потрачен 1 ⚡) против ${players.find(p => p.id === targetPlayerId)?.name ?? 'цели'}! Двор может наложить Вето.`,
+        `🔍 ${actor.name} разыгрывает инстант ⚡ «ОБЫСК ПОКОЕВ» (${spent}) против ${players.find(p => p.id === targetPlayerId)?.name ?? 'цели'}! Двор может наложить Вето.`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -257,7 +295,7 @@ export function playInstant(
       turnSubPhase: 'CARD_PLAY_PHASE',
       activeSpeechReactions: { ...state.activeSpeechReactions, [actor.id]: speech },
       history: [
-        `⛓️ ${actor.name} разыгрывает инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (потрачен 1 ⚡) против ${players.find(p => p.id === targetPlayerId)?.name ?? 'цели'}! Двор может наложить Вето.`,
+        `⛓️ ${actor.name} разыгрывает инстант ⚡ «ОБВИНЕНИЕ В ИЗМЕНЕ» (${spent}) против ${players.find(p => p.id === targetPlayerId)?.name ?? 'цели'}! Двор может наложить Вето.`,
         ...state.history
       ].slice(0, 50)
     }));
@@ -322,6 +360,7 @@ export function resolveInstantEffect(
       set(state => ({
         players: newPlayers,
         discardPile: [...state.discardPile, searched],
+        ...plotDisrupted(searched.id, state.plotPulses),
         history: [
           `🔍 «Обыск покоев»: интрига ${genOf(victim)} («${plotType}») сброшена!`,
           ...state.history

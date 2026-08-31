@@ -2,11 +2,11 @@ import type { Action, GameState, Player } from '../types';
 import { drawCardsFromDeck, HAND_SIZE } from '../cards';
 import { holds } from '../cardInstance';
 import { timerManager } from '../utils/timerManager';
-import { resolveMorningPlots } from './plotResolver';
+import { plotSpent, resolveMorningPlots } from './plotResolver';
 import {
   beginCoronationIfNeeded,
-  NO_CORONATION,
-  resolveCoronationAtTurnStart
+  isCoronationCandidate,
+  resolveCoronationsAtTurnStart
 } from './coronation';
 import { vetoReset } from './vetoChain';
 
@@ -22,12 +22,11 @@ function applyCoronationTurnStart(
   players: Player[],
   extra: Partial<GameState>
 ): boolean {
-  const { coronationCandidateId, coronationOriginId, rules } = get();
-  const verdict = resolveCoronationAtTurnStart(
+  const { coronations, rules } = get();
+  const { verdict, rest } = resolveCoronationsAtTurnStart(
     nextPlayerId,
     players,
-    coronationCandidateId,
-    coronationOriginId,
+    coronations,
     rules.crownsToWin
   );
   switch (verdict.kind) {
@@ -43,7 +42,9 @@ function applyCoronationTurnStart(
       }));
       return true;
     case 'abort':
-      set({ ...NO_CORONATION });
+      /* Снимаются только закрывшиеся круги. Чужие идут дальше: они привязаны
+         к своим зачинателям, и до их срока ещё далеко. */
+      set({ coronations: rest });
       return false;
     case 'continue':
       return false;
@@ -58,29 +59,54 @@ export function checkEndgameAndAdvanceTurn(
   get: StateGetter,
   set: StateSetter
 ): void {
-  const { players, coronationCandidateId, activePlayerId, hasPlayedRoleThisTurn, hasPlayedPlotThisTurn } = get();
+  const { players, coronations, activePlayerId, hasPlayedRoleThisTurn, hasPlayedPlotThisTurn } = get();
   const actor = players.find(p => p.id === activePlayerId);
 
-  if (!coronationCandidateId) {
-    const favorite = players.find(p => p.favor >= get().rules.crownsToWin);
-    if (favorite) beginCoronationIfNeeded(get, set, favorite.id);
+  /* Круг заводится каждому, кто стоит на пороге и ещё без круга: их может быть
+     несколько разом, и обойтись первым найденным значит оставить остальных
+     удерживать победные короны без надежды на победу. */
+  for (const favorite of players.filter(p => p.favor >= get().rules.crownsToWin)) {
+    if (!isCoronationCandidate(coronations, favorite.id)) {
+      beginCoronationIfNeeded(get, set, favorite.id);
+    }
   }
 
-  // Check if actor has tokens left and can still make plays
-  if (!actor || actor.actionTokens <= 0 || (hasPlayedRoleThisTurn && hasPlayedPlotThisTurn && actor.hand.length === 0)) {
+  /*
+   * Ход человека не заканчивается сам.
+   *
+   * Раньше он заканчивался: истратил последний жетон — и стол, не спрашивая,
+   * передавал ход дальше. Между действием и чужим ходом не оставалось ни кадра,
+   * чтобы посмотреть, чем всё кончилось, а «Завершить ход» была кнопкой, которую
+   * игра нажимала за игрока чаще, чем он сам. Теперь стол возвращается в IDLE
+   * и ждёт: передать ход — это решение, и принимает его игрок.
+   *
+   * Бот — другое дело: его «решение» это тот же расчёт, и лишняя пауза на него
+   * ничего не добавляет, а к каждому ходу двора прибавляет секунду ожидания.
+   * Исчерпав ход, он завершает его сам.
+   */
+  const spent =
+    !actor ||
+    actor.actionTokens <= 0 ||
+    (hasPlayedRoleThisTurn && hasPlayedPlotThisTurn && actor.hand.length === 0);
+
+  if (!actor || (actor.isBot && spent)) {
     get().endTurn();
-  } else {
-    // Return to IDLE in Phase 3 so active player can take a 2nd action or finish turn
-    set({
-      turnPhase: 'IDLE',
-      turnSubPhase: 'CARD_PLAY_PHASE',
-      pendingAction: null,
-      overlayInstant: null,
-      isVaBanqueActive: false,
-      ...vetoReset(),
-      isPendingActionAfterTruthChallenge: false
-    });
+    return;
   }
+
+  // Return to IDLE in Phase 3 so active player can take a 2nd action or finish turn
+  set({
+    turnPhase: 'IDLE',
+    turnSubPhase: 'CARD_PLAY_PHASE',
+    pendingAction: null,
+    overlayInstant: null,
+    isVaBanqueActive: false,
+    ...vetoReset(),
+    isPendingActionAfterTruthChallenge: false,
+    /* Вспышки к этому моменту давно доиграны: сюда приходят через
+       `ACTION_HOLD_MS`, а удар на карте длится доли секунды. */
+    plotPulses: []
+  });
 }
 
 export function endTurn(
@@ -131,7 +157,7 @@ export function endTurn(
   const nextFromUpdated = updatedPlayers[nextIndex];
   const morningType = nextFromUpdated.activePlot?.type;
   const morningNeedsVeto =
-    (morningType === 'Королевский приём' || morningType === 'Золотая булла') &&
+    morningType === 'Королевский приём' &&
     updatedPlayers.some(p => p.id !== nextFromUpdated.id && holds(p.hand, 'Право вето'));
 
   if (morningNeedsVeto && morningType) {
@@ -168,7 +194,8 @@ export function endTurn(
       activeSpeechReactions: {},
       timerSeconds: 0,
       revealOutcome: null,
-      informantPeekData: null
+      informantPeekData: null,
+      plotPulses: []
     });
     get()._triggerVetoWindowOrResolveEffect(morningAction, false);
     return;
@@ -178,12 +205,13 @@ export function endTurn(
     updatedPlayers: morningPlayers,
     curDiscard: morningDiscard,
     coronationTriggeredByReception,
-    nextPlayerUpdated
+    nextPlayerUpdated,
+    spentPlotId: morningSpent
   } = resolveMorningPlots(
     updatedPlayers,
     nextIndex,
     curDiscard,
-    get().coronationCandidateId,
+    get().coronations,
     set,
     get().rules.crownsToWin
   );
@@ -209,7 +237,11 @@ export function endTurn(
     activeSpeechReactions: {},
     timerSeconds: 0,
     revealOutcome: null,
-    informantPeekData: null
+    informantPeekData: null,
+    /* Утренний «Приём» срабатывает уже на новом ходу, поэтому список не
+       гасится, а перезаписывается его картой: общий сброс здесь затёр бы
+       само событие. */
+    ...(morningSpent ? plotSpent(morningSpent) : { plotPulses: [] })
   });
 
   if (coronationTriggeredByReception) {

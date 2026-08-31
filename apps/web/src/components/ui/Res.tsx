@@ -81,8 +81,14 @@ export const Seals: React.FC<{ count: number }> = ({ count }) => (
 
 export type DeltaEvent = { id: string; text: string; isGain: boolean };
 
-/** Просвет над коробкой, у которой капсула берёт своё место. */
-const DELTA_LIFT = 6;
+/**
+ * Просвет над коробкой, у которой капсула берёт своё место.
+ *
+ * Экспортируется, потому что капсулы вылетают не только отсюда: из карты
+ * интриги вылетает такая же (см. `motion/CardLayer.tsx`), и висеть над своим
+ * источником обе обязаны одинаково.
+ */
+export const DELTA_LIFT = 6;
 
 /**
  * Всплывающие капсулы ресурса («+1 🪙», «-1 ⚡», «🚫 ПРАВО ВЕТО!»).
@@ -134,7 +140,7 @@ export const Deltas: React.FC<{ events: readonly DeltaEvent[]; kind: ResourceKin
             {mine.map(d => (
               <div
                 key={d.id}
-                className={`delta ${d.isGain ? 'delta--gain' : 'delta--loss'}`}
+                className={`deltapill delta ${d.isGain ? 'delta--gain' : 'delta--loss'}`}
                 style={{ left: at.x, top: at.y }}
               >
                 {renderWithIcons(courtly(d.text))}

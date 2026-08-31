@@ -48,20 +48,21 @@ interface ChronicleProps {
 export const Chronicle: React.FC<ChronicleProps> = ({ open, onClose, onOpenRules }) => {
   const {
     history,
-    coronationCandidateId,
+    coronations,
     players
   } = useGameStore(
     useShallow(s => ({
       history: s.history,
-      coronationCandidateId: s.coronationCandidateId,
+      coronations: s.coronations,
       players: s.players
     }))
   );
   const [filter, setFilter] = useState<ChronicleFilter>('all');
 
-  const candidate = coronationCandidateId
-    ? players.find(p => p.id === coronationCandidateId)
-    : null;
+  /* Кругов может идти несколько — в подзаголовке перечисляем всех. */
+  const candidates = coronations
+    .map(c => players.find(p => p.id === c.candidateId))
+    .filter((p): p is (typeof players)[number] => !!p);
 
   const entries = useMemo(() => {
     const list = filter === 'all' ? history : history.filter(e => MATCHERS[filter].some(m => e.includes(m)));
@@ -76,7 +77,9 @@ export const Chronicle: React.FC<ChronicleProps> = ({ open, onClose, onOpenRules
       width={380}
       title="Летопись"
       description={
-        candidate ? `Коронация: ${candidate.name}` : `${history.length} записей`
+        candidates.length
+          ? `Коронация: ${candidates.map(p => p.name).join(', ')}`
+          : `${history.length} записей`
       }
     >
       <Tabs<ChronicleFilter>

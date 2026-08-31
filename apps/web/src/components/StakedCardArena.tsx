@@ -66,7 +66,8 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
     turnPhase,
     duelOutcome,
     pendingDuelDefenderRoleClaim,
-    overlayInstant
+    overlayInstant,
+    isVetoed
   } = useGameStore(
     useShallow(s => ({
       players: s.players,
@@ -74,19 +75,34 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
       turnPhase: s.turnPhase,
       duelOutcome: s.duelOutcome,
       pendingDuelDefenderRoleClaim: s.pendingDuelDefenderRoleClaim,
-      overlayInstant: s.overlayInstant
+      overlayInstant: s.overlayInstant,
+      isVetoed: s.isVetoed
     }))
   );
 
   if (!pendingAction && !overlayInstant) return null;
 
+  /* Оверлей поверх действия ложится сбоку и наискось — под ним лежит карта,
+     и её должно быть видно и по ней должно быть куда нажать. */
   const overlayAnchor = overlayInstant ? (
-    <CardAnchor zone={{ kind: 'overlay' }} className="cardanchor--overlay" />
+    <CardAnchor zone={{ kind: 'overlay', over: 'action' }} className="cardanchor--overlay" />
   ) : null;
+
+  /*
+   * Действие отменено вето, и само вето уже убрано со стола.
+   *
+   * Тот же признак, по которому раскладка уводит со стола перечёркнутую карту
+   * (см. `lib/cardZones.ts`), и нужен он здесь ровно затем же. `pendingAction`
+   * держится ещё `ACTION_HOLD_MS` после отмены, и подпись, пока вето лежало
+   * поверх, показывала его — а стоило вето улететь, как из-под него обратно
+   * всплывало «такой-то заявляет такого-то». Заявления в этот момент уже нет:
+   * карты разлетаются, а стол объявлял их заново.
+   */
+  const cancelled = isVetoed && !overlayInstant;
 
   /* Что происходит — одной фразой. Собирается в одном месте на все ветки:
      подпись обязана звучать одинаково, чем бы ни ходили. */
-  const caption = tableCaption(pendingAction, players);
+  const caption = cancelled ? null : tableCaption(pendingAction, players);
   const overlaid = overlayCaption(overlayInstant, pendingAction, players);
 
   /* 1. Plain court action — a badge, no card is staked. */
@@ -115,11 +131,15 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
      only the veto overlay or an already-slotted plot being resolved. */
   if (pendingAction?.type === 'plot') {
     const laying = !pendingAction.conspiracyEffect && !pendingAction.isMorningTrigger;
-    if (laying && !overlayAnchor) return null;
+    if (laying && !overlayInstant) return null;
+    /* Своя лунка, а не сдвинутая: интрига в это время лежит в слоте своего
+       игрока, посреди стола под оверлеем пусто — и вето занимает обычное
+       карточное место, ровно, как любая другая выложенная карта. Сдвиг и
+       наклон здесь были бы «поперёк» ничего. */
     return (
       <div className="staked">
         <div className="staked__pile">
-          {overlayAnchor}
+          {overlayInstant && <CardAnchor zone={{ kind: 'overlay', over: 'plot' }} />}
           <ClaimBadge text={overlaid ?? caption ?? ''} />
         </div>
       </div>

@@ -8,6 +8,11 @@
  * Здесь же — загрузка сохранённых наборов, тем же `PresetPicker`, что и в
  * лобби. Сохраняют их из партии, когда баланс уже опробован, а не вслепую до
  * неё.
+ *
+ * Прокручивается диалог целиком, своего скролла у списка правил нет: вложенная
+ * прокрутка обрезала содержимое по внутреннему отступу, то есть с зазором от
+ * рамки, и обрез приходилось замазывать градиентом. Режет теперь сама рамка
+ * панели, а отступ лежит внутри прокручиваемой области — как и положено.
  */
 import React, { useState } from 'react';
 import { Swords } from 'lucide-react';
@@ -44,10 +49,11 @@ export const RulesDialog: React.FC<RulesDialogProps> = ({ open, onClose, onStart
       description="Настройки применятся к этой партии и запомнятся до следующей"
     >
       <div className="ruleswrap">
-        <div className="ruleswrap__scroll">
-          <RulesEditor rules={rules} onChange={update} />
-        </div>
+        <RulesEditor rules={rules} onChange={update} />
 
+        {/* Кнопки — в конце списка, а не в закреплённом подвале. Подвал съедал
+            высоту диалога всё время ради двух кнопок, до которых доходят один
+            раз за настройку; прокрутка взамен стала на эту высоту длиннее. */}
         <div className="ruleswrap__foot">
           <PresetPicker onPick={update} />
 

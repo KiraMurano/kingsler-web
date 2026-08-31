@@ -75,7 +75,9 @@ export const CardDetailModal: React.FC<{
             {isAction && <Tag tone="truth">Нельзя оспорить</Tag>}
             {isInstant && <Tag tone="cold">{isReactive ? 'В любой момент' : 'В свой ход'}</Tag>}
             {info.targeted && <Tag tone="cold">Требуется цель</Tag>}
-            {info.blocksRole && <Tag tone="truth">Блокирует: {info.blocksRole}</Tag>}
+            {info.blocksRoles?.length ? (
+              <Tag tone="truth">Блокирует: {info.blocksRoles.join(', ')}</Tag>
+            ) : null}
             {info.blockableBy && <Tag tone="bluff">Блокируется: {info.blockableBy}</Tag>}
           </span>
         </span>

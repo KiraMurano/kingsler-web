@@ -12,6 +12,7 @@ import { executeRevealOutcome } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { ACTION_HOLD_MS } from '../timing.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 function human(id: string, hand: GameCard[]): Player {
   return {
@@ -49,9 +50,9 @@ useGameStore.getState().startGame();
 useGameStore.setState({
   players: [
     human('p1', ['Наследник', 'Шут']),
-    human('p2', ['Казначей', 'Рыцарь']),
+    human('p2', ['Казначей', 'Дуэлянт']),
     human('p3', ['Вор', 'Шут']),
-    bot('b1', ['Казначей', 'Рыцарь'])
+    bot('b1', ['Казначей', 'Дуэлянт'])
   ],
   activePlayerId: 'p1',
   opening: null
@@ -119,7 +120,7 @@ assert.equal(
   useGameStore.setState({
     players: [
       human('p1', ['Вор', 'Шут']),
-      { ...bot('b1', ['Казначей', 'Рыцарь']), actionTokens: 2 },
+      { ...bot('b1', ['Казначей', 'Дуэлянт']), actionTokens: 2 },
       { ...bot('b2', ['Наследник', 'Шут']), actionTokens: 2 }
     ],
     activePlayerId: 'b1',
@@ -181,7 +182,7 @@ useGameStore.getState().startGame();
 useGameStore.setState({
   players: [
     human('p1', ['Наследник', 'Шут']),
-    human('p2', ['Казначей', 'Рыцарь']),
+    human('p2', ['Казначей', 'Дуэлянт']),
     human('p3', ['Право вето', 'Шут'])
   ],
   activePlayerId: 'p1',
@@ -261,8 +262,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     turnPhase: 'DOUBT_WINDOW' as GameState['turnPhase'],
     turnSubPhase: 'CARD_PLAY_PHASE' as GameState['turnSubPhase'],
     rules: DEFAULT_RULES,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     pendingAction: null as Action | null,
     pendingDoubtDoubterId: null as string | null,
     isVaBanqueActive: false,
@@ -303,7 +303,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     players: [
       player({ id: 'p1', name: 'Анна', hand }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Дуэлянт']) })
     ]
   });
 
@@ -343,7 +343,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
   const { get, set, api } = makeHarness({
     players: [
       player({ id: 'p1', name: 'Анна', hand }),
-      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Рыцарь']) })
+      player({ id: 'p2', name: 'Борис', isBot: true, hand: mintDeck(['Казначей', 'Дуэлянт']) })
     ]
   });
 

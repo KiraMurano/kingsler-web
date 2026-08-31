@@ -305,9 +305,13 @@
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  padding: 7px 10px 8px;
+  /* Отступ на пиксель меньше: рамка стала вдвое толще, и без этого карточка
+     выросла бы на два пикселя и подвинула соседей. */
+  padding: 6px 9px 7px;
   border-radius: var(--radius);
-  border: 1px solid var(--line-cold);
+  /* Толщина как у карт (`.cardframe`): стол собран из карточек, и рамка у них
+     должна быть одна. */
+  border: 2px solid var(--line-cold);
   background: linear-gradient(180deg, rgba(20, 26, 38, 0.92) 0%, rgba(10, 13, 20, 0.94) 100%);
   box-shadow: var(--shadow-sm);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -634,18 +638,30 @@
 /* Floating resource deltas.
    `fixed` и портал в `body`: координаты приходят инлайном из `Deltas`, а слой
    берётся выше карт — иначе капсула ныряет под колоду и под карты соседа. */
-.delta {
-  position: fixed;
-  transform: translateX(-50%);
-  z-index: var(--z-above-cards);
+/*
+ * Вид вылетающей капсулы — отдельно от того, где она висит.
+ *
+ * Капсул на столе две породы: та, что вылетает у места игрока (портал в
+ * `body`, координаты меряются по ректу — см. `ui/Res.tsx`), и та, что вылетает
+ * из самой карты (лежит внутри неё). Летят и выглядят они одинаково, а
+ * позиционируются по-разному, и разделены здесь ровно по этой линии: скопируй
+ * я оформление во второй класс — они разошлись бы на первой же правке цвета.
+ */
+.deltapill {
   padding: 3px 9px;
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
   pointer-events: none;
-  animation: delta-float 2.2s ease-out forwards;
   box-shadow: var(--shadow-md);
+  animation: delta-float 2.2s ease-out forwards;
+}
+
+.delta {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: var(--z-above-cards);
 }
 
 .delta--gain {
@@ -656,6 +672,18 @@
 .delta--loss {
   background: rgba(180, 64, 90, 0.95);
   color: #fff;
+}
+
+/*
+ * Отработавшая интрига. Золотая — потому что она ни прибыль и ни потеря, а
+ * то, ради чего карту клали: заявленное состоялось. Зелёным на этом столе
+ * говорят «мне пришло», красным — «у меня отняли», и вставать в один ряд с
+ * ними этому сообщению незачем.
+ */
+.delta--spent {
+  background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 100%);
+  color: #2a1d05;
+  letter-spacing: 0.02em;
 }
 
 /* ==========================================================================
@@ -968,12 +996,12 @@
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-display);
-  font-size: 0.68rem;
+  font-size: 0.56rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  padding: 2px 9px;
-  border-radius: 12px;
+  padding: 1.5px 7px;
+  border-radius: 999px;
   border: 1px solid var(--line);
   background: rgba(10, 13, 20, 0.92);
   color: var(--gold-pale);
@@ -984,8 +1012,12 @@
      счёт вставал в ней по центру, и между словом и цифрой зияла дыра. Запас на
      всю подпись убирает и дыру, и дрожь: «31» и «33» разной ширины (наборный
      шрифт табличных цифр не знает), но обе умещаются, не двигая капсулу.
-     В `em`, а не в пикселях, чтобы запас ехал вместе с кеглем. */
-  min-width: 9.5em;
+     В `em`, а не в пикселях, чтобы запас ехал вместе с кеглем.
+
+     Запас подобран так, чтобы капсула укладывалась в габарит своей стопки:
+     раньше он был шире её, и две подписи сходились в одну сплошную полосу —
+     прочесть, где кончается колода и начинается сброс, было нельзя. */
+  min-width: 8.2em;
 }
 
 
@@ -1353,9 +1385,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-radius: var(--radius);
-  border: 1px solid var(--line-cold);
+  /* Толщина как у карт (`.cardframe`) и как у мест соседей. */
+  border: 2px solid var(--line-cold);
   background: linear-gradient(180deg, rgba(20, 26, 38, 0.92) 0%, rgba(10, 13, 20, 0.94) 100%);
   box-shadow: var(--shadow-sm);
   transition: border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out);
@@ -1515,6 +1548,67 @@
   box-shadow: 0 0 7px rgba(232, 200, 119, 0.4);
 }
 
+/* --------------------------------------------------------------------------
+   Полный набор корон: по дорожке идёт блик.
+
+   Единственное состояние дорожки, о котором стоит сообщать движением: набрать
+   порог значит запустить круг коронации, то есть отсчёт до конца партии.
+
+   Блик — отдельный слой поверх, а не анимация самого градиента. Градиент тут
+   один на всю дорожку, а сегменты показывают его куски, попадая в нужное
+   место через `background-position` и `--i`; сдвинь его — и куски разъедутся,
+   дорожка развалится на разноцветные полоски.
+   -------------------------------------------------------------------------- */
+/* Подпись дорожки: обычный набор с заглавной, а не капитель `.eyebrow`.
+   Капитель здесь читалась как ярлык рубрики, тогда как это ответ на вопрос
+   «сколько осталось» — и на круге коронации она же меняется на состояние
+   «На коронации». Разрядка мельче, чем у `.eyebrow`: строка стала длиннее,
+   и прежняя растаскивала её за пределы карточки. */
+.crowns__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.crowns--full .crowns__track {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.crowns--full .crowns__track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    rgba(255, 246, 214, 0.38) 50%,
+    transparent 62%
+  );
+  background-size: 260% 100%;
+  animation: crowns-sheen 3.4s linear infinite;
+}
+
+@keyframes crowns-sheen {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crowns--full .crowns__track::after {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
 .seat .crowns {
   gap: 3px;
 }
@@ -1523,9 +1617,9 @@
   white-space: nowrap;
 }
 
-.crowns--compact .eyebrow {
-  font-size: 0.58rem;
-  letter-spacing: 0.08em;
+.crowns--compact .crowns__label {
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2387,6 +2481,186 @@
   pointer-events: none;
 }
 
+/* --- Отклик карты на событие ----------------------------------------------
+ *
+ * Стол обязан отвечать на то, что на нём произошло, и отвечать ТОГДА ЖЕ.
+ * Сработка и срыв — удар (pop / тряска) плюс цвет, который уже не
+ * откатывается: зелёный как «Правда», красный как «Блеф». Заряд — короткий
+ * кивок, цвет ему не нужен: карта остаётся лежать, и заливка на каждый кивок
+ * превратила бы стол в гирлянду.
+ *
+ * Анимации висят на `.flip`, а не на узле карты: у `.cardlayer__hit`
+ * `transform` занят слоем движения.
+ */
+
+/*
+ * Сработала: короткий и резкий pop.
+ *
+ * Разгон вверх за одну десятую и возврат за остальное — так дёргается вещь,
+ * которую толкнули. Симметричная кривая читалась бы как «карта дышит».
+ */
+@keyframes plotpulse-spent {
+  0% { transform: scale(1); }
+  22% { transform: scale(1.16); }
+  46% { transform: scale(0.97); }
+  70% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/*
+ * Набрала заряд: тот же удар, только вполсилы.
+ */
+@keyframes plotpulse-charge {
+  0% { transform: scale(1); }
+  22% { transform: scale(1.06); }
+  46% { transform: scale(0.99); }
+  70% { transform: scale(1.015); }
+  100% { transform: scale(1); }
+}
+
+/*
+ * Сорвана: горизонтальная тряска, не pop.
+ *
+ * Pop — «получилось»; здесь карту сняли. Кривая короче сработки: срыв бывает
+ * на чужом ходу, и тянуть его незачем.
+ */
+@keyframes plotpulse-disrupt {
+  0% { transform: translateX(0) rotate(0deg); }
+  16% { transform: translateX(-12%) rotate(-2.8deg); }
+  34% { transform: translateX(10%) rotate(2.2deg); }
+  52% { transform: translateX(-6%) rotate(-1.4deg); }
+  72% { transform: translateX(3%) rotate(0.6deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+/*
+ * Заливка лица. Приходит с ударом и остаётся: `forwards` держит последний
+ * кадр, пока на карте висит класс. Без `forwards` анимация возвращала бы
+ * элемент к `opacity: 0` — и заливка гасла, хотя класс ещё на месте.
+ */
+@keyframes plotpulse-wash {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Вспышка заряда гаснет: карта остаётся, цвет на ней не должен застрять. */
+@keyframes plotpulse-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
+@keyframes plotpulse-tag {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.42); }
+  58% { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+
+.cardlayer__hit.is-pulse-spent .flip {
+  animation: plotpulse-spent var(--dur-pulse-spent) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cardlayer__hit.is-pulse-charge .flip {
+  animation: plotpulse-charge var(--dur-pulse-charge) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cardlayer__hit.is-pulse-disrupt .flip {
+  animation: plotpulse-disrupt var(--dur-pulse-disrupt) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Рамка красится теми же переменными, что и печать «Правда» / «Блеф», и
+ * держится, пока живёт класс. `border-color` явно — чтобы победить hover
+ * у `.is-idle`, у которого та же специфичность.
+ */
+.cardlayer__hit.is-pulse-spent .flip__face,
+.cardlayer__hit.is-pulse-spent .flip__face--front,
+.cardlayer__hit.is-pulse-spent:hover .flip__face,
+.cardlayer__hit.is-pulse-spent:hover .flip__face--front {
+  --frame: var(--sage);
+  --frame-bright: var(--sage-soft);
+  --frame-glow: rgba(91, 154, 134, 0.55);
+  border-color: var(--sage);
+}
+
+.cardlayer__hit.is-pulse-disrupt .flip__face,
+.cardlayer__hit.is-pulse-disrupt .flip__face--front,
+.cardlayer__hit.is-pulse-disrupt:hover .flip__face,
+.cardlayer__hit.is-pulse-disrupt:hover .flip__face--front {
+  --frame: var(--crimson);
+  --frame-bright: var(--crimson-soft);
+  --frame-glow: rgba(180, 64, 90, 0.55);
+  border-color: var(--crimson);
+}
+
+/*
+ * Заливка на лице, не на ударе: так она едет вместе с pop / тряской и
+ * обрезается скруглением карты. Счётчик выше (`z-index: 2`).
+ */
+.cardlayer__hit.is-pulse-spent .flip__face--front::after,
+.cardlayer__hit.is-pulse-disrupt .flip__face--front::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  animation: plotpulse-wash var(--dur-pulse-spent) var(--ease-out) forwards;
+}
+
+.cardlayer__hit.is-pulse-spent .flip__face--front::after {
+  background: rgba(91, 154, 134, 0.48);
+}
+
+.cardlayer__hit.is-pulse-disrupt .flip__face--front::after {
+  background: rgba(180, 64, 90, 0.48);
+  animation-duration: var(--dur-pulse-disrupt);
+}
+
+.cardlayer__hit.is-pulse-charge .chargetag,
+.cardlayer__hit.is-pulse-spent .chargetag {
+  animation: plotpulse-tag var(--dur-pulse-charge) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cardlayer__hit.is-pulse-charge::after {
+  content: '';
+  position: absolute;
+  inset: -7%;
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 4;
+  mix-blend-mode: screen;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 236, 190, 0.34) 0%,
+    rgba(255, 176, 74, 0.16) 45%,
+    rgba(255, 140, 40, 0) 72%
+  );
+  animation: plotpulse-flash var(--dur-pulse-charge) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardlayer__hit.is-pulse-spent .flip,
+  .cardlayer__hit.is-pulse-charge .flip,
+  .cardlayer__hit.is-pulse-disrupt .flip,
+  .cardlayer__hit.is-pulse-charge .chargetag {
+    animation: none;
+  }
+
+  .cardlayer__hit.is-pulse-spent .flip__face--front::after,
+  .cardlayer__hit.is-pulse-disrupt .flip__face--front::after {
+    animation: none;
+    opacity: 1;
+  }
+
+  .cardlayer__hit.is-pulse-charge::after {
+    display: none;
+  }
+}
+
 /* --- Заряды «Тайного заговора» ------------------------------------------- */
 
 /*
@@ -2423,3 +2697,150 @@
   pointer-events: none;
   z-index: 2;
 }
+
+/*
+ * У «Сети информаторов» тот же счётчик, но про деньги, а не про угрозу.
+ * Красный кружок здесь обещал бы взрыв там, где на самом деле идёт доход, —
+ * а цвет на этом столе и есть то, чем одно отличается от другого.
+ */
+/*
+ * У «Сети информаторов» счётчик — не наклейка, а монета.
+ *
+ * Считает она принесённое золото, и цифра на самой монете говорит это без
+ * единого слова: круглая плашка любого цвета всё равно читалась бы как
+ * «сколько осталось до удара», потому что ровно так её и приучил читать
+ * Заговор. Берётся тот же арт, что и в жребии, — герб без вычеканенной
+ * цифры: на аверсе с «1» наш счётчик спорил бы с чужой единицей.
+ */
+.chargetag--coin {
+  width: 34px;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background:
+    url('/assets/ui/coin-500.webp') center / contain no-repeat,
+    radial-gradient(circle, rgba(200, 160, 74, 0.5) 40%, transparent 72%);
+  /* Тень у монеты своя, круглая: прямоугольная от `box-shadow` торчала бы
+     углами из-под чеканки. */
+  box-shadow: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85));
+  color: #fff;
+  /* Размер цифры НЕ переопределяется: счётчик у Сети и у Заговора — одно и то
+     же число об одном и том же, и разный кегль читался бы как разная
+     важность. Отличать их должен цвет, а не рост.
+
+     Обводка, а не просто тень: белая цифра лежит на серебре, и без тёмного
+     контура она тонет в бликах чеканки. */
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.95),
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.7);
+}
+
+/* ==========================================================================
+   СОСТОЯНИЯ МЕСТА ЗА СТОЛОМ
+
+   Три разных вещи, и цвет у каждой свой, иначе стол приходится читать, а не
+   видеть:
+
+   * **золотая рамка и ровное свечение** — сейчас ход этого игрока. Событие
+     рядовое, оно повторяется каждый круг.
+   * **зелёный или красный блок** — ответ двора. Зелёный: поверил, пропустил,
+     ход идёт дальше. Красный: проверил, наложил вето, ход останавливается.
+     Цвета те же, что у колец на портретах, и это не совпадение — за столом
+     два ответа значат одно и то же независимо от того, где их показывают.
+   * **золотая карточка** — по игроку идёт круг коронации. Он в шаге от
+     победы, и это единственное состояние, ради которого стоит подсвечивать
+     карточку целиком.
+
+   Ничто из трёх не двигается. Пульсация пробовалась на круге коронации и
+   оказалась лишней: фон уже отвечает на вопрос «кто», а мерцающее свечение
+   поверх него только спорило с ним за внимание — при том, что круг идёт
+   долго, и всё это время мерцание висело бы на глазах.
+   ========================================================================== */
+.seat--active .seat__chip,
+.crest--active {
+  border-color: var(--gold);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 0 34px rgba(200, 160, 74, 0.16),
+    0 0 16px -3px rgba(200, 160, 74, 0.38);
+}
+
+/* --- Ответ двора: зелёный «дальше», красный «стоп» ----------------------- */
+.seat--believed .seat__chip,
+.seat--passed .seat__chip,
+.crest--believed,
+.crest--passed {
+  border-color: rgba(91, 154, 134, 0.6);
+  background:
+    linear-gradient(180deg, rgba(20, 58, 48, 0.55), rgba(8, 26, 21, 0.6)),
+    linear-gradient(180deg, var(--calm-top), var(--calm-bottom));
+}
+
+.seat--doubted .seat__chip,
+.seat--vetoed .seat__chip,
+.crest--doubted,
+.crest--vetoed {
+  border-color: rgba(224, 138, 156, 0.6);
+  background:
+    linear-gradient(180deg, rgba(74, 18, 30, 0.55), rgba(30, 8, 14, 0.6)),
+    linear-gradient(180deg, var(--calm-top), var(--calm-bottom));
+}
+
+/* --- Круг коронации: золотая карточка ------------------------------------
+ *
+ * Перебивает и ход, и ответ двора: те состояния живут секунды, а круг — весь
+ * оставшийся отрезок партии, и он важнее обоих.
+ *
+ * Тонировка, а не заливка — ровно как у зелёного и красного. Сплошное золото
+ * пробовалось и оказалось хуже: карточка превращалась в жёлтый прямоугольник,
+ * в котором портрет, короны и жетоны переставали различаться, а весь текст
+ * приходилось перекрашивать в чёрный. Полупрозрачный слой поверх обычного
+ * фона оставляет карточку карточкой, и содержимое читается как всегда.
+ */
+.seat--crowning .seat__chip,
+.crest--crowning {
+  border-color: rgba(232, 200, 119, 0.75);
+  background:
+    linear-gradient(180deg, rgba(96, 74, 20, 0.58), rgba(44, 33, 8, 0.62)),
+    linear-gradient(180deg, var(--calm-top), var(--calm-bottom));
+}
+
+
+/* Столбик слева: объявление на всю партию, а не часть чьего-то места.
+   Поверх стола и мимо кликов — под ним доигрывается партия.
+   Той же золотой тонировкой, что и карточка претендента: плашка и место —
+   одно сообщение, и разными цветами их читали бы как разные. */
+.crownboard {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: var(--z-above-cards);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.crowning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: linear-gradient(180deg, rgba(96, 74, 20, 0.92), rgba(30, 22, 6, 0.94));
+  border: 1px solid rgba(232, 200, 119, 0.75);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--gold-pale);
+}
+
+.crowning__crown {
+  flex-shrink: 0;
+}
+

@@ -11,6 +11,7 @@ import {
   selectBestRedirectionTarget
 } from './botTargeting.ts';
 import { mintDeck } from '../cardInstance.ts';
+import type { Coronation } from '../resolvers/coronation.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player {
   return {
@@ -38,7 +39,7 @@ const rival = player({
 const ctx = {
   players: [bot, rival],
   activePlayerId: bot.id,
-  coronationCandidateId: null as string | null
+  coronations: [] as Coronation[]
 };
 
 assert.equal(shouldPlaySearchNow(bot, rival, ctx, () => 1), true);
@@ -71,7 +72,7 @@ const crowned = player({
   activePlot: { id: 'b', type: 'Золотая булла' }
 });
 assert.equal(
-  shouldPlaySearchNow(bot, crowned, { ...ctx, players: [bot, crowned], coronationCandidateId: crowned.id }, () => 1),
+  shouldPlaySearchNow(bot, crowned, { ...ctx, players: [bot, crowned], coronations: [{ candidateId: crowned.id, originId: crowned.id }] }, () => 1),
   true
 );
 
@@ -101,7 +102,7 @@ for (const charges of [0, 1, 2, 3]) {
 
 // Полный заряд по цели с коронами — бить.
 assert.equal(
-  shouldActivateConspiracyNow(noRole, player({ ...rich, favor: 4 }), 4, null, () => 0),
+  shouldActivateConspiracyNow(noRole, player({ ...rich, favor: 4 }), 4, [], () => 0),
   true
 );
 
@@ -111,7 +112,7 @@ assert.equal(
     player({ ...noRole, hand: mintDeck(['Наследник', 'Шут']) }),
     player({ ...rich, gold: 4, favor: 1 }),
     4,
-    null,
+    [],
     () => 0
   ),
   true
@@ -128,7 +129,7 @@ assert.equal(
       activePlot: { id: 'ch', cardId: 'c1', type: 'Охранная грамота' }
     }),
     4,
-    null,
+    [],
     () => 1
   ),
   true,
@@ -137,7 +138,7 @@ assert.equal(
 
 // Сам на пороге победы — не тратить ход на Заговор.
 assert.equal(
-  shouldActivateConspiracyNow(player({ ...noRole, favor: 5 }), player({ ...rich, favor: 4 }), 4, null, () => 1),
+  shouldActivateConspiracyNow(player({ ...noRole, favor: 5 }), player({ ...rich, favor: 4 }), 4, [], () => 1),
   false
 );
 

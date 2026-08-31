@@ -15,6 +15,7 @@ import {
 } from './plotResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
 import { DEFAULT_RULES } from '../rules.ts';
+import type { Coronation } from './coronation.ts';
 
 function player(partial: Partial<Player> & Pick<Player, 'id'>): Player {
   return {
@@ -45,8 +46,7 @@ function makeHarness(players: Player[]) {
     players,
     discardPile: [] as CardInstance[],
     activePlayerId: players[0].id,
-    coronationCandidateId: null as string | null,
-    coronationOriginId: null as string | null,
+    coronations: [] as Coronation[],
     conspiracyPrompt: null,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],
     history: [] as string[]

@@ -2,6 +2,8 @@ import type { Role, PlotType, InstantType, GameCard } from './cards';
 import type { CardId, CardInstance } from './cardInstance';
 import type { GameRules } from './rules';
 export type { Role, PlotType, InstantType, GameCard } from './cards';
+export type { Coronation } from './resolvers/coronation';
+import type { Coronation } from './resolvers/coronation';
 export type { CardId, CardInstance } from './cardInstance';
 export type { GameRules } from './rules';
 
@@ -18,13 +20,35 @@ export interface BotArchetype {
   targetAggression: number;// Preference for attacking leaders vs weakest (0.0 - 1.0)
 }
 
+/**
+ * Что интрига сделала. См. `GameState.plotPulses`.
+ *
+ * `spent` — сработала и уходит (приём состоялся, Заговор разрядился, грамота
+ * приняла удар). `charge` — что-то получила: Заговор набрал заряд, Сеть
+ * принесла монету — в том числе последнюю, после которой карта просто
+ * улетает в сброс. `disrupt` — сорвана чужим ударом: кража, шантаж, обыск,
+ * блеф при страже. Замена своей интригой на новую — не событие, пульса нет.
+ */
+export type PlotPulseKind = 'spent' | 'charge' | 'disrupt';
+
+export interface PlotPulse {
+  cardId: CardId;
+  kind: PlotPulseKind;
+}
+
 export interface ActivePlotData {
   id: string;
   /** The card instance resting in the slot — the same one that left the hand. */
   cardId: CardId;
   type: PlotType;
   targetPlayerId?: string;
-  charges?: number; // Тайный заговор: 0–4
+  /**
+   * Накопитель интриги, если он у неё есть: заряды «Тайного заговора» (0–4) или
+   * принесённые монеты «Сети информаторов» (0–3). Поле одно на обе, потому что
+   * и на столе это одно и то же — цифра на карте, которая растёт и однажды
+   * доводит интригу до конца.
+   */
+  charges?: number;
 }
 
 export interface Player {
@@ -213,11 +237,13 @@ export interface GameState {
   timerSeconds: number;
   timerMaxSeconds: number;
   isTimerPaused: boolean;
-  coronationCandidateId: string | null;
+  /**
+   * Идущие круги коронации. Их может быть несколько: порога способны достичь
+   * двое и больше, и у каждого свой зачинатель, а значит и свой срок.
+   */
+  coronations: Coronation[];
   /** Не `null`, пока идёт открытие партии: стол ходов не принимает. */
   opening: OpeningData | null;
-  /** Player whose turn it was when the circle started; win is checked at their next turn start. */
-  coronationOriginId: string | null;
   
   // Pending Action state
   pendingAction: Action | null;
@@ -243,8 +269,25 @@ export interface GameState {
   pendingVetoPassedIds: string[];
   /** Действие, по которому идёт опрос вето. Как `pendingDoubtActionId`. */
   pendingVetoActionId: string | null;
+  /**
+   * Кем была цель атаки ДО того, как её перевели «Перенаправлением».
+   *
+   * Живёт ровно на время окна вето поверх перевода. Вето отменяет сам перевод,
+   * а не нападение, — значит нужно помнить, куда нападение возвращать.
+   * `null` — перевода на столе нет, окно вето (если оно открыто) про что-то
+   * другое.
+   */
+  pendingRedirectFromId: string | null;
   hasUsedNormalActionThisTurn: boolean;
   hasPlayedRoleThisTurn: boolean;
+  /**
+   * Выкладывал ли игрок Интригу в этом ходу.
+   *
+   * НЕ лимит: вторую Интригу за ход играть можно, она просто заменит первую.
+   * Флаг остался как наблюдение — по нему боты решают, что интригой они в этом
+   * ходу уже распорядились (`bot/botTurnPlanner.ts`), и по нему же считается,
+   * не исчерпал ли бот ход целиком (`resolvers/turnResolver.ts`).
+   */
   hasPlayedPlotThisTurn: boolean;
   isVaBanqueActive: boolean;
   /**
@@ -260,6 +303,28 @@ export interface GameState {
   revealOutcome: RevealOutcome | null;
   duelOutcome: DuelOutcome | null;
   informantPeekData: InformantPeekData | null;
+  /**
+   * Что случилось с интригами прямо сейчас — и, значит, что стол обязан
+   * показать на самих картах.
+   *
+   * Событий три, и они разной силы. **`spent`** — интрига сработала: приём
+   * состоялся, Заговор разрядился, грамота приняла удар. Такая карта уходит
+   * со стола ударом. **`disrupt`** — её сняли чужим ударом: кража и шантаж
+   * срывают приём, обыск сбрасывает любую, блеф сжигает стражу. Это тоже
+   * уход, но другой — карта дёргается, а не празднует.
+   *
+   * Простой сброс `spent`/`disrupt` не ставит: вытесненная новой интрига
+   * улетает совсем молча. Сеть после третьей монеты ставит `charge` (бейдж
+   * монеты) и улетает без задержки — обычный сброс, не удар сработки.
+   *
+   * **`charge`** — интрига что-то получила: Заговор набрал заряд, Сеть
+   * принесла монету. Тут удара не надо, нужен кивок.
+   *
+   * Список, а не одно поле: одна проверка заряжает все Заговоры на столе
+   * разом, и показать это надо на каждом. Живёт до ближайшего
+   * `_checkEndgameAndAdvanceTurn`, то есть заведомо дольше самой анимации.
+   */
+  plotPulses: PlotPulse[];
   conspiracyPrompt: ConspiracyPromptData | null;
 
   // Duel Specific Pending Cards
