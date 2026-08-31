@@ -16,7 +16,8 @@ for (const card of everyCard) {
   assert.ok(info, `у карты «${card}» нет записи в CARD_DESCRIPTIONS`);
   assert.equal(info.name, card, `запись «${card}» названа иначе: «${info.name}»`);
   assert.ok(info.artImage.endsWith('.webp'), `у карты «${card}» арт не webp: ${info.artImage}`);
-  assert.ok(CARD_COPIES_MAP[card] >= 1, `у карты «${card}» нет числа копий`);
+  assert.ok(CARD_COPIES_MAP[card] >= 0, `у карты «${card}» нет числа копий`);
+  assert.equal(info.copiesCount, CARD_COPIES_MAP[card], `«${card}»: описание и колода разошлись`);
 }
 
 // Две новые интриги на месте, по 2 копии каждая.
@@ -26,7 +27,7 @@ for (const card of ['Стража покоев', 'Охранная грамот�
   assert.equal(CARD_COPIES_MAP[card], 2, `«${card}» должна идти в 2 копиях`);
 }
 
-assert.equal(TOTAL_DECK_SIZE, 50, 'колода: 19 ролей + 15 интриг + 16 инстантов = 50');
+assert.equal(TOTAL_DECK_SIZE, 50, 'колода: 19 ролей + 12 интриг + 19 инстантов = 50');
 
 const deck = createInitialDeck();
 assert.equal(deck.length, TOTAL_DECK_SIZE, 'createInitialDeck расходится с TOTAL_DECK_SIZE');

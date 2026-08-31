@@ -17,15 +17,17 @@ import {
 
 // --- 1. Дефолты ---
 {
-  assert.equal(DEFAULT_RULES.crownsToWin, 5, 'порог победы по умолчанию — 5');
+  assert.equal(DEFAULT_RULES.crownsToWin, 3, 'порог победы по умолчанию — 3');
   assert.equal(DEFAULT_RULES.actionTokens, 2);
   assert.equal(DEFAULT_RULES.feastCost, 3);
   assert.equal(DEFAULT_RULES.rumorCost, 5);
   assert.equal(DEFAULT_RULES.blackmailCost, 0);
   assert.equal(DEFAULT_RULES.duelCostsToken, true);
-  assert.equal(DEFAULT_RULES.vetoOnVeto, false);
+  assert.equal(DEFAULT_RULES.paidDuelEnabled, true);
+  assert.equal(DEFAULT_RULES.vetoOnVeto, true);
   assert.equal(DEFAULT_RULES.unmaskEnabled, false);
-  assert.equal(DEFAULT_RULES.paidDoubtEnabled, false);
+  assert.equal(DEFAULT_RULES.paidDoubtEnabled, true);
+  assert.equal(DEFAULT_RULES.paidPlayEnabled, true);
   /* Пять покупок за золото стоят одинаково — две монеты. Не совпадение: это
      одна цена «жетона нет, плачу деньгами», и разъехавшиеся умолчания
      заставляли бы игрока выравнивать их руками при каждой новой партии. */
@@ -92,7 +94,7 @@ import {
 {
   const noVeto = normalizeRules({ deck: { ...DEFAULT_RULES.deck, 'Право вето': 0 } });
   assert.equal(noVeto.deck['Право вето'], 0);
-  assert.equal(deckSize(noVeto), 50 - 5, 'пять вето ушли из колоды');
+  assert.equal(deckSize(noVeto), 50 - 6, 'шесть вето ушли из колоды');
 
   const clamped = normalizeRules({ deck: { ...DEFAULT_RULES.deck, 'Наследник': 99, 'Шут': -3 } });
   assert.equal(clamped.deck['Наследник'], 10);

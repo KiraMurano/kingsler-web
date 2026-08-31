@@ -294,7 +294,7 @@ export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
     loreQuote: '«Я знаю о твоих похождениях больше, чем твой личный духовник. Одно неверное слово — и ты пропал.»',
     cost: 0,
     targeted: true,
-    copiesCount: 2
+    copiesCount: 0
   },
 
 
@@ -312,7 +312,7 @@ export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
     loreQuote: '«В темных коридорах шепчутся тени. Когда заговор созреет, трон зашатается до самого основания.»',
     cost: 0,
     targeted: false,
-    copiesCount: 3
+    copiesCount: 2
   },
 
   'Стража покоев': {
@@ -350,7 +350,7 @@ export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
   },
 
   // ==========================================================================
-  // 3. ИНСТАНТЫ (6 видов, всего 16 карт в колоде)
+  // 3. ИНСТАНТЫ (6 видов, всего 19 карт в колоде)
   // ==========================================================================
   'Право вето': {
     name: 'Право вето',
@@ -366,7 +366,7 @@ export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
     loreQuote: '«Именем Высшего совета объявляю указ недействительным. Расходитесь по покоям!»',
     cost: 0,
     targeted: false,
-    copiesCount: 5
+    copiesCount: 6
   },
 
   'Перенаправление': {
@@ -396,7 +396,7 @@ export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
     artImage: '/assets/cards/instant-allin.webp',
     shortDescription: 'Эффект роли удваивается при проверке.',
     fullDescription: 'Играется в свой ход вместе с картой Роли. Если вас проверят и вы не блефуете — эффект роли удваивается, а печати отменяются. Если вы блефовали с картой Ва-банк — поймавший вас на блефе получает 2 ⚜️. Эффект сохраняется и на дуэли.',
-    strategyTip: 'Играйте с Наследником при 4 👑, чтобы при успешной проверке сразу взять +2 👑 и выйти на коронацию!',
+    strategyTip: 'Играйте с Наследником при 2 👑, чтобы при успешной проверке сразу взять +2 👑 и выйти на коронацию!',
     loreQuote: '«Все или ничего. На кону честь рода и будущее королевства — ставки сделаны!»',
     cost: 0,
     targeted: false,
@@ -434,7 +434,7 @@ export const CARD_DESCRIPTIONS: Record<InspectableItem, CardDescription> = {
     loreQuote: '«Стража не спрашивает разрешения. Если в покоях прячут заговор — бумаги летят в камин.»',
     cost: 0,
     targeted: true,
-    copiesCount: 2
+    copiesCount: 4
   },
 
   'Обвинение в измене': {

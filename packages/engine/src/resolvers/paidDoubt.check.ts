@@ -51,12 +51,12 @@ const bystander = () => player({ id: 'b' });
   );
 }
 
-// --- 2. Без правил и без жетона проверка невозможна ---
+// --- 2. Без жетона проверка покупается золотом ---
 {
-  assert.equal(
+  assert.deepEqual(
     doubtPayment(DEFAULT_RULES, victim(), attackOn('v', 'Шантажист')),
-    null,
-    'по умолчанию золотом проверку не купить'
+    { tokens: 0, gold: 2 },
+    'по умолчанию проверку можно купить за 2 🪙'
   );
 }
 
@@ -97,7 +97,7 @@ const bystander = () => player({ id: 'b' });
 
 // --- 5. Срыв масок: только жертва атаки Вора или Шантажиста ---
 {
-  const rules = normalizeRules({ unmaskEnabled: true, unmaskCost: 2 });
+  const rules = normalizeRules({ paidDoubtEnabled: false, unmaskEnabled: true, unmaskCost: 2 });
   assert.deepEqual(
     doubtPayment(rules, victim(), attackOn('v', 'Шантажист')),
     { tokens: 0, gold: 2 },

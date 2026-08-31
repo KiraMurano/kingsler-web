@@ -63,13 +63,17 @@ const render = (rules = DEFAULT_RULES) =>
 
 // --- 4. Цены платных реакций показываются только когда правило включено ---
 {
-  assert.ok(!render().includes('Цена платной проверки'), 'выключено — цены нет');
+  assert.ok(render().includes('Цена платной проверки'), 'по умолчанию цена на экране');
+  assert.ok(
+    !render(normalizeRules({ paidDoubtEnabled: false })).includes('Цена платной проверки'),
+    'выключено — цены нет'
+  );
   assert.ok(
     render(normalizeRules({ paidDoubtEnabled: true })).includes('Цена платной проверки'),
     'включено — цена появилась'
   );
   assert.ok(
-    render(normalizeRules({ unmaskEnabled: true })).includes('Цена срыва масок'),
+    render(normalizeRules({ paidDoubtEnabled: false, unmaskEnabled: true })).includes('Цена срыва масок'),
     'у срыва масок своя цена'
   );
 }
@@ -81,7 +85,11 @@ const render = (rules = DEFAULT_RULES) =>
  * дешёвым и розыгрыш. Заимствование там осмысленно (платная дуэль это и есть
  * купленная проверка, только со щитом), здесь — нет. */
 {
-  assert.ok(!render().includes('Цена розыгрыша за монеты'), 'выключено — цены нет');
+  assert.ok(render().includes('Цена розыгрыша за монеты'), 'по умолчанию цена на экране');
+  assert.ok(
+    !render(normalizeRules({ paidPlayEnabled: false })).includes('Цена розыгрыша за монеты'),
+    'выключено — цены нет'
+  );
 
   const alone = render(normalizeRules({ paidPlayEnabled: true }));
   assert.ok(alone.includes('Цена розыгрыша за монеты'), 'включено — цена своя');

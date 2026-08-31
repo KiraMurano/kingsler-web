@@ -162,6 +162,7 @@ function handOf(api: { players: Player[] }, playerId: string): CardId[] {
   const { get, set, api, census } = makeHarness({
     isVetoed: true,
     overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    rules: { ...DEFAULT_RULES, vetoOnVeto: false },
     players: [player({ id: 'p1', name: 'Анна' })]
   });
   const ids = allCardIds(census);

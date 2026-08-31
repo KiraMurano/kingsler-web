@@ -192,8 +192,8 @@ function action(over: Partial<Action> = {}): Action {
   assert.equal(free.disabled, false, 'без требования жетона дуэль доступна и при 0 ⚡');
   assert.equal(free.spendsToken, false, 'и молнию на ней не рисуем');
 
-  // Жетон нужен, а его нет — и купить нечем.
-  const blocked = shieldOf(underAttack(normalizeRules({ duelCostsToken: true })));
+  // Жетон нужен, а его нет — и купить нечем (платная дуэль выключена, золота нет).
+  const blocked = shieldOf(underAttack(normalizeRules({ duelCostsToken: true, paidDuelEnabled: false })));
   assert.equal(blocked.disabled, true);
   assert.match(blocked.reason!, /^Нет жетонов/);
   assert.equal(blocked.tokenBlocked, true, 'дело именно в жетонах — молнию перечёркиваем');
@@ -817,6 +817,7 @@ for (const charges of [0, 1, 2, 3]) {
   const безПравила = deriveTableView(
     input({
       players: [player('p1', { hand: рука, actionTokens: 0, gold: 4 }), player('p2'), player('p3')],
+      rules: normalizeRules({ paidPlayEnabled: false }),
       turnSubPhase: 'CARD_PLAY_PHASE'
     }),
     'p1'

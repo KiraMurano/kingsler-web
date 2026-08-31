@@ -27,7 +27,7 @@ function seat(id: string, isBot: boolean, hand: GameCard[], tokens = 2): Player 
     avatar: '',
     seatNumber: 1,
     isBot,
-    gold: 4,
+    gold: 0,
     favor: 1,
     seals: 0,
     actionTokens: tokens,

@@ -19,7 +19,7 @@ function player(partial: Partial<Player> & Pick<Player, 'id' | 'name'>): Player 
     seatNumber: 1,
     isBot: true,
     gold: 4,
-    favor: 3,
+    favor: 0,
     seals: 0,
     actionTokens: 2,
     hand: mintDeck(['Обыск покоев', 'Право вето']),
@@ -79,7 +79,7 @@ assert.equal(
 const withHeir = player({ ...bot, hand: mintDeck(['Обыск покоев', 'Наследник']) });
 const weak = player({
   ...rival,
-  favor: 2,
+  favor: 0,
   activePlot: { id: 'd', type: 'Досье' }
 });
 assert.equal(

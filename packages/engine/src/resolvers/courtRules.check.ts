@@ -318,6 +318,7 @@ function cardIdOf(api: { players: Player[] }, playerId: string, card: GameCard):
   const { get, set, api } = makeHarness({
     turnPhase: 'TARGET_REACTION_WINDOW',
     pendingAction: pending,
+    rules: { ...DEFAULT_RULES, paidDuelEnabled: false },
     players: [
       player({ id: 'p1', name: 'Анна', hand: mintDeck(['Вор', 'Шут']) }),
       player({

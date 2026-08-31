@@ -116,19 +116,19 @@ function defaultDeck(): Record<GameCard, number> {
 }
 
 export const DEFAULT_RULES: GameRules = {
-  crownsToWin: 5,
+  crownsToWin: 3,
   actionTokens: 2,
   feastCost: 3,
   rumorCost: 5,
   blackmailCost: 0,
   duelCostsToken: true,
   duelCost: 0,
-  paidDuelEnabled: false,
+  paidDuelEnabled: true,
   paidDuelCost: 2,
-  vetoOnVeto: false,
+  vetoOnVeto: true,
   unmaskEnabled: false,
   unmaskCost: 2,
-  paidDoubtEnabled: false,
+  paidDoubtEnabled: true,
   /* Все пять покупок за золото стоят одинаково — две монеты: платная проверка,
      срыв масок, розыгрыш карты, выкуп щита на дуэли и (через
      `BLACKMAIL_PRICE_ON`) платный шантаж. Это одна и та же цена «жетона нет,
@@ -136,7 +136,7 @@ export const DEFAULT_RULES: GameRules = {
      каждую партию. Ползунки при этом независимые: развести цены можно, просто
      начинать с разных незачем. */
   paidDoubtCost: 2,
-  paidPlayEnabled: false,
+  paidPlayEnabled: true,
   paidPlayCost: 2,
   deck: defaultDeck()
 };

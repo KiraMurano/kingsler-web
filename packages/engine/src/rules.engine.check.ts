@@ -265,7 +265,7 @@ async function underAttack(rules: object) {
 
 // --- Тумблер включён: жетон списан ---
 {
-  const victim = await underAttack({ duelCostsToken: true });
+  const victim = await underAttack({ duelCostsToken: true, paidDuelEnabled: false });
   patch(victim, { actionTokens: 2 });
   const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
   useGameStore.getState().targetDeclareDuel(victim, shield);
@@ -276,7 +276,7 @@ async function underAttack(rules: object) {
 
 // --- Тумблер включён, жетонов нет: дуэль невозможна ---
 {
-  const victim = await underAttack({ duelCostsToken: true });
+  const victim = await underAttack({ duelCostsToken: true, paidDuelEnabled: false });
   patch(victim, { actionTokens: 0 });
   const shield = useGameStore.getState().players.find(p => p.id === victim)!.hand[0].id;
   useGameStore.getState().targetDeclareDuel(victim, shield);

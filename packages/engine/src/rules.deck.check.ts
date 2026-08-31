@@ -33,11 +33,11 @@ import { timerManager } from './utils/timerManager.ts';
 
 // --- 3. Ноль копий убирает карту целиком ---
 {
-  const rules = normalizeRules({ deck: { ...DEFAULT_RULES.deck, 'Право вето': 0, 'Досье': 0 } });
+  const rules = normalizeRules({ deck: { ...DEFAULT_RULES.deck, 'Право вето': 0, 'Чёрная книга': 0 } });
   const deck = createInitialDeck(rules.deck);
   assert.equal(deck.filter(c => c.card === 'Право вето').length, 0, 'вето вычищено');
-  assert.equal(deck.filter(c => c.card === 'Досье').length, 0, 'досье вычищено');
-  assert.equal(deck.length, 50 - 5 - 2);
+  assert.equal(deck.filter(c => c.card === 'Чёрная книга').length, 0, 'чёрная книга вычищена');
+  assert.equal(deck.length, 50 - 6 - 2);
 }
 
 // --- 4. Кастомный состав собирается ровно как заказан ---

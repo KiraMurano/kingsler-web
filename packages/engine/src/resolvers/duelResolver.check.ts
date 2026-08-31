@@ -66,7 +66,7 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     vetoChain: 0,
     isPendingActionAfterTruthChallenge: false,
     overlayInstant: null,
-    rules: DEFAULT_RULES,
+    rules: { ...DEFAULT_RULES, crownsToWin: 5 },
     coronations: [] as Coronation[],
     activeSpeechReactions: {} as Record<string, string>,
     floatingResourceEvents: [] as GameState['floatingResourceEvents'],

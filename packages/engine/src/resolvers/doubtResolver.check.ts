@@ -37,7 +37,7 @@ function bot(id: string, hand: GameCard[]): Player {
     avatar: '',
     seatNumber: 2,
     isBot: true,
-    gold: 2,
+    gold: 0,
     favor: 0,
     seals: 0,
     actionTokens: 0, // can't doubt — keeps this check deterministic

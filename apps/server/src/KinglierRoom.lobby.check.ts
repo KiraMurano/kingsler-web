@@ -17,6 +17,7 @@ const { Client } = await import('@colyseus/sdk');
 const { createServer } = await import('./app.ts');
 const { findOrCreateUserByEmail, updateProfile } = await import('./db.ts');
 const { JWT } = await import('colyseus');
+const { DEFAULT_RULES } = await import('@kinglier/engine/rules');
 
 const PORT = 27891;
 const server = createServer();
@@ -69,7 +70,7 @@ assert.equal((lastLobby as Lobby).seats[0].avatar, '/avatars/yulia.webp');
 assert.equal((lastLobby as Lobby).seats[0].title, 'Оппортунист');
 
 // --- Правила партии: их задаёт хост, сервер их нормализует и рассылает ---
-assert.equal((lastLobby as Lobby).rules.crownsToWin, 5, 'в снапшоте лежат дефолтные правила');
+assert.equal((lastLobby as Lobby).rules.crownsToWin, DEFAULT_RULES.crownsToWin, 'в снапшоте лежат дефолтные правила');
 
 let guestLobby: unknown = null;
 guest.onMessage('lobby', data => { guestLobby = data; });
