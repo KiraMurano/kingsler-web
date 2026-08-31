@@ -14,6 +14,7 @@ import { Tag } from './ui/Tag';
 import { Res } from './ui/Res';
 import { UiIcon, renderWithIcons } from './ui/Icon';
 import { Portrait } from './Portrait';
+import { CoronationVictory } from './CoronationVictory';
 
 const CardPlate: React.FC<{ card: GameCard; caption?: string; width?: number }> = ({
   card,
@@ -259,6 +260,10 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules, onExitT
     );
 
     return (
+      /* Итоги приходят последними: сперва салют и объявление, и только потом
+         таблица. Показать её сразу значит перебить объявление таблицей —
+         в ней есть что читать, а в объявлении не надо. */
+      <CoronationVictory winnerName={isDraw ? null : (winner?.name ?? null)}>
       <Dialog
         open
         onClose={onExitToMenu}
@@ -307,6 +312,7 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules, onExitT
           <LogOut size={18} /> Выйти в меню
         </Button>
       </Dialog>
+      </CoronationVictory>
     );
   }
 
@@ -345,7 +351,7 @@ export const Modals: React.FC<ModalsProps> = ({ showRules, onCloseRules, onExitT
                 <UiIcon kind="move" size="xs" />.
               </li>
               <li>
-                <b>Розыгрыш карт:</b> одна интрига, одна роль и любые инстанты. Добор карт
+                <b>Розыгрыш карт:</b> одна роль, любые интриги и инстанты. Добор карт
                 происходит только в конце хода.
               </li>
             </ul>

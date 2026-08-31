@@ -38,7 +38,10 @@ const FIXED = [
   cardArt('/assets/cards/back-dual-face.webp', TABLE_ART_WIDTH),
   '/assets/ui/thumbsup-500.webp',
   '/assets/ui/coin-500.webp',
-  '/assets/ui/coin-side-500.webp'
+  '/assets/ui/coin-side-500.webp',
+  /* Пушки салюта. Греются вместе со всем: они выкатываются рывком за секунду
+     до выстрела, и подгружаться в этот момент им уже поздно. */
+  '/assets/ui/cannon-500.webp'
 ];
 
 /** Порядок важен: первым греем то, что появится на столе раньше всего. */
