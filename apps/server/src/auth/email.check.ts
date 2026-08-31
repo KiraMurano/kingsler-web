@@ -66,6 +66,7 @@ assert.doesNotMatch(body.html, /\.webp/);
 for (const must of ['Войти в игру', '15 минут', 'КИНГСЛЕР']) {
   assert.ok(body.html.includes(must), `в письме нет текста: ${must}`);
 }
+assert.ok(body.html.includes('/assets/email/logo.png'), 'в письме нет логотипа');
 
 // Failure path: a non-OK response must throw, not swallow the error.
 globalThis.fetch = (async () => new Response('nope', { status: 500 })) as typeof fetch;

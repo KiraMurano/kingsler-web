@@ -58,6 +58,7 @@ function makeState(over: Partial<ZoneState> & Pick<ZoneState, 'players'>): ZoneS
     pendingAction: null,
     pendingDuelDefenderCardId: null,
     overlayInstant: null,
+    pendingRedirectFromId: null,
     isVetoed: false,
     vetoChain: 0,
     plotPulses: [],
@@ -847,6 +848,264 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   assertUnique(home, 'vetoed/role');
   assert.equal(keyAt(home, staked[0].id, 'vetoed/role'), 'hand:p1:0');
   assert.equal(keyAt(home, veto.id, 'vetoed/role'), 'discard');
+
+  /* Вето на пачку «ставка + Ва-банк». Оверлей в состоянии один, и без отдельной
+     заявки Ва-банк падал бы в сброс в тот же кадр, в котором вето пришло на
+     его место. Пачка остаётся на столе, пока круг вето идёт, и уходит разом,
+     когда оверлей снимают. */
+  const packStake = pile(['Наследник'])[0];
+  const vaBanque: CardInstance = { id: 'vb1', card: 'Ва-банк' };
+  const packVeto: CardInstance = { id: 'w3', card: 'Право вето' };
+  const packAction = roleAction({
+    actorId: 'p1',
+    stakedCardId: packStake.id,
+    withVaBanque: true
+  });
+  const packDuring = makeState({
+    players: [player({ id: 'p1', hand: [packStake] }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [vaBanque, packVeto],
+    pendingAction: packAction,
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  const packOnTable = deriveCardZones(packDuring, 'p1');
+  assertUnique(packOnTable, 'vetoed/vabanque');
+  assert.equal(
+    keyAt(packOnTable, packStake.id, 'vetoed/vabanque'),
+    'stake',
+    'ставка пачки остаётся, пока вето лежит'
+  );
+  assert.equal(
+    keyAt(packOnTable, vaBanque.id, 'vetoed/vabanque'),
+    'overlay:action',
+    'Ва-банк не уходит из пачки, когда поверх ложится вето'
+  );
+  assert.equal(
+    keyAt(packOnTable, packVeto.id, 'vetoed/vabanque'),
+    'overlay:action',
+    'вето лежит поверх пачки'
+  );
+
+  const packAfter = makeState({
+    players: [player({ id: 'p1', hand: [packStake] }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [vaBanque, packVeto],
+    pendingAction: packAction,
+    overlayInstant: null,
+    isVetoed: true,
+    turnPhase: 'IDLE'
+  });
+  const packGone = deriveCardZones(packAfter, 'p1');
+  assertUnique(packGone, 'vetoed/vabanque-after');
+  assert.equal(keyAt(packGone, packStake.id, 'vetoed/vabanque-after'), 'hand:p1:0');
+  assert.equal(keyAt(packGone, vaBanque.id, 'vetoed/vabanque-after'), 'discard');
+  assert.equal(keyAt(packGone, packVeto.id, 'vetoed/vabanque-after'), 'discard');
+
+  /* Чужой Ва-банк из прошлого хода в сбросе не поднимается: пачка — это флаг
+     текущего действия, а не «любая карта Ва-банк в колоде сброса». */
+  const leftover: CardInstance = { id: 'old-vb', card: 'Ва-банк' };
+  const leftoverState = makeState({
+    players: [player({ id: 'p1', hand: staked }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [leftover, veto],
+    pendingAction: roleAction({ actorId: 'p1', stakedCardId: staked[0].id }),
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  assert.equal(
+    keyAt(deriveCardZones(leftoverState, 'p1'), leftover.id, 'vetoed/leftover-vb'),
+    'discard',
+    'Ва-банк прошлого хода остаётся в сбросе'
+  );
+
+  /* Открытый инстант лежит в `table`, не в оверлее: вето садится поверх, а
+     карта остаётся, пока круг идёт, и уходит с вето, когда оверлей снимают. */
+  const search: CardInstance = { id: 'sr1', card: 'Обыск покоев' };
+  const searchVeto: CardInstance = { id: 'sr-w', card: 'Право вето' };
+  const searchAction: Action = {
+    id: 'a-sr',
+    type: 'instant',
+    name: 'Обыск покоев',
+    instantType: 'Обыск покоев',
+    actorId: 'p1',
+    stakedCardId: search.id,
+    costGold: 0,
+    costTokens: 1,
+    description: ''
+  };
+  const searchDuring = makeState({
+    players: [player({ id: 'p1' }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [search, searchVeto],
+    pendingAction: searchAction,
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  const searchOnTable = deriveCardZones(searchDuring, 'p1');
+  assertUnique(searchOnTable, 'vetoed/instant');
+  assert.equal(keyAt(searchOnTable, search.id, 'vetoed/instant'), 'table');
+  assert.equal(keyAt(searchOnTable, searchVeto.id, 'vetoed/instant'), 'overlay:action');
+
+  const searchAfter = makeState({
+    players: [player({ id: 'p1' }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [search, searchVeto],
+    pendingAction: searchAction,
+    overlayInstant: null,
+    isVetoed: true,
+    turnPhase: 'IDLE'
+  });
+  const searchGone = deriveCardZones(searchAfter, 'p1');
+  assertUnique(searchGone, 'vetoed/instant-after');
+  assert.equal(keyAt(searchGone, search.id, 'vetoed/instant-after'), 'discard');
+  assert.equal(keyAt(searchGone, searchVeto.id, 'vetoed/instant-after'), 'discard');
+
+  /* Перенаправление само оверлей: вето приходит на его место. Пока круг
+     перевода идёт (`pendingRedirectFromId`), перевод обязан оставаться под
+     вето — иначе карта улетает в сброс в тот же кадр, в котором вето легло. */
+  const redirectStake = pile(['Вор'])[0];
+  const redirect: CardInstance = { id: 'rd1', card: 'Перенаправление' };
+  const redirectVeto: CardInstance = { id: 'rd-w', card: 'Право вето' };
+  const redirectAction = roleAction({
+    actorId: 'p1',
+    roleClaim: 'Вор',
+    name: 'Вор',
+    targetId: 'p3',
+    stakedCardId: redirectStake.id
+  });
+  const redirectDuring = makeState({
+    players: [
+      player({ id: 'p1', hand: [redirectStake] }),
+      player({ id: 'p2', seatNumber: 2 }),
+      player({ id: 'p3', seatNumber: 3 })
+    ],
+    discardPile: [redirect, redirectVeto],
+    pendingAction: redirectAction,
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    pendingRedirectFromId: 'p3',
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  const redirectOnTable = deriveCardZones(redirectDuring, 'p1');
+  assertUnique(redirectOnTable, 'vetoed/redirect');
+  assert.equal(keyAt(redirectOnTable, redirectStake.id, 'vetoed/redirect'), 'stake');
+  assert.equal(
+    keyAt(redirectOnTable, redirect.id, 'vetoed/redirect'),
+    'overlay:action',
+    'перевод не уходит, пока вето лежит на нём'
+  );
+  assert.equal(keyAt(redirectOnTable, redirectVeto.id, 'vetoed/redirect'), 'overlay:action');
+
+  /* Круг закрылся: перевод либо устоял, либо отменён — оверлей снят, память о
+     цели погашена, удар идёт дальше. Ставка остаётся, перевод и вето уходят. */
+  const redirectAfter = makeState({
+    players: [
+      player({ id: 'p1', hand: [redirectStake] }),
+      player({ id: 'p2', seatNumber: 2 }),
+      player({ id: 'p3', seatNumber: 3 })
+    ],
+    discardPile: [redirect, redirectVeto],
+    pendingAction: redirectAction,
+    overlayInstant: null,
+    pendingRedirectFromId: null,
+    isVetoed: false,
+    turnPhase: 'TARGET_REACTION_WINDOW'
+  });
+  const redirectGone = deriveCardZones(redirectAfter, 'p1');
+  assertUnique(redirectGone, 'vetoed/redirect-after');
+  assert.equal(keyAt(redirectGone, redirectStake.id, 'vetoed/redirect-after'), 'stake');
+  assert.equal(keyAt(redirectGone, redirect.id, 'vetoed/redirect-after'), 'discard');
+  assert.equal(keyAt(redirectGone, redirectVeto.id, 'vetoed/redirect-after'), 'discard');
+
+  /* Чужое перенаправление из прошлого хода не поднимается. */
+  const leftoverRedirect: CardInstance = { id: 'old-rd', card: 'Перенаправление' };
+  const leftoverRedirectState = makeState({
+    players: [player({ id: 'p1', hand: staked }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [leftoverRedirect, veto],
+    pendingAction: roleAction({ actorId: 'p1', stakedCardId: staked[0].id }),
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    pendingRedirectFromId: null,
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  assert.equal(
+    keyAt(deriveCardZones(leftoverRedirectState, 'p1'), leftoverRedirect.id, 'vetoed/leftover-rd'),
+    'discard',
+    'перевод прошлого хода остаётся в сбросе'
+  );
+
+  /* Пачка «ставка + Ва-банк + перевод» под вето: все трое остаются. */
+  const tripleStake = pile(['Вор'])[0];
+  const tripleVb: CardInstance = { id: 'tr-vb', card: 'Ва-банк' };
+  const tripleRd: CardInstance = { id: 'tr-rd', card: 'Перенаправление' };
+  const tripleVeto: CardInstance = { id: 'tr-w', card: 'Право вето' };
+  const tripleDuring = makeState({
+    players: [
+      player({ id: 'p1', hand: [tripleStake] }),
+      player({ id: 'p2', seatNumber: 2 }),
+      player({ id: 'p3', seatNumber: 3 })
+    ],
+    discardPile: [tripleVb, tripleRd, tripleVeto],
+    pendingAction: roleAction({
+      actorId: 'p1',
+      roleClaim: 'Вор',
+      name: 'Вор',
+      targetId: 'p3',
+      stakedCardId: tripleStake.id,
+      withVaBanque: true
+    }),
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    pendingRedirectFromId: 'p3',
+    isVetoed: true,
+    turnPhase: 'VETO_WINDOW'
+  });
+  const triple = deriveCardZones(tripleDuring, 'p1');
+  assertUnique(triple, 'vetoed/triple');
+  assert.equal(keyAt(triple, tripleStake.id, 'vetoed/triple'), 'stake');
+  assert.equal(keyAt(triple, tripleVb.id, 'vetoed/triple'), 'overlay:action');
+  assert.equal(keyAt(triple, tripleRd.id, 'vetoed/triple'), 'overlay:action');
+  assert.equal(keyAt(triple, tripleVeto.id, 'vetoed/triple'), 'overlay:action');
+
+  /* Вето на вето: оба «Права вето» в одной лунке, пока цепочка жива. */
+  const firstVeto: CardInstance = { id: 'vv1', card: 'Право вето' };
+  const secondVeto: CardInstance = { id: 'vv2', card: 'Право вето' };
+  const chainStake = pile(['Наследник'])[0];
+  const chainDuring = makeState({
+    players: [player({ id: 'p1', hand: [chainStake] }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [firstVeto, secondVeto],
+    pendingAction: roleAction({ actorId: 'p1', stakedCardId: chainStake.id }),
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    isVetoed: false,
+    vetoChain: 2,
+    turnPhase: 'VETO_WINDOW'
+  });
+  const chain = deriveCardZones(chainDuring, 'p1');
+  assertUnique(chain, 'vetoed/chain');
+  assert.equal(keyAt(chain, firstVeto.id, 'vetoed/chain'), 'overlay:action', 'первое вето остаётся под встречным');
+  assert.equal(keyAt(chain, secondVeto.id, 'vetoed/chain'), 'overlay:action');
+  assert.equal(at(chain, firstVeto.id, 'vetoed/chain').vetoLink, 1);
+  assert.equal(at(chain, secondVeto.id, 'vetoed/chain').vetoLink, 2);
+
+  /* Вето прошлого хода при цепочке длины 1 не поднимается. */
+  const oldVeto: CardInstance = { id: 'old-w', card: 'Право вето' };
+  const nowVeto: CardInstance = { id: 'now-w', card: 'Право вето' };
+  const leftoverVetoState = makeState({
+    players: [player({ id: 'p1', hand: staked }), player({ id: 'p2', seatNumber: 2 })],
+    discardPile: [oldVeto, nowVeto],
+    pendingAction: roleAction({ actorId: 'p1', stakedCardId: staked[0].id }),
+    overlayInstant: { card: 'Право вето', actorId: 'p2' },
+    isVetoed: true,
+    vetoChain: 1,
+    turnPhase: 'VETO_WINDOW'
+  });
+  assert.equal(
+    keyAt(deriveCardZones(leftoverVetoState, 'p1'), oldVeto.id, 'vetoed/leftover-veto'),
+    'discard',
+    'вето прошлого хода остаётся в сбросе'
+  );
+  assert.equal(
+    keyAt(deriveCardZones(leftoverVetoState, 'p1'), nowVeto.id, 'vetoed/leftover-veto'),
+    'overlay:action'
+  );
 }
 
 /* ------------------------------------------------------------------ */

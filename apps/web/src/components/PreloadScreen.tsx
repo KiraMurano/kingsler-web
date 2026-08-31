@@ -13,6 +13,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { Brand } from './Brand';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -39,7 +40,7 @@ export const PreloadScreen: React.FC<{ visible: boolean; ratio: number }> = ({
           transition={{ duration: reduce ? 0.15 : 0.25, ease: EASE }}
         >
           <div className="preload__inner">
-            <span className="preload__title">Кингслер</span>
+            <Brand />
             <span className="preload__sub">Двор готовится к приёму</span>
 
             <span className="preload__bar">

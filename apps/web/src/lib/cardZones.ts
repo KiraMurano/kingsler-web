@@ -33,6 +33,7 @@ export type ZoneState = Pick<
   | 'overlayInstant'
   | 'isVetoed'
   | 'vetoChain'
+  | 'pendingRedirectFromId'
   | 'plotPulses'
   | 'revealOutcome'
   | 'duelOutcome'
@@ -97,6 +98,7 @@ export function deriveCardZones(
     overlayInstant,
     isVetoed,
     vetoChain,
+    pendingRedirectFromId,
     plotPulses,
     revealOutcome,
     duelOutcome,
@@ -235,6 +237,47 @@ export function deriveCardZones(
 
   /* 1. overlay — an instant laid on top of the current action. */
   if (overlayInstant) {
+    const over: 'plot' | 'action' = pendingAction?.type === 'plot' ? 'plot' : 'action';
+    const overlayZone: Zone = { kind: 'overlay', over };
+    const under = { underlay: duelIsLive };
+
+    /* Оверлей в состоянии один, а на столе может лежать пачка: Ва-банк,
+       перевод, предыдущие вето. Без этих заявок нижняя карта падала бы в
+       сброс в тот же кадр, в котором верхняя пришла на её место. Заявляются
+       снизу вверх, чтобы текущий оверлей рисовался сверху. */
+    if (overlayInstant.card !== 'Ва-банк' && pendingAction?.withVaBanque) {
+      const pack = { card: 'Ва-банк' as GameCard, actorId: pendingAction.actorId };
+      claim(
+        resolveOverlayCardId(state, pack),
+        overlayZone,
+        { known: 'Ва-банк' },
+        pendingAction.actorId,
+        under
+      );
+    }
+    if (overlayInstant.card !== 'Перенаправление' && pendingRedirectFromId) {
+      const pack = { card: 'Перенаправление' as GameCard, actorId: overlayInstant.actorId };
+      claim(
+        resolveOverlayCardId(state, pack),
+        overlayZone,
+        { known: 'Перенаправление' },
+        null,
+        under
+      );
+    }
+    if (overlayInstant.card === 'Право вето' && vetoChain > 1) {
+      const chain: CardInstance[] = [];
+      for (let i = discardPile.length - 1; i >= 0 && chain.length < vetoChain; i--) {
+        if (discardPile[i].card === 'Право вето') chain.push(discardPile[i]);
+      }
+      for (let i = chain.length - 1; i >= 1; i--) {
+        claim(chain[i].id, overlayZone, { known: 'Право вето' }, null, {
+          ...under,
+          vetoLink: vetoChain - i
+        });
+      }
+    }
+
     const overlay = { card: overlayInstant.card as GameCard, actorId: overlayInstant.actorId };
     claim(
       resolveOverlayCardId(state, overlay),
@@ -242,11 +285,11 @@ export function deriveCardZones(
          время уезжает в слот своего игрока, а посреди стола пусто. Он и
          занимает эту пустую лунку — обычную, карточную, — вместо того чтобы
          лечь наискось поверх ничего (см. `lib/cardLie.ts`). */
-      { kind: 'overlay', over: pendingAction?.type === 'plot' ? 'plot' : 'action' },
+      overlayZone,
       { known: overlay.card },
       overlay.actorId,
       {
-        underlay: duelIsLive,
+        ...under,
         /* Номер звена нужен только вето: по нему слой карт кладёт встречное
            вето накрест предыдущего. Остальным оверлеям он не значит ничего. */
         vetoLink: overlay.card === 'Право вето' ? vetoChain : undefined

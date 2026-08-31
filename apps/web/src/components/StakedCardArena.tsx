@@ -37,16 +37,18 @@ const ClaimBadge: React.FC<{ text: string; solo?: boolean }> = ({ text, solo }) 
   const rise = reduce ? 0 : 6;
   return (
     <AnimatePresence mode="wait">
-      <motion.span
-        key={text}
-        className={`claimbadge ${solo ? 'claimbadge--solo' : 'claimbadge--pinned'}`}
-        initial={{ opacity: 0, y: rise }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -rise }}
-        transition={{ duration: reduce ? 0.12 : dur.fade, ease: [0.4, 0, 0.2, 1] }}
-      >
-        {text}
-      </motion.span>
+      {text ? (
+        <motion.span
+          key={text}
+          className={`claimbadge ${solo ? 'claimbadge--solo' : 'claimbadge--pinned'}`}
+          initial={{ opacity: 0, y: rise }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -rise }}
+          transition={{ duration: reduce ? 0.12 : dur.fade, ease: [0.4, 0, 0.2, 1] }}
+        >
+          {text}
+        </motion.span>
+      ) : null}
     </AnimatePresence>
   );
 };
@@ -82,27 +84,26 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
 
   if (!pendingAction && !overlayInstant) return null;
 
+  /*
+   * Действие отменено вето, и само вето уже убрано со стола.
+   *
+   * Тот же признак, по которому раскладка уводит со стола перечёркнутую карту
+   * (см. `lib/cardZones.ts`). `pendingAction` держится ещё `ACTION_HOLD_MS`
+   * после отмены — без этой заставы стол оставлял бы пустой блок заявления
+   * ровно там, откуда карты только что улетели: лунка карты плюс подпись без
+   * текста.
+   */
+  if (isVetoed && !overlayInstant) return null;
+
   /* Оверлей поверх действия ложится сбоку и наискось — под ним лежит карта,
      и её должно быть видно и по ней должно быть куда нажать. */
   const overlayAnchor = overlayInstant ? (
     <CardAnchor zone={{ kind: 'overlay', over: 'action' }} className="cardanchor--overlay" />
   ) : null;
 
-  /*
-   * Действие отменено вето, и само вето уже убрано со стола.
-   *
-   * Тот же признак, по которому раскладка уводит со стола перечёркнутую карту
-   * (см. `lib/cardZones.ts`), и нужен он здесь ровно затем же. `pendingAction`
-   * держится ещё `ACTION_HOLD_MS` после отмены, и подпись, пока вето лежало
-   * поверх, показывала его — а стоило вето улететь, как из-под него обратно
-   * всплывало «такой-то заявляет такого-то». Заявления в этот момент уже нет:
-   * карты разлетаются, а стол объявлял их заново.
-   */
-  const cancelled = isVetoed && !overlayInstant;
-
   /* Что происходит — одной фразой. Собирается в одном месте на все ветки:
      подпись обязана звучать одинаково, чем бы ни ходили. */
-  const caption = cancelled ? null : tableCaption(pendingAction, players);
+  const caption = tableCaption(pendingAction, players);
   const overlaid = overlayCaption(overlayInstant, pendingAction, players);
 
   /* 1. Plain court action — a badge, no card is staked. */

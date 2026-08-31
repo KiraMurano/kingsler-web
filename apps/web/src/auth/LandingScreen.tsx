@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Crown, KeyRound, LogIn, Mail, ChevronDown, Sparkles } from 'lucide-react';
+import { Brand } from '../components/Brand';
 import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Overlay';
 import { CodeInput } from '../components/ui/CodeInput';
@@ -135,8 +136,7 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
       {/* Top Floating Nav Bar */}
       <header className="landing-nav">
         <div className="landing-nav__brand">
-          <Crown className="landing-nav__crown" size={20} />
-          <span className="landing-nav__logo gilded">КИНГСЛЕР</span>
+          <Brand size="nav" />
         </div>
         <Button tone="bare" size="sm" onClick={() => setLoginOpen(true)}>
           <LogIn size={15} /> Войти
@@ -153,14 +153,7 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
             <span>Карточная игра о дворцовых интригах и блефе</span>
           </div>
 
-          <div className="brand brand--hero">
-            <div className="brand__title">
-              <span className="brand__rule" />
-              <span className="gilded">КИНГСЛЕР</span>
-              <span className="brand__rule brand__rule--r" />
-            </div>
-            <div className="brand__sub">Битва за престол</div>
-          </div>
+          <Brand />
 
           <h1 className="landing-hero-block__headline">
             Правда — лишь то, <br />

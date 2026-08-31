@@ -1,5 +1,6 @@
 import React from 'react';
 import { BookOpen, Scale, LogOut, ScrollText } from 'lucide-react';
+import { Brand } from './Brand';
 
 interface TopBarProps {
   onOpenCodex: () => void;
@@ -31,14 +32,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       </button>
     </div>
 
-    <div className="brand">
-      <div className="brand__title">
-        <span className="brand__rule" />
-        <span className="gilded">КИНГСЛЕР</span>
-        <span className="brand__rule brand__rule--r" />
-      </div>
-      <div className="brand__sub">Битва за престол</div>
-    </div>
+    <Brand size="bar" />
 
     <div className="topbar__side topbar__side--end">
       <button

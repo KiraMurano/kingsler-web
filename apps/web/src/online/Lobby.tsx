@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Room } from '@colyseus/sdk';
 import { Check, Copy, Crown, LogIn, CirclePlus, ArrowLeft, LogOut, SlidersHorizontal } from 'lucide-react';
+import { Brand } from '../components/Brand';
 import { Button } from '../components/ui/Button';
 import { Tag } from '../components/ui/Tag';
 import { onlineClient, type LobbyMessage } from './OnlineGameClient';
@@ -24,19 +25,6 @@ function ScreenBack({ onClick, children }: { onClick: () => void; children: Reac
     <button type="button" className="iconbtn screen__back" onClick={onClick}>
       {children}
     </button>
-  );
-}
-
-function Brand({ subtitle }: { subtitle: string }) {
-  return (
-    <div className="brand brand--hero">
-      <div className="brand__title">
-        <span className="brand__rule" />
-        <span className="gilded">КИНГСЛЕР</span>
-        <span className="brand__rule brand__rule--r" />
-      </div>
-      <div className="brand__sub">{subtitle}</div>
-    </div>
   );
 }
 

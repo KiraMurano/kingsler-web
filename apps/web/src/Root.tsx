@@ -11,6 +11,7 @@ import { useAssetPreload } from './lib/preloadAssets';
 import { RulesDialog } from './rules/RulesDialog';
 import type { GameRules } from '@kinglier/engine/rules';
 import { ProfileDialog } from './components/ProfileDialog';
+import { Brand } from './components/Brand';
 import { Button } from './components/ui/Button';
 import './styles/screen.css';
 import './styles/rules.css';
@@ -78,14 +79,7 @@ export default function Root() {
       ) : mode === 'menu' ? (
         <div className="screen">
           <div className="screen__panel">
-            <div className="brand brand--hero">
-              <div className="brand__title">
-                <span className="brand__rule" />
-                <span className="gilded">КИНГСЛЕР</span>
-                <span className="brand__rule brand__rule--r" />
-              </div>
-              <div className="brand__sub">Битва за престол</div>
-            </div>
+            <Brand />
 
             <button type="button" className="account-button" onClick={() => setProfileOpen(true)}>
               <span className="account-button__avatar">

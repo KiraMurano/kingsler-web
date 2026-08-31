@@ -1895,27 +1895,9 @@
   text-align: center;
 }
 
-/* Имя игры отлито, а не набрано: тот же градиент, что у объявления начала
-   партии, — два экрана, на которых игра называет себя, должны выглядеть
-   родственно. */
-.preload__title {
-  font-family: var(--font-display);
-  font-size: clamp(2.1rem, calc(8 * var(--vw)), 3.4rem);
-  line-height: 1;
-  letter-spacing: 0.08em;
-  background: linear-gradient(
-    180deg,
-    #fdf3d8 0%,
-    var(--gold-bright) 38%,
-    var(--gold) 66%,
-    var(--gold-deep) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* Тень отдельным слоем: на прозрачном тексте `text-shadow` рисуется поверх
-     заливки и съедает градиент. */
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 30px rgba(200, 160, 74, 0.4));
+.preload__inner .brand--hero .brand__logo {
+  width: min(340px, 82vw);
+  filter: drop-shadow(0 0 30px rgba(200, 160, 74, 0.35));
 }
 
 .preload__sub {
@@ -1958,8 +1940,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .preload__title {
-    filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8));
+  .preload__inner .brand--hero .brand__logo {
+    filter: none;
   }
 }
 

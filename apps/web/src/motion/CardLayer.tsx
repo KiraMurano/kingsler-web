@@ -247,6 +247,14 @@ function stackOrder(placed: PlacedCard): number {
      но выше `stake`: на дуэли Ва-банк обязан оказаться под обеими ставками
      сразу, не дожидаясь вскрытия, которое поднимет их на `REVEALED_Z`. */
   if (placed.underlay) return ZONE_PRECEDENCE.duel - 5;
+  /* Пачка: нижние карты под тем, что на них наложили. Иначе все оверлеи в
+     одной лунке получают один z-index, и кто сверху — дело порядка в DOM. */
+  if (placed.zone.kind === 'overlay' && placed.face.known === 'Ва-банк') {
+    return ZONE_PRECEDENCE.overlay - 2;
+  }
+  if (placed.zone.kind === 'overlay' && placed.face.known === 'Перенаправление') {
+    return ZONE_PRECEDENCE.overlay - 1;
+  }
   return ZONE_PRECEDENCE[placed.zone.kind];
 }
 

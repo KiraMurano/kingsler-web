@@ -65,18 +65,13 @@
 }
 
 /* Hero wordmark — bigger cousin of the in-game TopBar brand */
-.brand--hero .brand__title {
-  font-size: clamp(1.8rem, calc(5 * var(--vw)), 2.6rem);
-  gap: 18px;
-}
-
-.brand--hero .brand__rule {
-  width: 64px;
-}
-
 .brand--hero .brand__sub {
   margin-top: 8px;
   font-size: 0.72rem;
+}
+
+.landing-hero-block .brand--hero .brand__logo {
+  width: min(540px, 78vw);
 }
 
 /* ==========================================================================
@@ -117,19 +112,6 @@
 .landing-nav__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.landing-nav__crown {
-  color: var(--gold-bright);
-  filter: drop-shadow(0 0 8px rgba(232, 200, 119, 0.4));
-}
-
-.landing-nav__logo {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
 }
 
 /* ==========================================================================
