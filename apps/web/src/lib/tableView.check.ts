@@ -198,6 +198,17 @@ function action(over: Partial<Action> = {}): Action {
   assert.match(blocked.reason!, /^Нет жетонов/);
   assert.equal(blocked.tokenBlocked, true, 'дело именно в жетонах — молнию перечёркиваем');
 
+  // Жетон есть — молния живая. Раньше `undefined === undefined` ставила
+  // запрет как раз в этом случае.
+  const armed = shieldOf(
+    underAttack(normalizeRules({ duelCostsToken: true, paidDuelEnabled: false }), {
+      actionTokens: 2
+    })
+  );
+  assert.equal(armed.disabled, false);
+  assert.equal(armed.spendsToken, true);
+  assert.equal(armed.tokenBlocked, false, 'жетон на месте — перечёркивать нечего');
+
   // Надбавка золотом видна в подписи и берётся из правил.
   const paid = shieldOf(
     underAttack(normalizeRules({ duelCostsToken: false, duelCost: 2 }), { gold: 5 })
@@ -269,7 +280,7 @@ function action(over: Partial<Action> = {}): Action {
 }
 
 // 6. Окно вето — опрос, а не таймер: у каждого спрашиваемого есть
-//    «Пропустить», а само вето по-прежнему играется картой.
+//    «Наложить вето» (глухая, если карты нет) и «Не накладывать вето».
 {
   const открыто = input({
     turnPhase: 'VETO_WINDOW',
@@ -279,22 +290,34 @@ function action(over: Partial<Action> = {}): Action {
   });
   const view = deriveTableView(открыто, 'p1');
   assert.equal(view.phase, 'veto');
-  assert.deepEqual(view.bar.map(b => b.kind), ['veto-pass'], 'отказ — кнопкой, вето — картой');
+  assert.deepEqual(
+    view.bar.map(b => b.kind),
+    ['veto', 'veto-pass'],
+    'сначала красное вето, потом отказ'
+  );
+  assert.equal(view.bar[0].label, 'Наложить вето');
+  assert.equal(view.bar[0].tone, 'danger');
+  assert.equal(view.bar[0].disabled, false, 'карта вето на руках — кнопка живая');
+  assert.equal(view.bar[1].label, 'Не накладывать вето');
   const [vetoId, jesterId] = view.viewerHandIds;
   assert.deepEqual(view.menus[vetoId].map(o => o.kind), ['veto', 'inspect']);
   assert.deepEqual(view.menus[jesterId].map(o => o.kind), ['inspect']);
 
   /* ГЛАВНОЕ: отсутствие «Права вето» на руках НЕ пропускает ход за игрока.
-     Его спрашивают ровно так же, и жать «Пропустить» он обязан сам — иначе
-     закрывшееся само окно означало бы «вето ни у кого нет». */
+     Его спрашивают ровно так же, и жать «Не накладывать вето» он обязан сам —
+     иначе закрывшееся само окно означало бы «вето ни у кого нет». Кнопка
+     наложить при этом глухая. */
   const безКарты = deriveTableView(
     { ...открыто, players: [player('p1', { hand: hand('Шут', 'Дуэлянт') }), player('p2'), player('p3')] },
     'p1'
   );
   assert.equal(безКарты.phase, 'veto', 'без вето на руках игрока всё равно спрашивают');
-  assert.deepEqual(безКарты.bar.map(b => b.kind), ['veto-pass'], 'и кнопка отказа у него есть');
+  assert.deepEqual(безКарты.bar.map(b => b.kind), ['veto', 'veto-pass'], 'обе кнопки на месте');
+  assert.equal(безКарты.bar[0].disabled, true, 'без карты вето кнопка наложить глухая');
+  assert.match(безКарты.bar[0].reason!, /Нет карты/);
+  assert.equal(безКарты.bar[1].disabled, false, 'отказ доступен и без карты');
 
-  /* Ответивший выпадает из опроса — второй раз своё «Пропустить» не жмут. */
+  /* Ответивший выпадает из опроса — второй раз своё «Не накладывать вето» не жмут. */
   const ответил = deriveTableView({ ...открыто, pendingVetoPassedIds: ['p1'] }, 'p1');
   assert.equal(ответил.phase, 'waiting', 'свой ответ дают один раз');
   assert.deepEqual(ответил.bar, []);
@@ -310,7 +333,19 @@ function action(over: Partial<Action> = {}): Action {
     'p2'
   );
   assert.equal(отменён.phase, 'veto', 'отменили его действие — ему и отвечать');
-  assert.deepEqual(отменён.bar.map(b => b.kind), ['veto-pass']);
+  assert.deepEqual(отменён.bar.map(b => b.kind), ['veto', 'veto-pass']);
+
+  /* У p1 карта есть, но в партии без «вето на вето» встречное класть нельзя. */
+  const сКартойПослеВето = deriveTableView(
+    { ...открыто, isVetoed: true, vetoChain: 1, overlayInstant: вето },
+    'p1'
+  );
+  assert.equal(сКартойПослеВето.bar[0].disabled, true, 'встречное вето выключено правилами');
+  const встречноеРазрешено = deriveTableView(
+    { ...открыто, isVetoed: true, vetoChain: 1, overlayInstant: вето, vetoOnVeto: true },
+    'p1'
+  );
+  assert.equal(встречноеРазрешено.bar[0].disabled, false, 'с правилом вето-на-вето кнопка живая');
 
   /* А вот сам наложивший вето из опроса выпадает: вето поверх собственного
      вето ничего не отменяет, и предлагать его — предлагать сжечь карту. */
@@ -353,6 +388,12 @@ function action(over: Partial<Action> = {}): Action {
       activePlayerId: 'p2',
       turnPhase: 'TARGET_REACTION_WINDOW',
       pendingAction: action({ roleClaim: 'Вор', targetId: 'p1' })
+    }),
+    input({
+      turnPhase: 'VETO_WINDOW',
+      activePlayerId: 'p2',
+      pendingAction: action(),
+      players: [player('p1', { hand: hand('Право вето', 'Шут') }), player('p2'), player('p3')]
     })
   ];
   for (const состояние of фазы) {

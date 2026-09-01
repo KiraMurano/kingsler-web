@@ -77,6 +77,27 @@
 /* ==========================================================================
    PUBLIC LANDING PAGE (Two-Block Modern Layout & 3D Card Fan Showcase)
    ========================================================================== */
+/* Тёплая заливка лендинга. Сбор двора и занавес берут ту же, чтобы переход
+   меню → стол не менял картинку, а только проявлял логотип и список. */
+.landing-page,
+.booting,
+.gather::before,
+.gamecover::before {
+  background: radial-gradient(
+    circle at 50% 12%,
+    rgba(45, 34, 18, 0.35) 0%,
+    rgba(5, 7, 12, 0.95) 55%,
+    var(--ink-abyss) 100%
+  );
+}
+
+/* Непроницаемая подложка только у шторки и сбора: иначе стол просветит.
+   Лендинг без неё — карты фона видны сквозь тёплую заливку. */
+.gamecover,
+.gather {
+  background-color: var(--ink-abyss);
+}
+
 .landing-page {
   position: relative;
   z-index: 1;
@@ -85,7 +106,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   scroll-behavior: smooth;
-  background: radial-gradient(circle at 50% 12%, rgba(45, 34, 18, 0.35) 0%, rgba(5, 7, 12, 0.95) 55%, var(--ink-abyss) 100%);
 }
 
 /* Floating navigation bar */

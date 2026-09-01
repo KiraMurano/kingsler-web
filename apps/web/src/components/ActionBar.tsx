@@ -9,9 +9,12 @@
  * написано выше. Глухая кнопка остаётся на месте, а причину рассказывает
  * тултипом: подпись внутри кнопки меняла её высоту и заставляла ряд плясать.
  */
-import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react';
+import { X } from 'lucide-react';
 import { dur } from '../motion/tokens.ts';
+import { AutoHeight } from './ui/AutoHeight';
 import { Button } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
 import { TokenCost } from './ui/TokenCost';
@@ -19,7 +22,16 @@ import type { BarActionKind, TableView } from '../lib/tableView.ts';
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 const SLIDE = 8;
-const PROMPT_DELAY_MS = 7000;
+/** Первое появление и возврат после закрытия — одна пауза. */
+const PROMPT_DELAY_MS = 10000;
+
+/** Жест слева от подписи — те же руки, что на портрете. */
+const HAND: Partial<Record<BarActionKind, { src: string; down?: boolean }>> = {
+  believe: { src: '/assets/ui/thumbsup-500.webp' },
+  'veto-pass': { src: '/assets/ui/thumbsup-500.webp' },
+  doubt: { src: '/assets/ui/thumbsup-500.webp', down: true },
+  veto: { src: '/assets/ui/stop-500.webp' }
+};
 
 export const ActionBar: React.FC<{
   view: TableView;
@@ -35,76 +47,150 @@ export const ActionBar: React.FC<{
   const promptActive = view.bar.length > 0 && isReactionPhase;
 
   /*
-   * Подсказка принадлежит ОДНОМУ ожиданию, и это её опознание.
+   * Подсказка принадлежит ОДНОМУ ожиданию.
    *
-   * Хранится не «показывать ли», а то, для какого ожидания часы уже отсчитали.
-   * Флаг пришлось бы гасить эффектом на каждую смену вопроса — то есть кадром
-   * позже самой смены, — и подсказка от прошлого вопроса успевала мигнуть над
-   * новым. Сравнение по значению гасит её в том же кадре, в котором вопрос
-   * сменился, само собой.
+   * `waitingFor` меняется вместе с вопросом: тогда плашка гаснет и часы
+   * заводятся заново. Закрытие не меняет вопроса — только прячет плашку
+   * на ту же паузу, после которой она вернётся.
    */
   const waitingFor = promptActive ? `${view.phase}~${promptKey ?? ''}` : null;
-  const [nagged, setNagged] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  const arm = (ms: number) => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      setVisible(true);
+    }, ms);
+  };
 
   useEffect(() => {
-    if (waitingFor === null) return;
-    const timer = window.setTimeout(() => setNagged(waitingFor), PROMPT_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    setVisible(false);
+    if (waitingFor === null) {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+      return;
+    }
+    arm(PROMPT_DELAY_MS);
+    return () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
   }, [waitingFor]);
 
-  const showPrompt = waitingFor !== null && waitingFor === nagged;
+  const dismiss = () => {
+    setVisible(false);
+    arm(PROMPT_DELAY_MS);
+  };
 
-  const content =
-    view.bar.length > 0 ? (
-      <div className="actionbar__col">
+  const showPrompt = waitingFor !== null && visible;
+
+  const item = useMemo<Variants>(
+    () =>
+      reduce
+        ? {
+            hidden: { opacity: 0 },
+            shown: { opacity: 1, transition: { duration: fade, ease: EASE } },
+            gone: { opacity: 0, transition: { duration: fade, ease: EASE } }
+          }
+        : {
+            hidden: { opacity: 0, y: travel, scale: 0.97 },
+            shown: (i: number) => ({
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: fade, ease: EASE, delay: i * dur.stagger }
+            }),
+            gone: {
+              opacity: 0,
+              y: -travel,
+              scale: 0.97,
+              pointerEvents: 'none',
+              transition: { duration: fade * 0.8, ease: EASE }
+            }
+          },
+    [reduce, fade, travel]
+  );
+
+  return (
+    <>
+      {createPortal(
         <AnimatePresence>
           {promptActive && showPrompt && (
             <motion.div
-              className="actionbar__prompt"
-              initial={{ opacity: 0, y: -6, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.94 }}
-              transition={{ duration: 0.3, ease: [0.2, 0.9, 0.3, 1] }}
+              className="waitprompt"
+              initial={{ opacity: 0, y: travel ? 10 : 0 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: travel ? 8 : 0 }}
+              transition={{ duration: fade, ease: EASE }}
             >
-              <span className="actionbar__prompt-block">Двор ждёт ваш выбор, милорд</span>
+              <span
+                className={
+                  reduce ? 'waitprompt__plaque' : 'waitprompt__plaque waitprompt__plaque--live'
+                }
+              >
+                Двор ждёт ваш выбор, милорд
+                <button
+                  type="button"
+                  className="waitprompt__close"
+                  onClick={dismiss}
+                  aria-label="Скрыть"
+                >
+                  <X size={16} strokeWidth={2.25} />
+                </button>
+              </span>
             </motion.div>
           )}
-        </AnimatePresence>
-        {view.bar.map(b => (
-          <Tooltip key={b.kind} text={b.disabled ? b.reason : b.hint} tapToOpen={b.disabled}>
-            <Button
-              tone={b.tone}
-              size="lg"
-              block
-              disabled={b.disabled}
-              onClick={() => onAct(b.kind)}
-            >
-              {b.label}
-              {b.spendsToken && <TokenCost blocked={b.tokenBlocked} />}
-            </Button>
-          </Tooltip>
-        ))}
+        </AnimatePresence>,
+        document.body
+      )}
+      <div className="actionbar">
+        {/* По кнопке, не весь набор: `wait` гасил ряд до пустоты, и смена
+            фаз читалась как вырезание. `popLayout` снимает уходящую с потока,
+            высота колонки едет в `AutoHeight`, а не прыгает. */}
+        <AutoHeight duration={fade} reduce={reduce} clip="during">
+          <div className="actionbar__col">
+            <AnimatePresence initial={false} mode="popLayout">
+              {view.bar.map((b, i) => {
+                const hand = HAND[b.kind];
+                return (
+                  <motion.div
+                    key={b.kind}
+                    className="actionbar__item"
+                    custom={i}
+                    variants={item}
+                    initial="hidden"
+                    animate="shown"
+                    exit="gone"
+                  >
+                    <Tooltip text={b.disabled ? b.reason : b.hint} tapToOpen={b.disabled}>
+                      <Button
+                        className={hand ? 'actionbar__cell' : ''}
+                        tone={b.tone}
+                        size="lg"
+                        block
+                        disabled={b.disabled}
+                        onClick={() => onAct(b.kind)}
+                      >
+                        {hand && (
+                          <img
+                            className={`actionbar__hand${hand.down ? ' actionbar__hand--down' : ''}`}
+                            src={hand.src}
+                            alt=""
+                            draggable={false}
+                          />
+                        )}
+                        <span className="actionbar__label">{b.label}</span>
+                        {b.spendsToken && <TokenCost size="lg" />}
+                      </Button>
+                    </Tooltip>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </AutoHeight>
       </div>
-    ) : null;
-
-  return (
-    <div className="actionbar">
-      {/* `wait`, а не `popLayout`: наложенные друг на друга наборы кнопок
-          читаются как грязь — см. комментарий в `PhasePanel`. */}
-      <AnimatePresence mode="wait" initial={false}>
-        {content && (
-          <motion.div
-            key={view.phase}
-            className="actionbar__view"
-            initial={{ opacity: 0, y: travel }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: travel }}
-            transition={{ duration: fade, ease: EASE }}
-          >
-            {content}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </>
   );
 };

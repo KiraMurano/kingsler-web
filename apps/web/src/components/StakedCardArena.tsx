@@ -147,9 +147,13 @@ export const StakedCardArena: React.FC<StakedCardArenaProps> = () => {
     );
   }
 
-  /* 4. Duel — two cards clash. */
-  const isDuelOutcome = turnPhase === 'DUEL_OUTCOME' && !!duelOutcome;
-  if (turnPhase === 'DUEL_CLASH' || isDuelOutcome) {
+  /* 4. Duel — two cards clash.
+     *
+     * Весь такт `DUEL_OUTCOME`, а не только кадры, пока `duelOutcome` ещё в
+     * состоянии: закрытие исхода обнуляет его на тик раньше, чем снимает
+     * заявление. Без этой лунки стол на этот тик возвращал бы подпись заявки,
+     * и карты сначала прыгали бы в старую лунку, а уже потом — в сброс. */
+  if (turnPhase === 'DUEL_CLASH' || turnPhase === 'DUEL_OUTCOME') {
     const defenderClaim = (pendingDuelDefenderRoleClaim ||
       duelOutcome?.defenderClaim ||
       'Казначей') as GameCard;

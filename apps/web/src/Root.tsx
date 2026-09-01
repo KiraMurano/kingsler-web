@@ -20,8 +20,8 @@ import './styles/rules.css';
 
 type Mode = 'menu' | 'offline' | 'online-lobby' | 'online-game';
 
-/** Занавес меню → стол. То же число, что `--dur-panel`: занавес рисует CSS. */
-const COVER_MS = dur.panel * 1000;
+/** Занавес меню → стол. То же число, что `--dur-cover`: занавес рисует CSS. */
+const COVER_MS = dur.cover * 1000;
 
 export default function Root() {
   const [account, setAccount] = useState<Account | null | 'loading'>('loading');
@@ -195,7 +195,10 @@ export default function Root() {
         <App mode="online" account={account} onExit={exitToMenu} />
       )}
       {createPortal(
-        <div className={`gamecover${cover ? ' is-on' : ''}`} aria-hidden />,
+        <div className={`gamecover${cover ? ' is-on' : ''}`} aria-hidden>
+          <CardBackdrop />
+          <div className="landing-hero-block__backdrop-glow" />
+        </div>,
         document.body
       )}
     </>

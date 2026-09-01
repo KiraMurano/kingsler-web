@@ -260,9 +260,12 @@ export function resolveDuelClash(get: StateGetter, set: StateSetter): void {
     get().addSealsToPlayer(award.playerId, award.count);
   }
 
+  /* Карты уже вскрыты — пауза, чтобы лица и штампы успели прочитаться.
+     После неё `closeDuelOutcome` либо оставляет карту нападающего на вето
+     (пробитие), либо снимает заявление, и обе карты улетают в сброс. */
   timerManager.scheduleDelay(() => {
     get().closeDuelOutcome();
-  }, 4000);
+  }, ACTION_HOLD_MS);
 }
 
 export function closeDuelOutcome(
@@ -276,10 +279,12 @@ export function closeDuelOutcome(
   set({ duelOutcome: null });
 
   if (breakthrough) {
+    /* Атака прошла: карта нападающего остаётся на столе, двор решает, ветить ли. */
     get()._triggerVetoWindowOrResolveEffect(pendingAction);
   } else {
-    timerManager.scheduleDelay(() => {
-      get()._checkEndgameAndAdvanceTurn();
-    }, 800);
+    /* Оба блефовали, оба сказали правду, или блефовал нападающий — заявления
+       больше нет. Обе вскрытые карты уже в сбросе и должны туда улететь с
+       ристалища, а не возвращаться в лунку заявки. */
+    get()._checkEndgameAndAdvanceTurn();
   }
 }

@@ -91,8 +91,9 @@ export const CardMenu: React.FC<{
                 type="button"
                 className={[
                   'cardmenu__item',
-                  `cardmenu__item--${o.tone}`,
-                  o.kind === 'inspect' ? 'cardmenu__item--icon' : '',
+                  o.kind === 'inspect'
+                    ? 'cardmenu__item--icon'
+                    : `cardmenu__item--${o.tone}`,
                   /* Переключатель обязан выглядеть переключателем: рядом с
                      «Разыграть» он не действие, а состояние следующего
                      действия, и спутать их нельзя. */
@@ -119,12 +120,12 @@ export const CardMenu: React.FC<{
                     партии, поэтому он сжат до лупы и не делит ряд наравне с
                     решениями. */}
                 {o.kind === 'inspect' ? (
-                  <Search size={17} aria-label={o.label} />
+                  <Search size={20} strokeWidth={2.75} aria-label={o.label} />
                 ) : (
                   <>
                     {o.toggle && <span className="cardmenu__pip" aria-hidden />}
                     <span className="cardmenu__label">{o.label}</span>
-                    {o.spendsToken && <TokenCost blocked={o.tokenBlocked} size="xs" />}
+                    {o.spendsToken && <TokenCost blocked={o.tokenBlocked} size="lg" />}
                   </>
                 )}
               </motion.button>

@@ -63,7 +63,9 @@ export type BarActionKind =
   | 'end-turn'
   | 'doubt'
   | 'believe'
-  /** «Пропустить» в окне вето. Окно держится ответами, а не таймером. */
+  /** «Наложить вето» в окне вето. Карта тратится; без карты кнопка глуха. */
+  | 'veto'
+  /** «Не накладывать вето». Окно держится ответами, а не таймером. */
   | 'veto-pass';
 
 export type Tone = 'gold' | 'danger' | 'calm' | 'good' | 'arcane' | 'ember';
@@ -404,8 +406,10 @@ function underAttackMenu(card: GameCard, viewer: Player, input: TableViewInput):
       ? noTokens
       : 'Не хватает золота.';
   /* Молнию перечёркиваем только когда дело действительно в жетонах: при
-     нехватке золота она бы врала. */
-  const duelTokenBlocked = duelReason === noTokens;
+     нехватке золота она бы врала. Сравнивать с `noTokens` нельзя: при живых
+     жетонах это `undefined`, и `undefined === undefined` ставила запрет
+     как раз когда жетон есть. */
+  const duelTokenBlocked = duelReason === 'Нет жетонов действия.';
   const price = duel && duel.gold > 0 ? ` · ${duel.gold} 🪙` : '';
 
   const duelOption = (bluff: boolean): CardMenuOption => ({
@@ -603,16 +607,32 @@ function barFor(phase: PhaseKind, viewer: Player, input: TableViewInput): BarBut
         }
       ];
     case 'veto': {
-      /* Одна кнопка: вето кладётся нажатием на саму карту в руке — оно её
-         тратит, и решение о карте принимается на карте. Здесь только отказ. */
       const counter = input.isVetoed;
+      const hasVeto = holdsVeto(viewer);
+      const canPlay = hasVeto && (!counter || input.vetoOnVeto);
       return [
+        {
+          kind: 'veto',
+          spendsToken: false,
+          tokenBlocked: false,
+          label: 'Наложить вето',
+          tone: 'danger',
+          disabled: !canPlay,
+          hint: counter
+            ? 'Снять чужое вето встречным. Карта уйдёт в сброс'
+            : 'Отменить готовящийся эффект. Карта уйдёт в сброс',
+          reason: canPlay
+            ? undefined
+            : hasVeto
+              ? 'Встречное вето в этой партии не действует.'
+              : 'Нет карты «Право вето».'
+        },
         {
           kind: 'veto-pass',
           spendsToken: false,
           tokenBlocked: false,
-          label: 'Пропустить',
-          tone: 'calm',
+          label: 'Не накладывать вето',
+          tone: 'good',
           disabled: false,
           hint: counter
             ? 'Оставить отмену в силе. Ход пойдёт дальше, когда ответят все'
@@ -749,12 +769,12 @@ function guidanceFor(phase: PhaseKind, input: TableViewInput, viewer: Player): s
     case 'veto':
       if (input.isVetoed) {
         return holdsVeto(viewer)
-          ? 'Действие отменено. Снимите отмену встречным вето или пропустите.'
-          : 'Действие отменено вето. Пропустите, чтобы двор пошёл дальше.';
+          ? 'Действие отменено. Снимите отмену встречным вето или не накладывайте вето.'
+          : 'Действие отменено вето. Нажмите «Не накладывать вето», чтобы двор пошёл дальше.';
       }
       return holdsVeto(viewer)
-        ? 'Наложите вето картой из руки или пропустите.'
-        : 'Вмешаться нечем — пропустите, чтобы двор пошёл дальше.';
+        ? 'Наложите вето или не накладывайте — двор ждёт каждого.'
+        : 'Карты вето нет — нажмите «Не накладывать вето», чтобы двор пошёл дальше.';
     case 'coronation':
       return 'Сбейте влияние претендента, пока круг не замкнулся.';
     default:

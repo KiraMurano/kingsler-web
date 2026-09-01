@@ -7,9 +7,10 @@
  * Поэтому бросок, галочки и момент старта у всех одни.
  *
  * Экран сбора — непрозрачный: стол под ним ещё не для глаз, и просвет
- * выдал бы полусобранный интерфейс. Занавес из Root накрывает меню тем же
- * цветом, так что переход — это появление логотипа и списка, а не смена
- * картинки. Когда двор собран, экран тает и открывает стол под монетку.
+ * выдал бы полусобранный интерфейс. Фон — как у лендинга: те же карты и
+ * тёплая заливка. Занавес из Root накрывает меню тем же цветом, так что
+ * переход — это появление логотипа и списка, а не смена картинки. Когда
+ * двор собран, экран тает и открывает стол под монетку.
  *
  * Стол при этом ходов не принимает всё открытие целиком — заслонка стоит в
  * движке (`performAction`) и в воркере, а не на этом оверлее: онлайн-клиент
@@ -25,6 +26,7 @@ import { TOSS_SPIN_MS, TOSS_VERDICT_MS } from '@kinglier/engine/timing';
 import type { OpeningData, Player } from '@kinglier/engine/types';
 import { Portrait } from './Portrait';
 import { Brand } from './Brand';
+import { CardBackdrop } from './CardBackdrop';
 import { designRect } from '../lib/uiScale.ts';
 
 /**
@@ -259,6 +261,8 @@ const GatherOverlay: React.FC<{
       }}
       style={{ pointerEvents: gathered ? 'none' : 'auto' }}
     >
+      <CardBackdrop />
+      <div className="landing-hero-block__backdrop-glow" />
       <div className="gather__col">
         <div className="gather__head">
           <Brand />

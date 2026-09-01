@@ -353,6 +353,11 @@ export default function App({
         if (view.phase === 'under-attack') targetAcceptAttack(human.id);
         else passDoubt(human.id);
         break;
+      case 'veto': {
+        const held = human.hand.find(h => h.card === 'Право вето');
+        if (held) playInstant(human.id, 'Право вето', held.id);
+        break;
+      }
       case 'veto-pass':
         passVeto(human.id);
         break;

@@ -9,9 +9,11 @@
  */
 import React from 'react';
 import { Ban } from 'lucide-react';
-import { UiIcon } from './Icon';
+import { UiIcon, type UiIconSize } from './Icon';
 
-export const TokenCost: React.FC<{ blocked?: boolean; size?: 'xs' | 'sm' }> = ({
+const BAN: Partial<Record<UiIconSize, number>> = { xs: 14, sm: 18, md: 22, lg: 26 };
+
+export const TokenCost: React.FC<{ blocked?: boolean; size?: 'xs' | 'sm' | 'md' | 'lg' }> = ({
   blocked,
   size = 'sm'
 }) => (
@@ -20,6 +22,8 @@ export const TokenCost: React.FC<{ blocked?: boolean; size?: 'xs' | 'sm' }> = ({
     aria-label={blocked ? 'нет жетона действия' : 'стоит один жетон действия'}
   >
     <UiIcon kind="move" size={size} />
-    {blocked && <Ban className="tokencost__ban" size={18} strokeWidth={2.25} aria-hidden />}
+    {blocked && (
+      <Ban className="tokencost__ban" size={BAN[size] ?? 18} strokeWidth={2.25} aria-hidden />
+    )}
   </span>
 );

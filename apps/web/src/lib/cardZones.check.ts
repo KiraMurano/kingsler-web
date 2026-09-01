@@ -497,6 +497,50 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
     'a mutual bluff stamps both cards БЛЕФ'
   );
   assert.equal(at(clash, defendStakeId, 'duel/outcome').wasTruth, false);
+
+  /* Закрытие исхода обнуляет `duelOutcome` на тик раньше, чем снимает
+     заявление. Карты обязаны остаться на ристалище, а не прыгнуть в лунку
+     заявки — иначе стол на кадр восстанавливает «состояние заявления». */
+  const closing = makeState({
+    ...showing,
+    duelOutcome: null,
+    discardPile: [attackerHand[0], defenderHand[1]]
+  });
+  const stillClashing = deriveCardZones(closing, 'p1');
+  assertUnique(stillClashing, 'duel/closing');
+  assert.equal(keyAt(stillClashing, attackStakeId, 'duel/closing'), 'duel:attacker');
+  assert.equal(keyAt(stillClashing, defendStakeId, 'duel/closing'), 'duel:defender');
+  assert.equal(
+    stillClashing.filter(c => c.zone.kind === 'stake').length,
+    0,
+    'закрытие исхода не возвращает ставку в лунку заявления'
+  );
+
+  /* Пробитие: атака идёт на вето, карта нападающего остаётся на столе,
+     щит защитника — уже вскрытая карта, она уходит в сброс. */
+  const vetoing = makeState({
+    ...showing,
+    duelOutcome: null,
+    turnPhase: 'VETO_WINDOW',
+    discardPile: [attackerHand[0], defenderHand[1]]
+  });
+  const onVeto = deriveCardZones(vetoing, 'p1');
+  assertUnique(onVeto, 'duel/veto');
+  assert.equal(keyAt(onVeto, attackStakeId, 'duel/veto'), 'stake');
+  assert.equal(keyAt(onVeto, defendStakeId, 'duel/veto'), 'discard');
+
+  /* Дуэль без пробития закрыта: заявления нет, обе карты в сбросе. */
+  const settled = makeState({
+    ...showing,
+    pendingAction: null,
+    duelOutcome: null,
+    turnPhase: 'IDLE',
+    discardPile: [attackerHand[0], defenderHand[1]]
+  });
+  const discarded = deriveCardZones(settled, 'p1');
+  assertUnique(discarded, 'duel/settled');
+  assert.equal(keyAt(discarded, attackStakeId, 'duel/settled'), 'discard');
+  assert.equal(keyAt(discarded, defendStakeId, 'duel/settled'), 'discard');
 }
 
 /* ------------------------------------------------------------------ */

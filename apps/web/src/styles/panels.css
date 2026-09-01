@@ -1048,6 +1048,20 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  /* Высота — как у строки текста, иначе крупная молния тянет кнопку.
+     Ширина — под сам знак, чтобы он не наезжал на подпись. */
+  width: 1.75em;
+  height: 1em;
+}
+
+.tokencost .ui-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.75em;
+  height: 1.75em;
+  margin: 0;
+  translate: -50% -50%;
 }
 
 /* Запрещённое действие: молния притухает, но остаётся узнаваемой — знак
@@ -1398,14 +1412,30 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  /* Непрозрачный, без размытия: стол под ним ещё не для глаз. Фон тот же,
-     что у занавеса в Root, — иначе смена режима моргнула бы другой заливкой. */
-  background:
-    radial-gradient(120% 90% at 50% 40%, rgba(28, 22, 12, 0.95) 0%, rgba(6, 7, 11, 1) 70%),
-    var(--ink-900);
+  overflow: hidden;
+  /* Непрозрачный, без размытия: стол под ним ещё не для глаз. Заливка общая
+     с лендингом (`.landing-page` в `screen.css`), карты — как там же. */
+}
+
+.gather::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.gather .card-backdrop {
+  z-index: 0;
+}
+
+.gather .landing-hero-block__backdrop-glow {
+  z-index: 2;
 }
 
 .gather__col {
+  position: relative;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1970,10 +2000,24 @@
   z-index: calc(var(--z-toast) + 1);
   pointer-events: none;
   opacity: 0;
-  background:
-    radial-gradient(120% 90% at 50% 40%, rgba(28, 22, 12, 0.95) 0%, rgba(6, 7, 11, 1) 70%),
-    var(--ink-900);
-  transition: opacity var(--dur-panel) var(--ease-out);
+  overflow: hidden;
+  transition: opacity var(--dur-cover) var(--ease-cover);
+}
+
+.gamecover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.gamecover .card-backdrop {
+  z-index: 0;
+}
+
+.gamecover .landing-hero-block__backdrop-glow {
+  z-index: 2;
 }
 
 .gamecover.is-on {

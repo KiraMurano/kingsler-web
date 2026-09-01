@@ -1820,51 +1820,134 @@
   gap: 8px;
 }
 
-/* Бордовый блок-напоминание над кнопками справа (появляется через 7 секунд, не сдвигает кнопки) */
-.actionbar__prompt {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 5;
+/* Ширина как у кнопки: иначе `popLayout` снимет уходящую с потока, и
+   абсолютная копия сожмётся по содержимому. */
+.actionbar__item {
+  width: 100%;
 }
 
-.actionbar__prompt-block {
+.actionbar__item > .tt {
+  width: 100%;
+}
+
+/* ==========================================================================
+   НАПОМИНАНИЕ: ДВОР ЖДЁТ ВЫБОРА
+   ========================================================================== */
+
+/*
+ * Плашка в центре экрана, не над кнопками справа. Портал в `body`, как у
+ * баннера цели: иначе её съела бы стопка колонки, а слой карт (75) накрыл бы
+ * стол. Оболочка клики пропускает; сама плашка — нет: её можно закрыть.
+ */
+.waitprompt {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-above-cards);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.waitprompt__plaque {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--alert-top) 0%, var(--alert-bottom) 100%);
+  border: 1px solid var(--alert-line);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Раз в 10 с — короткий микро-взрыв: сжатие, скачок, тряска, вспышка тени.
+ * `scale` / `translate` / `rotate`, не `transform`: появление рисует
+ * `motion` через `transform` на оболочке, и два `transform` стёрли бы друг друга.
+ */
+.waitprompt__plaque--live {
+  animation: waitprompt-burst 10s ease-in-out infinite;
+}
+
+@keyframes waitprompt-burst {
+  0%,
+  92.8% {
+    scale: 1;
+    translate: 0 0;
+    rotate: 0deg;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  }
+  94% {
+    scale: 0.96 0.98;
+    translate: 0 2px;
+    rotate: 0deg;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+  }
+  95.4% {
+    scale: 1.07;
+    translate: 0 -6px;
+    rotate: -2.5deg;
+    box-shadow:
+      0 14px 28px rgba(0, 0, 0, 0.5),
+      0 0 14px rgba(180, 64, 90, 0.35);
+  }
+  96.4% {
+    scale: 1.04;
+    translate: 2px -3px;
+    rotate: 2.5deg;
+  }
+  97.4% {
+    scale: 1.05;
+    translate: -2px -4px;
+    rotate: -2deg;
+  }
+  98.4% {
+    scale: 1.02;
+    translate: 1px -1px;
+    rotate: 1deg;
+    box-shadow: 0 11px 24px rgba(0, 0, 0, 0.5);
+  }
+  100% {
+    scale: 1;
+    translate: 0 0;
+    rotate: 0deg;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waitprompt__plaque--live {
+    animation: none;
+  }
+}
+
+.waitprompt__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 14px;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(88, 24, 40, 0.96) 0%, rgba(44, 12, 22, 0.98) 100%);
-  border: 1px solid rgba(225, 75, 110, 0.65);
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #ffe6ec;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
-  white-space: nowrap;
-  animation: prompt-glow-pulse 2.2s ease-in-out infinite;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
 }
 
-@keyframes prompt-glow-pulse {
-  0%, 100% {
-    border-color: rgba(225, 75, 110, 0.55);
-    box-shadow:
-      0 4px 14px rgba(0, 0, 0, 0.65),
-      0 0 10px rgba(225, 29, 72, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  }
-  50% {
-    border-color: rgba(255, 120, 150, 0.9);
-    box-shadow:
-      0 6px 20px rgba(0, 0, 0, 0.75),
-      0 0 20px rgba(225, 29, 72, 0.7),
-      inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  }
+.waitprompt__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Обёртка подсказки — блочная, иначе кнопка внутри неё теряет ширину. */
@@ -1942,6 +2025,52 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+/*
+ * Кнопка-ячейка: рука в одном и том же столбце, текст всегда от левого края
+ * этого столбца. Иначе разная длина подписи («Верю» / «Не накладывать вето»)
+ * сдвигала бы иконки, и колонка читалась бы как набор центрированных пилюль,
+ * а не как список выбора.
+ */
+.actionbar__col .btn.actionbar__cell {
+  align-items: stretch;
+}
+
+.actionbar__col .btn.actionbar__cell .btn__row {
+  display: grid;
+  grid-template-columns: 1.75em minmax(0, 1fr) auto;
+  width: 100%;
+  justify-content: stretch;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.actionbar__label {
+  justify-self: start;
+  text-align: left;
+}
+
+.actionbar__cell .tokencost {
+  justify-self: end;
+}
+
+/* Рука слева от подписи. Те же арты, что на портрете: большой палец — вера
+   и отказ от вето, перевёрнутый — проверка, ладонь — наложить вето. */
+.actionbar__hand {
+  width: 1.75em;
+  height: 1.75em;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  /* Запястье на арте снизу, и без сдвига рука визуально проседает. */
+  translate: 0 -0.06em;
+}
+
+.actionbar__hand--down {
+  scale: 1 -1;
+  translate: 0 0.06em;
 }
 
 .actionbar__footnote {
@@ -2046,10 +2175,23 @@
     color 0.16s var(--ease-out);
 }
 
-/* Лупа ничего не меняет в партии, поэтому она квадратная и не тянет на себя
-   место наравне с решениями. */
+/* Лупа ничего не меняет в партии: без плашки, знак сам белый и жирный.
+   Тень вместо заливки — иначе на сукне пропадает. */
 .cardmenu__item--icon {
-  padding: 9px 11px;
+  align-self: center;
+  padding: 4px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 8px rgba(0, 0, 0, 0.55));
+}
+
+.cardmenu__item--icon:hover:not(:disabled) {
+  background: none;
+  border: 0;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 8px rgba(200, 160, 74, 0.35));
 }
 
 .cardmenu__item--calm {
@@ -2226,6 +2368,7 @@
 }
 
 .phase__title {
+  position: relative;
   font-family: var(--font-display);
   font-size: 0.82rem;
   font-weight: 700;
@@ -2235,6 +2378,11 @@
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line-cold);
   transition: color var(--dur-fade) var(--ease-out);
+}
+
+.phase__title-line,
+.phase__copy {
+  width: 100%;
 }
 
 /* Заголовок набран капителью, а ник — нет: игрок сам решил, как пишется его
@@ -2248,6 +2396,7 @@
 }
 
 .phase__guidance {
+  position: relative;
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--text-muted);

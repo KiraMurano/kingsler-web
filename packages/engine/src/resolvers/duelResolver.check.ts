@@ -266,6 +266,18 @@ function makeHarness(overrides: Partial<GameState> = {}) {
     closeDuelOutcome(get, set);
     assertCardCensus(api, allIds, `${c.resultType}: after the outcome modal closes`);
 
+    if (c.resultType === 'attacker_breakthrough') {
+      assert.ok(api.pendingAction, 'пробитие: заявление остаётся — карта нападающего ждёт вето');
+      assert.equal(api.turnPhase, 'VETO_WINDOW', 'пробитие открывает окно вето, а не снимает стол');
+    } else {
+      assert.equal(
+        api.pendingAction,
+        null,
+        `${c.resultType}: заявление снимается сразу — карты улетают в сброс, а не возвращаются в лунку заявки`
+      );
+      assert.equal(api.turnPhase, 'IDLE', `${c.resultType}: стол свободен после дуэли без пробития`);
+    }
+
     timerManager.clearAll();
   }
 }

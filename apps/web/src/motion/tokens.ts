@@ -35,8 +35,8 @@ export const spring = {
  * Durations, in seconds, for the things a spring cannot express: a flip has
  * a fixed arc, a crossfade has a fixed length, a stagger is a fixed offset.
  *
- * `flip`, `fade` and `panel` are mirrored into CSS as milliseconds in
- * `styles/tokens.css`.
+ * `flip`, `fade`, `panel` and `cover` are mirrored into CSS as milliseconds
+ * in `styles/tokens.css`.
  *
  *  - `stagger` separates two cards that leave at the same instant, so a
  *    two-card draw reads as two cards rather than as one wide one.
@@ -52,6 +52,11 @@ export const dur = {
   flip: 0.5,
   fade: 0.18,
   panel: 0.26,
+  /**
+   * Занавес меню/лобби → стол. Редкая смена сцены, не клик: две секунды
+   * на выход и столько же на вход, иначе переход снова читается как морг.
+   */
+  cover: 2,
   stagger: 0.06,
   /**
    * Отклик карты на событие: удар сработавшей интриги, дёрганье сорванной

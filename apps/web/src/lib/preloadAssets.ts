@@ -37,6 +37,7 @@ const LANES = 6;
 const FIXED = [
   cardArt('/assets/cards/back-dual-face.webp', TABLE_ART_WIDTH),
   '/assets/ui/thumbsup-500.webp',
+  '/assets/ui/stop-500.webp',
   '/assets/ui/coin-500.webp',
   '/assets/ui/coin-side-500.webp',
   '/assets/ui/blood-drop.webp',

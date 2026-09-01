@@ -86,6 +86,9 @@
   --z-toast: 1200;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Симметричная кривая на длинный растворяющийся занавес: `--ease-out`
+     на двух секундах почти всё отдаёт в первый кадр и потом ползёт. */
+  --ease-cover: cubic-bezier(0.45, 0, 0.55, 1);
 
   /* Mirrors of `motion/tokens.ts` — the same numbers, in milliseconds, for
      the handful of effects that stay on CSS. Change them in both places. */
@@ -96,6 +99,7 @@
   --dur-pulse-disrupt: 420ms;
   --dur-fade: 180ms;
   --dur-panel: 260ms;
+  --dur-cover: 2000ms;
 }
 
 /* --------------------------------------------------------------------------

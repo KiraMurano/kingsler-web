@@ -11,6 +11,14 @@ assert.match(source, /back-dual-face\.webp/);
 assert.match(source, /intrigue-plot\.webp/);
 assert.match(source, /card-backdrop--hidden/);
 
+const opening = readFileSync(new URL('./OpeningSequence.tsx', import.meta.url), 'utf8');
+assert.match(opening, /<CardBackdrop/);
+
+const tokens = readFileSync(new URL('../motion/tokens.ts', import.meta.url), 'utf8');
+assert.match(tokens, /cover:\s*2/);
+const cssTokens = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf8');
+assert.match(cssTokens, /--dur-cover:\s*2000ms/);
+
 // Card aspect ratio is 2 / 3
 assert.match(css, /\.card-backdrop__card\s*\{[^}]*aspect-ratio:\s*2\s*\/\s*3;/s);
 // Cards are opaque (opacity: 1)

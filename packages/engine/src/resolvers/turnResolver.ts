@@ -103,6 +103,9 @@ export function checkEndgameAndAdvanceTurn(
     isVaBanqueActive: false,
     ...vetoReset(),
     isPendingActionAfterTruthChallenge: false,
+    pendingDuelDefenderCardId: null,
+    pendingDuelDefenderRoleClaim: null,
+    duelOutcome: null,
     /* Вспышки к этому моменту давно доиграны: сюда приходят через
        `ACTION_HOLD_MS`, а удар на карте длится доли секунды. */
     plotPulses: []
