@@ -366,89 +366,91 @@
 }
 
 /* ==========================================================================
-   ОБЫЧНОЕ ДЕЙСТВИЕ — широкая карточка со своим артом
+   ОБЫЧНОЕ ДЕЙСТВИЕ — арт с именем, правило на сплошной полосе
    ==========================================================================
-   Полоса, а не карта: обычное действие картой не является, и путать его с
-   рукой нельзя. Арты нарисованы в 3:1, но карточка ниже — 4.5:1: в списке из
-   четырёх подряд трёхкратная полоса читалась как четыре плаката. Арт при этом
-   обрезается по высоте (`cover`, по центру), а в файле лежит целиком — вернуть
-   пропорцию можно этой одной строкой, не трогая картинок.
-
-   `aspect-ratio`, а не фиксированная высота: пропорция держится сама на любой
-   ширине, а если описание всё же длиннее — коробка вырастет, и текст не
-   обрежется. Это ровно тот случай у «Распустить слух»: у него описание вдвое
-   длиннее остальных. */
+   Полоса, а не карта: обычное действие картой не является. Арты нарисованы
+  в 3:1 — шапка той же пропорции, `contain`, без обрезки. Имя на картинке,
+  описание уже на заливке. */
 .actionlist {
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
 
+.actioncard__tilt {
+  position: relative;
+  height: 100%;
+  perspective: 900px;
+}
+
+.actioncard__tilt:hover {
+  z-index: 2;
+}
+
 .actioncard {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  aspect-ratio: 4.5 / 1;
+  height: 100%;
   padding: 0;
   border: 1px solid var(--line-cold);
   border-radius: 11px;
   overflow: hidden;
-  background-color: var(--ink-800);
-  background-size: cover;
-  background-position: center;
-  /* Фон обрезается по внутреннему краю канта.
-     По умолчанию он заливает и полосу самого канта, а полог над ним её не
-     накрывает: `inset: 0` у абсолютного потомка считается от внутреннего края,
-     кант остаётся снаружи. Из-за этого по всему периметру шла яркая ниточка
-     необработанного арта — светлая у доступных карточек и мутная у погашенных,
-     и читалась она как артефакт рамки. */
-  background-clip: padding-box;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.16s ease, transform 0.12s ease;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .actioncard:hover:not([aria-disabled='true']) {
   border-color: var(--gold);
-  transform: translateY(-1px);
+  box-shadow: 0 26px 48px rgba(0, 0, 0, 0.8), 0 0 26px rgba(200, 160, 74, 0.34);
 }
 
-/* Полог под текстом. Отдельным узлом, а не тенью на буквах: тень обводит
-   каждую букву и на длинном описании превращается в грязь. Слева плотный,
-   справа сходит на нет — арт нарисован так, что смысловая его часть справа. */
-.actioncard__veil {
+.actioncard__art {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  background-color: var(--ink-700);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Полог только под имя: левый нижний угол шапки, арт справа остаётся собой. */
+.actioncard__art::after {
+  content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(8, 10, 16, 0.94) 0%,
-    rgba(8, 10, 16, 0.86) 42%,
-    rgba(8, 10, 16, 0.5) 72%,
-    rgba(8, 10, 16, 0.22) 100%
+  pointer-events: none;
+  background: radial-gradient(
+    90% 80% at 0% 100%,
+    rgba(8, 10, 16, 0.92) 0%,
+    rgba(8, 10, 16, 0.55) 36%,
+    transparent 68%
   );
 }
 
-.actioncard__text {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  height: 100%;
-  padding: 11px 14px;
-}
-
 .actioncard__head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
 }
 
 .actioncard__name {
   font-family: var(--font-display);
-  font-size: 1.02rem;
+  font-size: 1.28rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--gold-pale);
@@ -456,27 +458,40 @@
 }
 
 .actioncard__desc {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 8px 14px 10px;
   font-size: 0.78rem;
   line-height: 1.35;
   color: var(--text-soft);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.42);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
 }
 
-/* Недоступное действие гаснет вместе с артом: обесцвеченная полоса читается
-   как «сейчас нельзя» быстрее любой подписи. Клики при этом не глушим —
-   ссылки на карты внутри описания должны открываться и в этом состоянии
-   (см. `off` в `ActionCard`). */
+/* Недоступное действие — ч/б и тише, но непрозрачное: стол под карточкой
+   не должен просвечивать. Клики не глушим: ссылки на карты внутри описания
+   должны открываться и без золота (см. `off` в `ActionCard`). */
 .actioncard[aria-disabled='true'] {
-  cursor: default;
+  cursor: not-allowed;
 }
 
-.actioncard[aria-disabled='true'] .actioncard__veil {
-  background: linear-gradient(90deg, rgba(8, 10, 16, 0.95) 0%, rgba(8, 10, 16, 0.8) 100%);
+.actioncard[aria-disabled='true'] .cardlink {
+  cursor: pointer;
 }
 
 .actioncard--off {
-  filter: grayscale(0.85);
-  opacity: 0.55;
+  filter: grayscale(1) brightness(0.78);
+}
+
+.actioncard--off .actioncard__name,
+.actioncard--off .actioncard__desc {
+  color: var(--text-muted);
+}
+
+.actioncard--off .cardlink {
+  color: var(--text-muted);
+  border-bottom-color: rgba(139, 143, 156, 0.5);
 }
 
 .optgrid {

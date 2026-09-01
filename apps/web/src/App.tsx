@@ -356,6 +356,10 @@ export default function App({
       case 'veto-pass':
         passVeto(human.id);
         break;
+      default: {
+        const _exhaustive: never = kind;
+        return _exhaustive;
+      }
     }
   };
 
@@ -754,26 +758,24 @@ export default function App({
         onSelectCard={handleInspectCard}
       />
 
-      {bluffCardId && (
-        <BluffDialog
-          stakedCardId={bluffCardId}
-          armedVaBanque={vaBanqueArmed}
-          onClose={() => {
-            setBluffCardId(null);
-            setVaBanqueArmed(false);
-          }}
-        />
-      )}
-      {courtActionsOpen && (
-        <CourtActionsDialog
-          onClose={() => setCourtActionsOpen(false)}
-          onInspectCard={handleInspectCard}
-          onStartExchange={() => {
-            setOpenMenuCardId(null);
-            setExchangePick([]);
-          }}
-        />
-      )}
+      <BluffDialog
+        open={bluffCardId !== null}
+        stakedCardId={bluffCardId}
+        armedVaBanque={vaBanqueArmed}
+        onClose={() => {
+          setBluffCardId(null);
+          setVaBanqueArmed(false);
+        }}
+      />
+      <CourtActionsDialog
+        open={courtActionsOpen}
+        onClose={() => setCourtActionsOpen(false)}
+        onInspectCard={handleInspectCard}
+        onStartExchange={() => {
+          setOpenMenuCardId(null);
+          setExchangePick([]);
+        }}
+      />
 
       {/* Стоит последней из диалогов: её открывают из «Действий двора», и при
           равном z-index кто ниже по разметке, тот и сверху. */}

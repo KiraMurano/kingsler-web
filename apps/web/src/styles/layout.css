@@ -1681,6 +1681,138 @@
   flex-direction: column;
 }
 
+/* Обычные действия над кнопками. Портал в `body`, как у меню карты: иначе
+   слой карт (75) накрыл бы список. Оболочка клики ловит, сама невидима.
+   Стекло — отдельный слой: блюр сразу полный, проявляется opacity. Иначе
+   предок с fade гасит `backdrop-filter` рывком. */
+.courtpop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-above-cards);
+  /* Иначе Motion может повесить transform на оболочку, и стекло размоет пустоту. */
+  transform: none;
+}
+
+.popglass {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  border: 1px solid var(--line-mid);
+  background: rgba(8, 12, 19, 0.35);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
+.courtpop__box {
+  position: absolute;
+  padding: 10px;
+  overflow: visible;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-lg);
+}
+
+.courtpop__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.courtpop__card {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.courtpop__card:hover {
+  z-index: 2;
+}
+
+.courtpop .actioncard--off {
+  opacity: 0.55;
+}
+
+.courtpop .actioncard__art {
+  background-size: cover;
+  background-position: left center;
+}
+
+.courtpop .actioncard__name {
+  font-size: 1.08rem;
+}
+
+.courtpop .actioncard__desc {
+  padding: 7px 10px 8px;
+  font-size: 0.72rem;
+}
+
+/* Блеф — та же коробка над рукой, три плитки в ряд, арт 3:2. */
+.bluffpop__box {
+  position: absolute;
+  padding: 10px;
+  overflow: visible;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-lg);
+}
+
+.bluffpop__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.bluffpop__box--vabanque .popglass {
+  border-color: rgba(139, 114, 196, 0.55);
+}
+
+.bluffpop__note,
+.bluffpop__warn {
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / -1;
+}
+
+.bluffpop__warn {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--crimson-soft);
+}
+
+.bluffpop__card {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.bluffpop__card:hover {
+  z-index: 2;
+}
+
+.bluffpop__box .actioncard__art {
+  aspect-ratio: 3 / 2;
+  /* Портрет 2:3 в шапку 3:2: ширина в край, сверху лицо, низ карты обрезан. */
+  background-size: cover;
+  background-position: top center;
+}
+
+.bluffpop__box .actioncard__name {
+  font-size: 1.28rem;
+}
+
+.bluffpop__gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--gold-pale);
+}
+
 .actionbar__col {
   position: relative;
   display: flex;

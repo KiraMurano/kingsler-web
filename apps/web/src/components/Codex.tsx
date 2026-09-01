@@ -132,7 +132,7 @@ export const Codex: React.FC<CodexProps> = ({ open, onClose, onSelectCard }) => 
       <div className="panel__body">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {tab === 'actions' ? (
-            /* Тем же `ActionCard`, что и в модалке обычных действий: одно и
+            /* Тем же `ActionCard`, что и в попапе обычных действий: одно и
                то же показывают одинаково, иначе два похожих блока в двух
                файлах разойдутся на первой же правке. */
             visibleActions.map(act => (

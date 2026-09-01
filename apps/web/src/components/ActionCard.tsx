@@ -1,23 +1,29 @@
 /**
- * Обычное действие — широкая карточка со своим артом.
+ * Обычное действие — арт с крупным именем, описание на сплошной полосе снизу.
  *
  * Раньше это были строки без арта, и комментарий над ними объяснял почему: «у
  * них нет ни лица, ни арта, и крупная плитка обещала больше, чем в них есть».
  * Теперь лицо у них есть, и обещание стало правдой — четыре действия двора
  * перестали быть списком настроек и читаются как то же, чем играют.
  *
- * Формат 3:1 — тот же, в котором нарисованы арты, и он же держит карточку
- * широкой полосой, а не картой: обычное действие картой не является, и путать
- * его с рукой нельзя.
+ * Арт — широкая полоса, не карта: обычное действие картой не является.
+ * Имя лежит на картинке, правило — уже на заливке под ней, чтобы буквы
+ * не боролись с артом.
  *
- * Компонент один на модалку и на кодекс. Место, где показывают одно и то же,
- * должно показывать это одинаково, а два похожих блока в двух файлах
+ * Компонент один на попап двора и на кодекс. Место, где показывают одно и
+ * то же, должно показывать это одинаково, а два похожих блока в двух файлах
  * расходятся на первой же правке.
+ *
+ * Наклон к курсору — та же формула, что у карт за столом (`cardTilt`): иначе
+ * «как карты» разошлось бы с картами на первой правке предела.
  */
 import React from 'react';
+import { motion, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import type { InspectableItem } from '@kinglier/engine/data/cardDescriptions';
 import { CARD_DESCRIPTIONS } from '@kinglier/engine/data/cardDescriptions';
 import { cardArt } from '../lib/cardArt.ts';
+import { cardTilt } from '../lib/cardTilt.ts';
+import { spring, tilt } from '../motion/tokens.ts';
 
 export const ActionCard: React.FC<{
   action: InspectableItem;
@@ -38,26 +44,62 @@ export const ActionCard: React.FC<{
   onClick?: () => void;
 }> = ({ action, badge, children, off = false, onClick }) => {
   const info = CARD_DESCRIPTIONS[action];
+  const reduce = !!useReducedMotion();
+  const tiltXTarget = useMotionValue(0);
+  const tiltYTarget = useMotionValue(0);
+  const tiltX = useSpring(tiltXTarget, spring.hover);
+  const tiltY = useSpring(tiltYTarget, spring.hover);
+
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (reduce || e.pointerType !== 'mouse') return;
+    const next = cardTilt(
+      e.currentTarget.getBoundingClientRect(),
+      e.clientX,
+      e.clientY,
+      tilt.pointerMax
+    );
+    tiltXTarget.set(next.x);
+    tiltYTarget.set(next.y);
+  };
+
+  const releaseTilt = () => {
+    tiltXTarget.set(0);
+    tiltYTarget.set(0);
+  };
 
   return (
-    <button
-      type="button"
-      className={`actioncard${off ? ' actioncard--off' : ''}`}
-      aria-disabled={off}
-      onClick={onClick}
-      style={info.artImage ? { backgroundImage: `url(${cardArt(info.artImage, 512)})` } : undefined}
-    >
-      {/* Полог под текстом: арт светлый и подробный, буквы по нему не читаются.
-          Отдельным узлом, а не тенью на тексте, — тень обводит каждую букву и
-          на длинном описании превращается в грязь. */}
-      <span className="actioncard__veil" aria-hidden />
-      <span className="actioncard__text">
-        <span className="actioncard__head">
-          <span className="actioncard__name">{info.name}</span>
-          {badge}
+    <div className="actioncard__tilt">
+      <motion.button
+        type="button"
+        className={`actioncard${off ? ' actioncard--off' : ''}`}
+        aria-disabled={off}
+        style={{
+          rotateX: reduce ? 0 : tiltX,
+          rotateY: reduce ? 0 : tiltY,
+          transformStyle: 'preserve-3d'
+        }}
+        whileHover={
+          !off && !reduce ? { y: -10, scale: 1.03, transition: spring.hover } : undefined
+        }
+        whileTap={!off && !reduce ? { scale: 0.97, transition: spring.press } : undefined}
+        onPointerMove={onPointerMove}
+        onPointerLeave={releaseTilt}
+        onPointerDown={releaseTilt}
+        onClick={onClick}
+      >
+        <span
+          className="actioncard__art"
+          style={info.artImage ? { backgroundImage: `url(${cardArt(info.artImage, 512)})` } : undefined}
+        >
+          <span className="actioncard__head">
+            <span className="actioncard__name">{info.name}</span>
+            {badge}
+          </span>
         </span>
-        <span className="actioncard__desc">{children}</span>
-      </span>
-    </button>
+        <span className="actioncard__desc">
+          <span>{children}</span>
+        </span>
+      </motion.button>
+    </div>
   );
 };

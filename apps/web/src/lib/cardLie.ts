@@ -66,17 +66,21 @@ function seat(placed: PlacedCard): number | null {
   const zone: Zone = placed.zone;
   switch (zone.kind) {
     case 'overlay':
-      /* Поверх выкладки Интриги вето ложится ровно: оно занимает обычную
+      /* Поверх выкладки Интриги одно вето ложится ровно: оно занимает обычную
          карточную лунку посреди стола, и наклон там не «поперёк действия», а
-         просто криво. */
-      if (zone.over === 'plot') return 0;
+         просто криво. Встречное вето приходит в ту же лунку с тем же лицом —
+         его как раз надо класть накрест, иначе два вето совпадают пиксель в
+         пиксель. */
       if (placed.face.known === 'Перенаправление') return tilt.overlayRedirect;
-      if (placed.face.known !== 'Право вето') return tilt.overlay;
+      if (placed.face.known !== 'Право вето') {
+        return zone.over === 'plot' ? 0 : tilt.overlay;
+      }
       /* Чётное звено цепочки ложится накрест нечётного: два вето подряд
          приходят в одну лунку и оба показывают одно лицо. */
-      return placed.vetoLink !== undefined && placed.vetoLink % 2 === 0
-        ? tilt.overlayVetoCounter
-        : tilt.overlayVeto;
+      if (placed.vetoLink !== undefined && placed.vetoLink % 2 === 0) {
+        return tilt.overlayVetoCounter;
+      }
+      return zone.over === 'plot' ? 0 : tilt.overlayVeto;
     case 'stake':
       return tilt.stake;
     case 'duel':
