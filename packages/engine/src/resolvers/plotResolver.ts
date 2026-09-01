@@ -32,6 +32,19 @@ export function initialCharges(plotType: PlotType): number | undefined {
 }
 
 /**
+ * Цифра на счётчике карты.
+ *
+ * В движке у обеих интриг накопитель растёт от нуля. На лице «Сети» нужна
+ * обратная шкала: сколько выплат ещё осталось, а не сколько уже принесли.
+ */
+export function plotMeterShown(plotType: PlotType, charges: number): number | undefined {
+  const cap = PLOT_METER[plotType];
+  if (cap === undefined) return undefined;
+  if (plotType === 'Сеть информаторов') return Math.max(0, cap - charges);
+  return charges;
+}
+
+/**
  * Интрига сработала: карта уходит со стола ударом, а не молча.
  *
  * Возвращает заплатку, а не пишет в состояние сам, — ровно как `vetoReset`:

@@ -1377,10 +1377,17 @@
 /* ---- Сбор двора ---- */
 
 .gather {
+  position: fixed;
+  inset: 0;
   z-index: var(--z-toast);
   display: grid;
   place-items: center;
   padding: 24px;
+  /* Непрозрачный, без размытия: стол под ним ещё не для глаз. Фон тот же,
+     что у занавеса в Root, — иначе смена режима моргнула бы другой заливкой. */
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(28, 22, 12, 0.95) 0%, rgba(6, 7, 11, 1) 70%),
+    var(--ink-900);
 }
 
 .gather__col {
@@ -1397,6 +1404,10 @@
   align-items: center;
   gap: 8px;
   text-align: center;
+}
+
+.gather .brand--hero .brand__logo {
+  width: min(300px, 72vw);
 }
 
 .gather__title {
@@ -1490,8 +1501,6 @@
   display: block;
 }
 
-/* Имя белым и крупным, с тенью: оно стоит на фоне стола, просвечивающего
-   сквозь скрим, и без тени тонет в нём. */
 .gather__name {
   min-width: 0;
   font-size: 1.22rem;
@@ -1499,7 +1508,6 @@
   line-height: 1.2;
   color: #fff;
   overflow-wrap: anywhere;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.6);
 }
 
 /* ---- Кнопка «Готов» ---- */
@@ -1937,6 +1945,31 @@
      дёргалось бы на каждом проценте. */
   min-width: 4ch;
   font-variant-numeric: tabular-nums;
+}
+
+/* Занавес меню → стол. Цвет как у сбора двора: под шторкой монтируется
+   партия, и уход шторки — это появление логотипа, а не смена заливки. */
+.gamecover {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-toast) + 1);
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(28, 22, 12, 0.95) 0%, rgba(6, 7, 11, 1) 70%),
+    var(--ink-900);
+  transition: opacity var(--dur-panel) var(--ease-out);
+}
+
+.gamecover.is-on {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gamecover {
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

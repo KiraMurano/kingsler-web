@@ -49,17 +49,16 @@ export const RulesDialog: React.FC<RulesDialogProps> = ({ open, onClose, onStart
       description="Настройки применятся к этой партии и запомнятся до следующей"
     >
       <div className="ruleswrap">
+        {/* Старт сверху: за ботами приходят играть, а не крутить ползунки.
+            Наборы — в конце, их открывают нарочно. */}
+        <Button tone="gold" size="lg" block disabled={blocked} onClick={() => onStart(rules)}>
+          <Swords size={18} /> Начать игру
+        </Button>
+
         <RulesEditor rules={rules} onChange={update} />
 
-        {/* Кнопки — в конце списка, а не в закреплённом подвале. Подвал съедал
-            высоту диалога всё время ради двух кнопок, до которых доходят один
-            раз за настройку; прокрутка взамен стала на эту высоту длиннее. */}
         <div className="ruleswrap__foot">
           <PresetPicker onPick={update} />
-
-          <Button tone="gold" size="lg" block disabled={blocked} onClick={() => onStart(rules)}>
-            <Swords size={18} /> Начать игру
-          </Button>
         </div>
       </div>
     </Dialog>

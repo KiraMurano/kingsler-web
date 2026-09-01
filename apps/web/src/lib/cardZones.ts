@@ -15,7 +15,7 @@
  * is never also emitted in the lower one.
  */
 import type { GameCard, GameState, PlotPulseKind, PlotType } from '@kinglier/engine/types';
-import { initialCharges } from '@kinglier/engine/resolvers/plotResolver';
+import { initialCharges, plotMeterShown } from '@kinglier/engine/resolvers/plotResolver';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
 import { ZONE_PRECEDENCE } from '../motion/zones.ts';
 import type { Face, PlacedCard, Zone } from '../motion/zones.ts';
@@ -357,10 +357,9 @@ export function deriveCardZones(
       { kind: 'plot', playerId: pendingAction.actorId },
       { known: laid },
       pendingAction.actorId,
-      /* Накопитель показывается с первого кадра выкладки, а не со следующего
-         состояния: карта уже в слоте, и цифра — часть того, что на ней
-         напечатано. Какой интриге он положен, решает движок. */
-      { charges: initialCharges(laid as PlotType) }
+      /* Накопитель с первого кадра выкладки. У Сети — сколько выплат осталось,
+         не сколько уже принесли: иначе карта стартовала бы с нуля. */
+      { charges: plotMeterShown(laid as PlotType, initialCharges(laid as PlotType) ?? 0) }
     );
   }
   for (const p of players) {
@@ -370,7 +369,7 @@ export function deriveCardZones(
       { kind: 'plot', playerId: p.id },
       { known: p.activePlot.type },
       p.id,
-      { charges: p.activePlot.charges, pulse: pulseOf(p.activePlot.cardId) }
+      { charges: plotMeterShown(p.activePlot.type, p.activePlot.charges ?? 0), pulse: pulseOf(p.activePlot.cardId) }
     );
   }
 

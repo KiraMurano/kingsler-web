@@ -5,7 +5,7 @@ import { accOf, genOf, verbCaught, verbDoubted } from '../utils/russianText';
 import { botMemory } from '../Bot';
 import { triggerResourceFloat } from '../utils/visualEffects';
 import { timerManager } from '../utils/timerManager';
-import { ACTION_HOLD_MS } from '../timing';
+import { ACTION_HOLD_MS, DOUBT_HOLD_MS } from '../timing';
 import { discardProtectiveIntrigueOnBluff } from './crownLoss';
 import {
   chargeActiveConspiracies,
@@ -232,7 +232,6 @@ export function passDoubt(
    * виде `reveal`, и партия вставала намертво.
    */
   if (pendingDoubtDoubterId) return;
-  timerManager.clearAll();
 
   const actor = players.find(p => p.id === pendingAction.actorId);
   if (!actor) return;
@@ -244,6 +243,10 @@ export function passDoubt(
 
   const passer = players.find(p => p.id === playerId);
   if (!passer || pendingDoubtPassedIds.includes(playerId)) return;
+
+  /* Пустой клик таймер не трогает: после последнего «Верю» уже тикает пауза
+     до вето, и повтор той же кнопки иначе снимал бы её `clearAll`-ом. */
+  timerManager.clearAll();
 
   const passedIds = [...pendingDoubtPassedIds, playerId];
   set(state => ({
@@ -510,7 +513,11 @@ export function proceedAfterDoubtPassed(
     history: [`🂠 Действие «${action.roleClaim}» от ${state.players.find(p => p.id === action.actorId)?.name || 'игрока'} не оспорено двором (карта остаётся в руке).`, ...state.history].slice(0, 50)
   }));
 
-  get()._triggerVetoWindowOrResolveEffect(action, false);
+  /* Фаза ещё сомнение: окно вето перекрыло бы зелёные «Верю» в тот же кадр.
+     Пауза — чтобы ответ двора успел постоять, см. `DOUBT_HOLD_MS`. */
+  timerManager.scheduleDelay(() => {
+    get()._triggerVetoWindowOrResolveEffect(action, false);
+  }, DOUBT_HOLD_MS);
 }
 
 export function triggerVetoWindowOrResolveEffect(

@@ -6,15 +6,14 @@
  * движок в `opening`, и оффлайн, и все клиенты онлайн-стола читают одно поле.
  * Поэтому бросок, галочки и момент старта у всех одни.
  *
- * Скрим накрывает стол только на сборе двора — единственной стадии, которая
- * чего-то ждёт от игрока. Дальше он не нужен и мешает: жребий бросается уже
- * над открытым столом, карты летят по нему же, а фанфара ставит точку поверх
- * розданного. Прятать стол ровно в тот момент, когда его наконец собирают, —
- * это прятать то, ради чего всё и делалось.
+ * Экран сбора — непрозрачный: стол под ним ещё не для глаз, и просвет
+ * выдал бы полусобранный интерфейс. Занавес из Root накрывает меню тем же
+ * цветом, так что переход — это появление логотипа и списка, а не смена
+ * картинки. Когда двор собран, экран тает и открывает стол под монетку.
  *
  * Стол при этом ходов не принимает всё открытие целиком — заслонка стоит в
  * движке (`performAction`) и в воркере, а не на этом оверлее: онлайн-клиент
- * может прислать действие и мимо чужого скрима.
+ * может прислать действие и мимо чужого оверлея.
  */
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -25,6 +24,7 @@ import { useGameStore } from '@kinglier/engine/GameStore';
 import { TOSS_SPIN_MS, TOSS_VERDICT_MS } from '@kinglier/engine/timing';
 import type { OpeningData, Player } from '@kinglier/engine/types';
 import { Portrait } from './Portrait';
+import { Brand } from './Brand';
 import { designRect } from '../lib/uiScale.ts';
 
 /**
@@ -212,7 +212,7 @@ function useTableCenter(): { x: number; y: number } | null {
  * столбце у каждого своя строка: лицо и имя рядом, читается одним взглядом.
  *
  * Когда двор собран, оверлей уходит сам, не дожидаясь смены стадии: движок
- * держит паузу перед жребием (`tossAt`), и она же — время на то, чтобы скрим
+ * держит паузу перед жребием (`tossAt`), и она же — время на то, чтобы экран
  * растаял и открыл стол, над которым полетит монета.
  */
 const GatherOverlay: React.FC<{
@@ -247,27 +247,28 @@ const GatherOverlay: React.FC<{
 
   return createPortal(
     <motion.div
-      className="scrim gather"
+      className="gather"
       role="status"
       aria-live="polite"
-      initial={{ opacity: 0 }}
+      initial={false}
       /* Пауза отстояла — растворяемся, открывая стол под монетку. */
       animate={{ opacity: leaving ? 0 : 1 }}
       transition={{
-        duration: reduce ? 0.12 : leaving ? GATHER_FADE_MS / 1000 : 0.34,
+        duration: reduce ? 0.12 : leaving ? GATHER_FADE_MS / 1000 : 0,
         ease: EASE
       }}
       style={{ pointerEvents: gathered ? 'none' : 'auto' }}
     >
       <div className="gather__col">
         <div className="gather__head">
+          <Brand />
           <span className="gather__title">Двор собирается</span>
           <span className="gather__sub">
             {gathered
               ? 'Двор собран — бросаем жребий'
               : viewerReady
                 ? 'Ждём остальных'
-                : 'Отметьтесь, и будет брошен жребий'}
+                : 'Милорд, отметьтесь о прибытии'}
           </span>
         </div>
 
@@ -428,10 +429,10 @@ const TossOverlay: React.FC<{
                 reduce
                   ? { duration: 0 }
                   : {
-                      duration: flightS * FLIGHT.touchdownAt,
-                      ease: SPIN_EASE,
-                      times: SPIN_TIMES
-                    }
+                    duration: flightS * FLIGHT.touchdownAt,
+                    ease: SPIN_EASE,
+                    times: SPIN_TIMES
+                  }
               }
             >
               {/* Боковая грань: стопка одинаковых кругов, разнесённых по Z.
@@ -594,5 +595,9 @@ export const OpeningSequence: React.FC = () => {
          ходом, и на ней экран пуст: между «партия началась» и первым действием
          должен быть вдох, а не надпись. */
       return opening.holdUntil === null ? <Fanfare key={opening.id} /> : null;
+    default: {
+      const _exhaustive: never = opening.stage;
+      return _exhaustive;
+    }
   }
 };

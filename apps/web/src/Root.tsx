@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Globe, Swords, UserRoundPen } from 'lucide-react';
 import App from './App';
 import { Lobby } from './online/Lobby';
@@ -13,10 +14,14 @@ import type { GameRules } from '@kinglier/engine/rules';
 import { ProfileDialog } from './components/ProfileDialog';
 import { Brand } from './components/Brand';
 import { Button } from './components/ui/Button';
+import { dur } from './motion/tokens.ts';
 import './styles/screen.css';
 import './styles/rules.css';
 
 type Mode = 'menu' | 'offline' | 'online-lobby' | 'online-game';
+
+/** Занавес меню → стол. То же число, что `--dur-panel`: занавес рисует CSS. */
+const COVER_MS = dur.panel * 1000;
 
 export default function Root() {
   const [account, setAccount] = useState<Account | null | 'loading'>('loading');
@@ -27,6 +32,41 @@ export default function Root() {
   const [mode, setMode] = useState<Mode>(
     () => (new URLSearchParams(location.search).has('room') ? 'online-lobby' : 'menu')
   );
+  /* Непрозрачная шторка: сначала накрывает меню, под ней монтируется стол,
+     потом уходит. Без неё смена режима — резка на полусобранный стол. */
+  const [cover, setCover] = useState(false);
+  const coverTimer = useRef(0);
+  /* Повторный «lobby: PLAYING» не должен заново заводить занавес. */
+  const entering = useRef(false);
+
+  useEffect(() => () => window.clearTimeout(coverTimer.current), []);
+
+  /* Шторка уходит только после того, как стол смонтировался под ней:
+     иначе два rAF в том же тике, что setMode, снимут её ещё над меню. */
+  useEffect(() => {
+    if (!cover) return;
+    if (mode !== 'offline' && mode !== 'online-game') return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setCover(false));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [cover, mode]);
+
+  const enterGame = (next: 'offline' | 'online-game') => {
+    if (entering.current) return;
+    entering.current = true;
+    window.clearTimeout(coverTimer.current);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setMode(next);
+      return;
+    }
+    setCover(true);
+    coverTimer.current = window.setTimeout(() => setMode(next), COVER_MS);
+  };
 
   /*
    * Прогрев артов начинается вместе с приложением, а не с партией.
@@ -51,6 +91,9 @@ export default function Root() {
   }, []);
 
   const exitToMenu = () => {
+    entering.current = false;
+    window.clearTimeout(coverTimer.current);
+    setCover(false);
     onlineClient.leave();
     if (location.search) history.replaceState(null, '', location.pathname);
     setMode('menu');
@@ -131,8 +174,7 @@ export default function Root() {
             onClose={() => setRulesOpen(false)}
             onStart={rules => {
               setOfflineRules(rules);
-              setRulesOpen(false);
-              setMode('offline');
+              enterGame('offline');
             }}
           />
         </div>
@@ -145,12 +187,16 @@ export default function Root() {
         />
       ) : mode === 'online-lobby' ? (
         <Lobby
-          onGameStarted={() => setMode('online-game')}
+          onGameStarted={() => enterGame('online-game')}
           onExit={exitToMenu}
           autoJoinRoomId={autoJoinRoomId}
         />
       ) : (
         <App mode="online" account={account} onExit={exitToMenu} />
+      )}
+      {createPortal(
+        <div className={`gamecover${cover ? ' is-on' : ''}`} aria-hidden />,
+        document.body
       )}
     </>
   );

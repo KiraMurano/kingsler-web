@@ -180,7 +180,7 @@ const CATEGORY_DATA: Record<
 const CATEGORIES: CategoryKey[] = ['roles', 'plots', 'instants'];
 
 /** Насколько карта под курсором крупнее соседок. Одна цифра на весь веер. */
-const HOVER_SCALE = 1.1;
+const HOVER_SCALE = 1.16;
 
 type SlotAnimState = 'idle' | 'revealing' | 'waving';
 
@@ -256,7 +256,7 @@ const FanCard: React.FC<{
         '--rotate-deg': `${offset * 7.2}deg`,
         '--translate-x': `${offset * 116}px`,
         /* Квадратичный провис: крайние карты уходят вниз широкой дугой. */
-        '--translate-y': `${offset * offset * 5.2}px`,
+        '--translate-y': `${offset * offset * 8.4}px`,
         zIndex: hovered ? 60 : 10 + index
       } as React.CSSProperties}
       onPointerEnter={() => onHoverChange(card)}

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import type { GameCard, Player } from './types.ts';
 import { mintDeck } from './cardInstance.ts';
 import { useGameStore } from './GameStore.ts';
-import { ACTION_HOLD_MS } from './timing.ts';
+import { ACTION_HOLD_MS, DOUBT_HOLD_MS } from './timing.ts';
 
 function bot(id: string, hand: GameCard[]): Player {
   return {
@@ -98,6 +98,12 @@ assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW');
 useGameStore.getState().passDoubt('p1'); // заявивший: отбивается, окно не двигается
 assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW', 'the claimant does not answer their own claim');
 useGameStore.getState().passDoubt('b1');
+assert.equal(
+  useGameStore.getState().turnPhase,
+  'DOUBT_WINDOW',
+  'зелёные «Верю» ещё стоят — вето откроется после паузы'
+);
+await new Promise(resolve => setTimeout(resolve, DOUBT_HOLD_MS + 80));
 assert.equal(
   useGameStore.getState().turnPhase,
   'VETO_WINDOW',

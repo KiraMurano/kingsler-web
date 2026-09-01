@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { motion, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import { Crown, KeyRound, LogIn, Mail, ChevronDown, Sparkles } from 'lucide-react';
 import { Brand } from '../components/Brand';
 import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Overlay';
 import { CodeInput } from '../components/ui/CodeInput';
 import { CardFanShowcase } from '../components/CardFanShowcase';
+import { spring, tilt } from '../motion/tokens.ts';
+import { cardTilt } from '../lib/cardTilt.ts';
 import {
   requestMagicLink,
   verifyMagicCode,
@@ -50,6 +53,65 @@ const GAME_HIGHLIGHTS = [
     text: `Накопите ${DEFAULT_RULES.crownsToWin} корон Благосклонности и удержите их целый круг, отражая атаки соперников.`
   }
 ] as const;
+
+const HIGHLIGHT_SCALE = 1.05;
+
+function HighlightCard({ title, text, art }: (typeof GAME_HIGHLIGHTS)[number]) {
+  const reduce = !!useReducedMotion();
+  const tiltXTarget = useMotionValue(0);
+  const tiltYTarget = useMotionValue(0);
+  const tiltX = useSpring(tiltXTarget, spring.hover);
+  const tiltY = useSpring(tiltYTarget, spring.hover);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (hovered) return;
+    tiltXTarget.set(0);
+    tiltYTarget.set(0);
+  }, [hovered, tiltXTarget, tiltYTarget]);
+
+  const onPointerMove = (e: PointerEvent<HTMLElement>) => {
+    if (reduce || e.pointerType !== 'mouse') return;
+    const next = cardTilt(
+      e.currentTarget.getBoundingClientRect(),
+      e.clientX,
+      e.clientY,
+      tilt.pointerMax
+    );
+    tiltXTarget.set(next.x);
+    tiltYTarget.set(next.y);
+  };
+
+  return (
+    <div
+      className="landing-highlight-frame"
+      style={{ '--highlight-art': `url(${art})` } as CSSProperties}
+    >
+      <motion.article
+        className="landing-highlight"
+        style={{
+          rotateX: reduce ? 0 : tiltX,
+          rotateY: reduce ? 0 : tiltY,
+          transformStyle: 'preserve-3d'
+        }}
+        animate={{ scale: hovered && !reduce ? HIGHLIGHT_SCALE : 1 }}
+        transition={spring.hover}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => {
+          tiltXTarget.set(0);
+          tiltYTarget.set(0);
+          setHovered(false);
+        }}
+        onPointerMove={onPointerMove}
+      >
+        <div className="landing-highlight__body">
+          <strong>{title}</strong>
+          <span>{text}</span>
+        </div>
+      </motion.article>
+    </div>
+  );
+}
 
 export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) => void }) {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -178,17 +240,8 @@ export function LandingScreen({ onLoggedIn }: { onLoggedIn: (account: Account) =
 
           {/* 3 Core Highlights — illustrated chapters, not icon-in-a-box */}
           <div className="landing-highlights">
-            {GAME_HIGHLIGHTS.map(({ title, text, art }) => (
-              <article
-                className="landing-highlight"
-                key={title}
-                style={{ '--highlight-art': `url(${art})` } as React.CSSProperties}
-              >
-                <div className="landing-highlight__body">
-                  <strong>{title}</strong>
-                  <span>{text}</span>
-                </div>
-              </article>
+            {GAME_HIGHLIGHTS.map(item => (
+              <HighlightCard key={item.title} {...item} />
             ))}
           </div>
         </div>

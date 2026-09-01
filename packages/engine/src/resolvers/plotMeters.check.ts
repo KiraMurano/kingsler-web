@@ -18,7 +18,7 @@ import type { GameCard, Player } from '../types.ts';
 import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { INFORMANT_PAYOUTS, initialCharges } from './plotResolver.ts';
+import { INFORMANT_PAYOUTS, initialCharges, plotMeterShown } from './plotResolver.ts';
 
 function seat(id: string, hand: GameCard[], plot?: Player['activePlot']): Player {
   return {
@@ -80,6 +80,10 @@ const informant = (charges: number): Player['activePlot'] =>
   assert.equal(initialCharges('Сеть информаторов'), 0);
   assert.equal(initialCharges('Досье'), undefined, 'у остальных интриг счётчика нет');
   assert.equal(initialCharges('Королевский приём'), undefined);
+  assert.equal(plotMeterShown('Тайный заговор', 2), 2, 'Заговор показывает накопленное');
+  assert.equal(plotMeterShown('Сеть информаторов', 0), INFORMANT_PAYOUTS, 'Сеть на выкладке — полный запас');
+  assert.equal(plotMeterShown('Сеть информаторов', 1), INFORMANT_PAYOUTS - 1, 'и считает, сколько выплат ещё осталось');
+  assert.equal(plotMeterShown('Досье', 0), undefined);
 }
 
 /* --- 2. Своей проверкой Заговор не кормят. ------------------------------ */

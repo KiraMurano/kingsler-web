@@ -33,7 +33,10 @@ import { LobbyRulesDialog } from '../online/LobbyRulesDialog.tsx';
   assert.ok(html.includes('Корон для победы'), 'редактор правил внутри');
   assert.ok(html.includes('Начать игру'), 'кнопка старта на месте');
   assert.ok(html.includes('Загрузить настройки'), 'кнопка загрузки на месте');
-  assert.ok(html.includes('ruleswrap__foot'), 'кнопки собраны в один блок');
+  const startAt = html.indexOf('Начать игру');
+  const rulesAt = html.indexOf('Корон для победы');
+  assert.ok(startAt >= 0 && startAt < rulesAt, 'старт стоит над списком правил');
+  assert.ok(html.includes('ruleswrap__foot'), 'загрузка наборов в конце списка');
   /* Вложенного скроллера у списка правил нет: он обрезал содержимое по краю
      внутреннего отступа, с зазором от рамки. Крутится диалог целиком —
      `.overlay__body` со своим отступом внутри прокрутки. */

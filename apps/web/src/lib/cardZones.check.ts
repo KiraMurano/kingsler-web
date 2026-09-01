@@ -19,6 +19,7 @@ import type { PlacedCard, Zone } from '../motion/zones.ts';
 import type { Action, GameCard, Player } from '@kinglier/engine/types';
 import type { CardId, CardInstance } from '@kinglier/engine/cardInstance';
 import { mintDeck } from '@kinglier/engine/cardInstance';
+import { INFORMANT_PAYOUTS } from '@kinglier/engine/resolvers/plotResolver';
 
 /* ------------------------------------------------------------------ */
 /* Tiny state factory so the cases below stay readable.                */
@@ -1198,10 +1199,31 @@ function keyAt(placed: PlacedCard[], id: CardId, label: string): string {
   };
 
   /* Счётчик виден с первого кадра выкладки: карта уже в слоте, и цифра — часть
-     того, что на ней напечатано. */
+     того, что на ней напечатано. У Сети — сколько выплат ещё осталось. */
   assert.equal(meter('Тайный заговор'), 0, 'Заговор выкладывается с нулём зарядов');
-  assert.equal(meter('Сеть информаторов'), 0, 'Сеть — с нулём принесённых монет');
+  assert.equal(
+    meter('Сеть информаторов'),
+    INFORMANT_PAYOUTS,
+    'Сеть на выкладке показывает полный запас выплат'
+  );
   assert.equal(meter('Досье'), undefined, 'у остальных интриг счётчика нет вовсе');
+
+  const paid = deriveCardZones(
+    makeState({
+      players: [
+        player({
+          id: 'p1',
+          activePlot: { id: 'i', cardId: 'cSet', type: 'Сеть информаторов', charges: 1 }
+        })
+      ]
+    }),
+    'p1'
+  );
+  assert.equal(
+    at(paid, 'cSet', 'net-left').charges,
+    INFORMANT_PAYOUTS - 1,
+    'после выплаты счётчик Сети считает оставшееся, не принесённое'
+  );
 }
 
 /* A face that no rule can read is simply unknown, never invented. */

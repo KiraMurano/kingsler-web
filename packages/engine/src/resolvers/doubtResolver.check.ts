@@ -10,7 +10,7 @@ import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
 import { executeRevealOutcome } from './doubtResolver.ts';
 import { timerManager } from '../utils/timerManager.ts';
-import { ACTION_HOLD_MS } from '../timing.ts';
+import { ACTION_HOLD_MS, DOUBT_HOLD_MS } from '../timing.ts';
 import { DEFAULT_RULES } from '../rules.ts';
 import type { Coronation } from './coronation.ts';
 
@@ -96,6 +96,18 @@ assert.equal(useGameStore.getState().turnPhase, 'DOUBT_WINDOW', 'the claimant do
 /* В партии за бота это делает его собственный таймер (`handleDoubtPhase`);
    здесь движок ботов не поднят, поэтому отвечаем за него руками. */
 useGameStore.getState().passDoubt('b1');
+assert.equal(
+  useGameStore.getState().turnPhase,
+  'DOUBT_WINDOW',
+  'после последнего «Верю» двор ещё виден — вето подождёт паузу'
+);
+useGameStore.getState().passDoubt('b1');
+assert.equal(
+  useGameStore.getState().turnPhase,
+  'DOUBT_WINDOW',
+  'повтор того же «Верю» не снимает паузу до вето'
+);
+await new Promise(resolve => setTimeout(resolve, DOUBT_HOLD_MS + 80));
 assert.equal(
   useGameStore.getState().turnPhase,
   'VETO_WINDOW',

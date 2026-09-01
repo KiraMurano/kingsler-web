@@ -915,7 +915,8 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
                 'flip__face',
                 'flip__face--front',
                 showVerdict ? (verdict ? 'flip__face--truth' : 'flip__face--bluff') : '',
-                info ? `cardframe cardframe--${info.category}` : ''
+                info ? `cardframe cardframe--${info.category}` : '',
+                placed.charges !== undefined ? 'flip__face--metered' : ''
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -945,8 +946,8 @@ const LayerCard: React.FC<{ placed: PlacedCard; getBase: () => BaseSize }> = ({
               {placed.charges !== undefined && (
                 <span
                   className={`chargetag${
-                    /* У Сети это принесённые монеты, а не заряды: красная
-                       наклейка «сейчас рванёт» здесь врала бы. */
+                    /* У Сети это принесённые монеты, не угроза: капля крови
+                       «сейчас рванёт» здесь врала бы. */
                     placed.face.known === 'Сеть информаторов' ? ' chargetag--coin' : ''
                   }`}
                 >

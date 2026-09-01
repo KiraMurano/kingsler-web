@@ -238,21 +238,32 @@
   margin-top: 20px;
 }
 
+.landing-highlight-frame {
+  min-width: 0;
+  perspective: 900px;
+}
+
+.landing-highlight-frame:hover {
+  z-index: 2;
+}
+
 .landing-highlight {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   min-height: 292px;
+  height: 100%;
   padding: 22px 20px 20px;
   text-align: left;
   overflow: hidden;
   isolation: isolate;
+  will-change: transform;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line-cold);
   background: var(--ink-800);
   box-shadow: var(--shadow-card);
-  transition: transform 0.4s var(--ease-out), border-color 0.3s ease, box-shadow 0.4s ease;
+  transition: border-color 0.3s ease, box-shadow 0.4s ease;
 }
 
 .landing-highlight::before {
@@ -280,17 +291,25 @@
     rgba(8, 11, 18, 0.94) 76%,
     var(--ink-800) 100%
   );
+  transition: opacity 0.35s ease;
 }
 
-.landing-highlight:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 26px 50px rgba(0, 0, 0, 0.6);
-}
+@media (hover: hover) and (pointer: fine) {
+  .landing-highlight:hover {
+    border-color: rgba(232, 200, 119, 0.55);
+    box-shadow:
+      0 16px 36px rgba(0, 0, 0, 0.55),
+      0 0 22px rgba(200, 160, 74, 0.3);
+  }
 
-/* On hover, the art itself comes alive in full colour instead of showing an icon */
-.landing-highlight:hover::before {
-  transform: scale(1.12);
-  filter: saturate(1.15) brightness(0.92);
+  .landing-highlight:hover::before {
+    transform: scale(1.12);
+    filter: saturate(1.22) brightness(1.04);
+  }
+
+  .landing-highlight:hover::after {
+    opacity: 0.72;
+  }
 }
 
 .landing-highlight__body {
@@ -652,7 +671,7 @@
 
 /* Inspector positioned lower so it's never covered by the cards */
 .fan-inspector {
-  margin-top: 32px;
+  margin-top: 44px;
   min-height: 52px;
   display: flex;
   align-items: center;
@@ -921,6 +940,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .landing-highlight::before {
+    transition: filter 0.3s ease;
+  }
+
+  .landing-highlight:hover::before {
+    transform: scale(1.06);
+  }
+
   .codeinput__caret {
     animation: none;
   }

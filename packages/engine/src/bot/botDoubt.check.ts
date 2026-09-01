@@ -18,7 +18,7 @@ import type { GameCard, Player } from '../types.ts';
 import { mintDeck } from '../cardInstance.ts';
 import { useGameStore } from '../GameStore.ts';
 import { startBotEngine, stopBotEngine } from '../Bot.ts';
-import { BOT_REACTION_MS, BOT_REACTION_JITTER_MS } from '../timing.ts';
+import { BOT_REACTION_MS, BOT_REACTION_JITTER_MS, DOUBT_HOLD_MS } from '../timing.ts';
 
 function seat(id: string, isBot: boolean, hand: GameCard[], tokens = 2): Player {
   return {
@@ -114,10 +114,20 @@ try {
 
     // Живой наблюдатель отвечает последним, и только теперь двор опрошен.
     useGameStore.getState().passDoubt('p2');
-    assert.notEqual(
+    assert.equal(
       useGameStore.getState().turnPhase,
       'DOUBT_WINDOW',
+      'последний ответ закрывает опрос, но вето ждёт паузу — зелёные «Верю» ещё стоят'
+    );
+    assert.ok(
+      useGameStore.getState().pendingDoubtPassedIds.includes('p2'),
       'the last answer must settle the court'
+    );
+    await new Promise(resolve => setTimeout(resolve, DOUBT_HOLD_MS + 80));
+    assert.equal(
+      useGameStore.getState().turnPhase,
+      'VETO_WINDOW',
+      'после паузы открывается окно вето'
     );
   }
 

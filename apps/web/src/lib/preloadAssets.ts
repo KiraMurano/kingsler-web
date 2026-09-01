@@ -39,6 +39,7 @@ const FIXED = [
   '/assets/ui/thumbsup-500.webp',
   '/assets/ui/coin-500.webp',
   '/assets/ui/coin-side-500.webp',
+  '/assets/ui/blood-drop.webp',
   /* Пушки салюта. Греются вместе со всем: они выкатываются рывком за секунду
      до выстрела, и подгружаться в этот момент им уже поздно. */
   '/assets/ui/cannon-500.webp'

@@ -1,6 +1,16 @@
 /** Pause so a tabled action can be read before the next beat. */
 export const ACTION_HOLD_MS = 2200;
 
+/**
+ * Пауза после того, как двор сказал «Верю», и до окна вето.
+ *
+ * Опрос закрывается в тот же миг, когда ответил последний, — и без этой паузы
+ * зелёные метки не успевают постоять: окно вето сразу перекрывает их своим
+ * опросом. Две секунды — чтобы три «Верю» прочитались как ответ двора, а не
+ * как вспышка перед следующей панелью.
+ */
+export const DOUBT_HOLD_MS = 2000;
+
 /** Bot thinking before taking their own turn action. */
 export const BOT_MOVE_MS = 1600;
 export const BOT_MOVE_JITTER_MS = 700;
